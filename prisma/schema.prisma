@@ -1,0 +1,296 @@
+// Sorted — Prisma schema
+// Source of truth: HANDOFF.md §4 (skeleton) and §9 (money-integrity rules).
+// If code ever contradicts HANDOFF.md §3/§5/§9, HANDOFF.md wins.
+//
+// Money-integrity rules enforced by this schema:
+//   - all money fields are BigInt kobo — never Float, never Int (Int is
+//     32-bit and can't safely hold large naira amounts converted to kobo).
+//   - LedgerEntry has no updatedAt and application code must never issue an
+//     UPDATE or DELETE against it — append-only is enforced by convention
+//     and code review, not by a DB trigger, in v1.
+//   - LedgerEntry.eventId is unique -> replayed webhooks are idempotent.
+//   - Criterion.locked and Gig.status are flipped only by server-side logic
+//     that checks an allowed-transition map (see gigs.service.ts) — never a
+//     raw client-writable field.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity (§3.1)
+// ---------------------------------------------------------------------------
+
+enum KycStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  phone               String   @unique
+  name                String?
+  roleFlags           String[] // e.g. ["payer","solver"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
+  kycStatus           KycStatus @default(unverified)
+  identityRef         String? // SEAM (§3.1): opaque ref into whichever IdentityVerifier produced kycStatus
+  monnifyCustomerRef  String?
+  payoutBankCode      String?
+  payoutAccountNumber String?
+  payoutAccountName   String?
+  createdAt           DateTime @default(now())
+
+  gigsAsPayer     Gig[]      @relation("PayerGigs")
+  claims          Claim[]
+  disputesRaised  Dispute[]  @relation("DisputeRaisedBy")
+  disputesRuled   Dispute[]  @relation("DisputeNeutral")
+  gigTemplates    GigTemplate[]
+}
+
+// ---------------------------------------------------------------------------
+// Taxonomy (§3.2 SEAM — TAXONOMY): domain/submarket/payer_type are data,
+// not enums hardcoded in logic. Growth is a seed-table insert, not a deploy.
+// ---------------------------------------------------------------------------
+
+model Domain {
+  id    String @id @default(cuid())
+  key   String @unique // e.g. "physical" | "digital"
+  label String
+
+  submarkets Submarket[]
+  gigs       Gig[]
+}
+
+model Submarket {
+  id       String  @id @default(cuid())
+  key      String  @unique
+  label    String
+  domainId String?
+  domain   Domain? @relation(fields: [domainId], references: [id])
+
+  gigs Gig[]
+}
+
+model PayerTypeRef {
+  id    String @id @default(cuid())
+  key   String @unique // e.g. "individual" | "corporate" | "ngo" | "government"
+  label String
+
+  gigs Gig[]
+}
+
+// ---------------------------------------------------------------------------
+// Gigs (§3.2)
+// ---------------------------------------------------------------------------
+
+enum GigSource {
+  self_posted // SEAM (§3.2 INTAKE): the only source in v1; future feeders add values here, never branch logic elsewhere
+}
+
+enum MaterialsMode {
+  bounty_covers
+  solver_supplies
+}
+
+enum GigStatus {
+  draft
+  escrow_pending
+  open
+  claimed
+  in_progress
+  submitted
+  signed_off
+  disputed
+  released
+  refunded
+  cancelled
+}
+
+model GigTemplate {
+  id         String   @id @default(cuid())
+  payerId    String
+  payer      User     @relation(fields: [payerId], references: [id])
+  spec       Json
+  recurrence Json? // SEAM (§3.2 RECURRENCE): unused in v1 — generate instances from this later
+  createdAt  DateTime @default(now())
+
+  gigs Gig[]
+}
+
+model Gig {
+  id          String   @id @default(cuid())
+  payerId     String
+  payer       User     @relation("PayerGigs", fields: [payerId], references: [id])
+  source      GigSource @default(self_posted)
+  templateId  String? // SEAM (§3.2 RECURRENCE): nullable, always null in v1
+  template    GigTemplate? @relation(fields: [templateId], references: [id])
+
+  title       String
+  description String
+
+  domainId     String
+  domain       Domain       @relation(fields: [domainId], references: [id])
+  submarketId  String
+  submarket    Submarket    @relation(fields: [submarketId], references: [id])
+  payerTypeId  String
+  payerType    PayerTypeRef @relation(fields: [payerTypeId], references: [id])
+
+  locationText   String
+  locationGeoLat Float?
+  locationGeoLng Float?
+
+  materialsMode MaterialsMode
+  bountyKobo    BigInt // ★ money — integer kobo, never float
+
+  status           GigStatus @default(draft)
+  matchingStrategy String    @default("fixed_price_accept") // SEAM (§3.3): key into MatchingStrategy registry
+
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+
+  criteria      Criterion[]
+  claims        Claim[]
+  escrow        EscrowRecord?
+  disputes      Dispute[]
+  ledgerEntries LedgerEntry[]
+}
+
+model Criterion {
+  id                    String  @id @default(cuid())
+  gigId                 String
+  gig                   Gig     @relation(fields: [gigId], references: [id])
+  orderIndex            Int
+  text                  String
+  locked                Boolean @default(false) // ★ true at publish, immutable thereafter — server-enforced
+  verificationStrategy  String  @default("payer_signoff") // SEAM (§3.6): key into VerificationStrategy registry, settable per criterion
+  proofUrl              String?
+  met                   Boolean?
+}
+
+// ---------------------------------------------------------------------------
+// Matching (§3.3) — no persisted state of its own; strategy key lives on Gig.
+// ---------------------------------------------------------------------------
+
+enum ClaimStatus {
+  pending
+  active
+  withdrawn
+  completed
+}
+
+model Claim {
+  id        String      @id @default(cuid())
+  gigId     String
+  gig       Gig         @relation(fields: [gigId], references: [id])
+  solverId  String
+  solver    User        @relation(fields: [solverId], references: [id])
+  staked    Boolean     @default(false)
+  status    ClaimStatus @default(pending)
+  claimedAt DateTime    @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Escrow (§3.5, §5) ★ — the money core
+// ---------------------------------------------------------------------------
+
+enum EscrowState {
+  awaiting_funding
+  funded
+  stake_held
+  releasing
+  released
+  refunded
+  dispute_hold // while set: no release is possible, enforced in EscrowService
+}
+
+model EscrowRecord {
+  id                 String      @id @default(cuid())
+  gigId              String      @unique
+  gig                Gig         @relation(fields: [gigId], references: [id])
+  provider           String      @default("monnify") // SEAM (§3.4): PaymentsProvider key
+  holdingAccountRef  String?
+
+  bountyKobo         BigInt // ★
+  stakeKobo          BigInt      @default(0) // ★
+  stakeHeld          Boolean     @default(false)
+
+  platformFeeBps     Int // ★ config PER GIG (1000=10%, 500=launch rate) — never a constant
+  feeKobo            BigInt? // ★
+  solverPayoutKobo   BigInt? // ★
+
+  state              EscrowState @default(awaiting_funding)
+  disbursementRef    String? // idempotency key for disbursement — double-release protection
+
+  stateChangedAt     DateTime    @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Disputes (§3.7)
+// ---------------------------------------------------------------------------
+
+enum DisputeRuling {
+  for_solver
+  for_payer
+  split
+}
+
+enum DisputeStatus {
+  open
+  assigned
+  ruled
+  closed
+}
+
+model Dispute {
+  id          String         @id @default(cuid())
+  gigId       String
+  gig         Gig            @relation(fields: [gigId], references: [id])
+  raisedById  String
+  raisedBy    User           @relation("DisputeRaisedBy", fields: [raisedById], references: [id])
+  reason      String
+  neutralId   String?
+  neutral     User?          @relation("DisputeNeutral", fields: [neutralId], references: [id])
+  ruling      DisputeRuling?
+  penaltyKobo BigInt?
+  status      DisputeStatus  @default(open)
+  createdAt   DateTime       @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Ledger (§3.8) ★ — append-only, never update/delete
+// ---------------------------------------------------------------------------
+
+enum LedgerEntryType {
+  fund
+  stake
+  release
+  refund
+  fee
+  penalty
+  payout
+}
+
+enum LedgerDirection {
+  in
+  out
+}
+
+model LedgerEntry {
+  id          String          @id @default(cuid())
+  gigId       String
+  gig         Gig             @relation(fields: [gigId], references: [id])
+  type        LedgerEntryType
+  amountKobo  BigInt // ★
+  direction   LedgerDirection
+  providerRef String
+  eventId     String          @unique // ★ idempotency — replayed webhook is a no-op, never a duplicate row
+  createdAt   DateTime        @default(now())
+
+  // No updatedAt field on purpose: this row is never updated after insert.
+}
