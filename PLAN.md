@@ -165,7 +165,7 @@ team to confirm mockup numbers against `SPEC.md` when available).
 
 ---
 
-## Slice 3 — Gigs + intake seam
+## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to
 `FixedPriceAccept` behind the interface (mockups 02–05 per HANDOFF.md §7).
@@ -214,6 +214,34 @@ numbers as given in the handoff; not independently verified against
 `PaymentsProvider`/Monnify, or `LedgerService.record()` beyond the stub —
 those are slice 4 and require the "first money slice — supervise" review
 gate per HANDOFF.md §7/§9.
+
+**Implementation notes:**
+- `domain`/`submarket`/`payerType` on `CreateGigInput` are taxonomy
+  **keys** (e.g. `"plumbing"`, not a cuid) — `GigsService.createGig`
+  resolves them to IDs and 400s on an unknown key. Matches how
+  `GET /taxonomy/submarkets` returns them.
+- `payerId` is never trusted from the request body — `GigsController`
+  takes it from the verified JWT (`@CurrentUser()`), so a client can't
+  post a gig as someone else by editing JSON.
+- `createGig` calls `IdentityService.assertRole(payerId, 'payer')` before
+  anything else — the cross-module call `IdentityPort.assertRole` exists
+  for exactly this.
+- Extracted `common/auth/` (`AuthModule`, `JwtAuthGuard`,
+  `@CurrentUser()`) out of the Identity module folder, where slice 2 had
+  put it. Every module with auth'd routes needs the guard, not just
+  Identity, and the guard has no business-state dependency, so it belongs
+  next to `PrismaModule` as shared infra rather than being imported
+  cross-module from inside Identity's folder. `GigsModule` imports
+  `AuthModule` directly (not transitively through `IdentityModule`) for
+  the same reason: it needs the guard itself, not Identity's business
+  logic.
+- The full `Gig.status` allowed-transition map (§9) is written now, even
+  though most target states aren't reachable yet (their owning slice
+  isn't built) — so slices 4–8 call `transitionStatus()` against an
+  already-reviewed rule instead of each inventing its own check.
+
+**Still open:** `listGigs` stays a stub (slice 5). No migration has run
+against a live database — see the note at the top of this file.
 
 ---
 

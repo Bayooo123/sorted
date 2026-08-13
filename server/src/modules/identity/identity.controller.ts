@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { IdentityService } from './identity.service';
-import { AuthenticatedUser, JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CurrentUser } from './decorators/current-user.decorator';
+import { AuthenticatedUser, JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteRoleProfileDto } from './dto/complete-role-profile.dto';
