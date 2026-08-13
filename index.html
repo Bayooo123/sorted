@@ -7,6 +7,13 @@
 <meta name="description" content="Sorted is an escrow-protected marketplace for getting real-world jobs done. Post a gig, fund it in escrow, pay only when it's verified done." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="alternate icon" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#027A61" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Sorted" />
 <style>
   :root {
     --green-primary:#027A61;
@@ -233,6 +240,7 @@
   }
 
   .form-note[data-state="sent"] { color: var(--green-primary); font-weight: 600; }
+  .form-note[data-state="error"] { color: #B3261E; font-weight: 600; }
 
   /* ---------- hero visual: escrow card ---------- */
 
@@ -570,6 +578,80 @@
     font-size: 13px;
     color: var(--text-muted);
   }
+
+  /* ---------- install banner ---------- */
+
+  #install-banner {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--text-primary);
+    color: #fff;
+    border-radius: 14px;
+    padding: 14px 14px 14px 16px;
+    box-shadow: 0 12px 32px -8px rgba(12,31,27,0.4);
+    transform: translateY(120%);
+    opacity: 0;
+    transition: transform .25s ease, opacity .25s ease;
+    pointer-events: none;
+  }
+
+  #install-banner.visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #install-banner .ib-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    flex: none;
+  }
+
+  #install-banner .ib-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  #install-banner .ib-title {
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  #install-banner .ib-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.65);
+    margin-top: 1px;
+  }
+
+  #install-banner button {
+    flex: none;
+    border: none;
+    border-radius: 9px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #install-banner .ib-install {
+    background: var(--green-bright);
+    color: var(--text-primary);
+  }
+
+  #install-banner .ib-dismiss {
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    padding: 9px 8px;
+  }
 </style>
 </head>
 <body>
@@ -735,19 +817,138 @@
   </div>
 </footer>
 
+<div id="install-banner" role="dialog" aria-label="Install Sorted">
+  <svg class="ib-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect width="28" height="28" rx="8" fill="#C8FFF6"/>
+    <path d="M8 14.5L12 18.5L20 9.5" stroke="#027A61" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="ib-copy">
+    <div class="ib-title" id="install-banner-title">Install Sorted</div>
+    <div class="ib-sub" id="install-banner-sub">Add it to your home screen for one-tap access.</div>
+  </div>
+  <button class="ib-install" id="install-banner-action" type="button">Install</button>
+  <button class="ib-dismiss" id="install-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>
+</div>
+
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 
-  // Client-side only placeholder — no signup endpoint exists yet.
-  // Wire this to a real endpoint (e.g. a waitlist table via the Identity
-  // or a standalone marketing service) before relying on it to capture leads.
+  // Waitlist signups go straight to a dedicated Supabase project
+  // (project "sorted", table public.waitlist) via PostgREST. The key below
+  // is a publishable/anon key — safe to expose client-side by design.
+  // Row Level Security on the table allows INSERT only, for anyone; there
+  // is no SELECT policy, so this key cannot be used to read the list back.
+  var SUPABASE_URL = 'https://mnlrixtrqwrdypzyepby.supabase.co';
+  var SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_9u2JEhg3ZUs84BHT4pHrwA_Sk-LpFmG';
+
   document.getElementById('waitlist-form').addEventListener('submit', function (e) {
     e.preventDefault();
+    var form = this;
+    var emailInput = document.getElementById('waitlist-email');
     var note = document.getElementById('waitlist-note');
-    note.textContent = "Thanks — we'll let you know.";
-    note.dataset.state = 'sent';
-    this.reset();
+    var button = form.querySelector('button[type="submit"]');
+    var email = emailInput.value.trim();
+
+    button.disabled = true;
+    note.textContent = 'Adding you…';
+    note.dataset.state = '';
+
+    fetch(SUPABASE_URL + '/rest/v1/waitlist', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_PUBLISHABLE_KEY,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ email: email, source: 'landing_pwa' }),
+    })
+      .then(function (res) {
+        // 201 = inserted. 409 = unique violation, i.e. already on the
+        // list — treat that as success too, not an error.
+        if (res.ok || res.status === 409) {
+          note.textContent = "Thanks — we'll let you know.";
+          note.dataset.state = 'sent';
+          form.reset();
+        } else {
+          throw new Error('Request failed: ' + res.status);
+        }
+      })
+      .catch(function () {
+        note.textContent = "Something went wrong — try again in a moment.";
+        note.dataset.state = 'error';
+      })
+      .finally(function () {
+        button.disabled = false;
+      });
   });
+
+  // ---------- service worker ----------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+
+  // ---------- install banner ----------
+  (function () {
+    var DISMISS_KEY = 'sorted-install-dismissed';
+    var banner = document.getElementById('install-banner');
+    var installBtn = document.getElementById('install-banner-action');
+    var dismissBtn = document.getElementById('install-banner-dismiss');
+    var subEl = document.getElementById('install-banner-sub');
+    var deferredPrompt = null;
+
+    function alreadyInstalled() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+
+    function wasDismissed() {
+      try { return localStorage.getItem(DISMISS_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    function dismiss() {
+      banner.classList.remove('visible');
+      try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
+    }
+
+    dismissBtn.addEventListener('click', dismiss);
+
+    if (alreadyInstalled() || wasDismissed()) {
+      // nothing to do — already installed, or user said no already
+    } else {
+      // Chrome/Edge/Android: real install prompt via beforeinstallprompt
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.classList.add('visible');
+      });
+
+      installBtn.addEventListener('click', function () {
+        if (!deferredPrompt) { dismiss(); return; }
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.finally(function () {
+          deferredPrompt = null;
+          banner.classList.remove('visible');
+        });
+      });
+
+      // iOS Safari never fires beforeinstallprompt — show manual instructions instead.
+      var isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+      if (isIos && !alreadyInstalled()) {
+        subEl.textContent = 'Tap the Share icon, then "Add to Home Screen."';
+        installBtn.style.display = 'none';
+        banner.classList.add('visible');
+      }
+    }
+
+    window.addEventListener('appinstalled', function () {
+      banner.classList.remove('visible');
+      try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
+    });
+  })();
 </script>
 
 </body>
