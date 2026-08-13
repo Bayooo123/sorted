@@ -1,6 +1,18 @@
 # Sorted
 
-Escrowed gig marketplace — modular monolith (NestJS + TypeScript + Prisma/Postgres).
+This repo has two independent deployables, split at the top level so each
+can deploy with its platform's zero-config defaults — no dashboard
+overrides needed on either side:
+
+- **`/` (repo root)** — the marketing/waitlist landing page. Plain static
+  HTML (`index.html`), no build step, no `package.json` at this level.
+  Vercel's default project settings (Root Directory = `/`) serve it as-is.
+  This is what fixes the `404: DEPLOYMENT_NOT_FOUND` the "sorted" Vercel
+  project was returning — that project had nothing to deploy because the
+  whole repo was empty.
+- **`server/`** — the NestJS + Prisma API described in `HANDOFF.md`. Per
+  `HANDOFF.md` §2 this deploys to Railway/Render, not Vercel; when that's
+  set up, point that service's root directory at `server/`.
 
 Start here:
 - [`HANDOFF.md`](./HANDOFF.md) — the CTO handoff: architecture decision, the
@@ -8,27 +20,29 @@ Start here:
 - [`PLAN.md`](./PLAN.md) — endpoints/interfaces/screens plan for slices 1–3,
   written per `HANDOFF.md` §10. Stop-for-review point before any
   Payments/Escrow logic.
-- [`web/`](./web) — the marketing/waitlist landing page. See
-  [`web/README.md`](./web/README.md) for why this is a separate folder and
-  how to point Vercel at it.
 
-## Status
+## Landing page
 
-Skeleton only: nine Nest modules (`src/modules/*`), each exposing just its
-documented interface as typed stubs, plus the full Prisma schema
-(`prisma/schema.prisma`). No business logic, no HTTP routes, no migration
-run yet. `npx nest build` and `npx prisma validate` both pass.
+`index.html` at the repo root. No dependencies, no build. Edit it directly.
+The waitlist form is client-side only right now — see the comment in its
+`<script>` tag; it isn't wired to a real signup endpoint yet.
 
-## Getting started
+## API
 
 ```bash
+cd server
 npm install
 cp .env.example .env       # fill in DATABASE_URL at minimum
 npx prisma generate
 npx nest start --watch
 ```
 
-## Module map
+Skeleton only: nine Nest modules (`server/src/modules/*`), each exposing
+just its documented interface as typed stubs, plus the full Prisma schema
+(`server/prisma/schema.prisma`). No business logic, no HTTP routes, no
+migration run yet. `npx nest build` and `npx prisma validate` both pass.
+
+### Module map
 
 | Module | Owns | Interface | Seam |
 |---|---|---|---|
