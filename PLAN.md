@@ -5,10 +5,17 @@ endpoints, module interfaces, and the screens they back"). No Payments or
 Escrow logic (§5) is implemented until this plan is approved — slice 4 is
 out of scope here.
 
-Status of this repo right now: module skeleton (nine Nest modules, stub
-methods only) and the full Prisma schema from §4 are in place and build
-clean (`npx nest build` succeeds, `npx prisma validate` succeeds). Nothing
-below is implemented yet.
+Status of this repo right now: module skeleton (nine Nest modules) and the
+full Prisma schema from §4 are in place. **Slice 2 (Identity: OTP auth,
+JWT, role-profile registration) is implemented for real** — see its
+section below for what that covers and what's still open. Slices 3+ are
+still stub methods only. `npx nest build` and `npx prisma validate` both
+pass.
+
+No migration has been run against a live database yet — schema changes
+are written and validated, not applied. Whoever sets `DATABASE_URL`
+(Postgres-compatible) needs to run `npx prisma migrate dev` and
+`npm run prisma:seed` before slice 2 actually works end-to-end.
 
 ---
 
@@ -101,30 +108,60 @@ roles-vs-lists rule above and writes `User.roleFlags` plus both join
 tables' rows in one transaction, so a solver-flagged user can never exist
 with zero offerings.
 
-**Endpoints (all in an `IdentityController`, module stays HTTP-free
-otherwise per the "modules talk through interfaces" rule — the controller
-is the only thing that touches Express/Nest HTTP primitives):**
+**Endpoints — IMPLEMENTED (all in `IdentityController`, module stays
+HTTP-free otherwise per the "modules talk through interfaces" rule — the
+controller is the only thing that touches Express/Nest HTTP primitives):**
 ```
 POST /auth/otp/request     { phone }                    -> { requestId }
 POST /auth/otp/verify      { requestId, code }           -> { accessToken, user }
 GET  /me                   (auth'd)                      -> IdentityUser
-PATCH /me/payout-destination (auth'd) { bankCode, accountNumber } -> PayoutDestination
+PATCH /me/payout-destination (auth'd) { bankCode, accountNumber, accountName } -> PayoutDestination
 POST /me/role-profile       (auth'd) CompleteRoleProfileInput -> IdentityUser
 GET  /taxonomy/submarkets                                -> Submarket[]  (populate the picker)
+GET  /taxonomy/domains                                   -> Domain[]
 ```
 
 `POST /me/role-profile` is registration step 2, called right after OTP
 verification succeeds and before the account is usable — the client
-should treat a user with no completed role profile as still mid-signup,
-not as a fully registered account.
+should treat a user with `roles: []` (empty) as still mid-signup, not as a
+fully registered account. `GET /me` returns that empty-roles state as-is,
+by design — it's the client's signal to route back into onboarding.
+
+Implementation notes:
+- OTP codes: 6 digits, scrypt-hashed (Node built-in, no new dependency —
+  raw code is never stored), `OTP_TOKEN_TTL_SECONDS` expiry,
+  `OTP_MAX_ATTEMPTS` guess limit per request. First OTP request for a
+  phone number upserts a bare `User` row (`roleFlags: []`).
+- JWT via `@nestjs/jwt`, `JWT_SECRET`/`JWT_EXPIRES_IN` in `.env.example`.
+  `JwtAuthGuard` + `@CurrentUser()` decorator gate the auth'd routes.
+- SMS via Africa's Talking (`NotificationsService`, real implementation —
+  see `server/.env.example` for `AFRICASTALKING_*` vars). Fixed a real
+  module-boundary issue while wiring this: `NotificationsPort.notify()`
+  used to take just a `userId`, which would force Notifications to look up
+  the phone number itself — either reading Identity's `User` table
+  directly (forbidden by §9) or importing IdentityModule and creating a
+  circular dependency (Identity already imports Notifications to send
+  OTPs). Fixed by having the caller pass the phone in (`NotifyTarget`),
+  since Identity already has it.
+- `npm run prisma:seed` populates `Domain`/`Submarket`/`PayerTypeRef` with
+  a starting taxonomy (10 physical + 10 digital submarkets, 4 payer
+  types) — a starting set, not final; adding more is a seed re-run, not a
+  deploy, per the TAXONOMY seam.
+
+**Not implemented / explicitly deferred:**
+- `IdentityVerifier` strategy / `verifyIdentity()` body — slice 9 (KYC
+  gate), gating payouts only.
+- Rate limiting on `/auth/otp/request` beyond the per-request attempt cap
+  — nothing currently stops someone spamming OTP requests at a phone
+  number. Worth a guard (e.g. max N requests per phone per hour) before
+  this is exposed to real traffic at any volume, not just a demo.
+- No migration has been run against a real database — see the note at the
+  top of this file.
 
 **Screens backed:** onboarding / phone entry / OTP verification / account
 type + category picker screens (not numbered in the mockup list available
 to this session — `/screens` wasn't part of this upload; Jude/founding
 team to confirm mockup numbers against `SPEC.md` when available).
-
-**Out of scope for this slice:** KYC verification itself (`IdentityVerifier`
-strategy, `verifyIdentity` body) — that's slice 9, gating payouts only.
 
 ---
 

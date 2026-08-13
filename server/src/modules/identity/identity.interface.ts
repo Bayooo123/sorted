@@ -58,6 +58,15 @@ export interface IdentityVerifier {
   verify(userId: string, input: unknown): Promise<KycStatus>;
 }
 
+export interface OtpRequestResult {
+  requestId: string;
+}
+
+export interface OtpVerifyResult {
+  accessToken: string;
+  user: IdentityUser;
+}
+
 /** The only surface other modules may call into Identity through. */
 export interface IdentityPort {
   getUser(userId: string): Promise<IdentityUser>;
@@ -72,3 +81,11 @@ export interface IdentityPort {
    */
   completeRoleProfile(userId: string, input: CompleteRoleProfileInput): Promise<IdentityUser>;
 }
+
+/**
+ * requestOtp / verifyOtp / setPayoutDestination are NOT on IdentityPort —
+ * they're triggered by HTTP (IdentityController), not called by other
+ * modules. IdentityPort is specifically "what other modules may call";
+ * these live as plain methods on IdentityService instead. Kept here as
+ * named types so the controller and service share one definition.
+ */

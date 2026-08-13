@@ -1,52 +1,240 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { randomBytes, randomInt, scryptSync, timingSafeEqual } from 'crypto';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  NotImplementedException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
   CompleteRoleProfileInput,
   IdentityPort,
   IdentityUser,
   KycStatus,
+  OtpRequestResult,
+  OtpVerifyResult,
   PayoutDestination,
   Role,
 } from './identity.interface';
 
-/**
- * Skeleton only — slice 2 in HANDOFF.md §7 implements this body (phone+OTP,
- * roles). Every method below is the module's full public surface; nothing
- * else is exported.
- */
+const OTP_CODE_DIGITS = 6;
+const SCRYPT_KEY_LENGTH = 64;
+
 @Injectable()
 export class IdentityService implements IdentityPort {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly jwt: JwtService,
+    @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
+  ) {}
 
-  getUser(_userId: string): Promise<IdentityUser> {
-    throw new NotImplementedException('IdentityService.getUser — slice 2');
+  // ---------------------------------------------------------------------
+  // Phone + OTP auth (not on IdentityPort — HTTP-triggered, see the note
+  // at the bottom of identity.interface.ts)
+  // ---------------------------------------------------------------------
+
+  async requestOtp(phone: string): Promise<OtpRequestResult> {
+    // Upsert so a first-time phone number gets a bare account (empty
+    // roleFlags — registration step 2, completeRoleProfile, fills that in)
+    // and a returning phone number just reuses its existing row.
+    const user = await this.prisma.user.upsert({
+      where: { phone },
+      create: { phone, roleFlags: [] },
+      update: {},
+    });
+
+    const code = randomInt(0, 10 ** OTP_CODE_DIGITS).toString().padStart(OTP_CODE_DIGITS, '0');
+    const salt = randomBytes(16).toString('hex');
+    const codeHash = this.hashOtpCode(code, salt);
+    const ttlSeconds = Number(this.config.get('OTP_TOKEN_TTL_SECONDS') ?? 300);
+
+    const otpRequest = await this.prisma.otpRequest.create({
+      data: {
+        phone,
+        codeHash,
+        salt,
+        expiresAt: new Date(Date.now() + ttlSeconds * 1000),
+      },
+    });
+
+    await this.notifications.notify({ userId: user.id, phone }, { kind: 'otp', code });
+
+    return { requestId: otpRequest.id };
+  }
+
+  async verifyOtp(requestId: string, code: string): Promise<OtpVerifyResult> {
+    const otpRequest = await this.prisma.otpRequest.findUnique({ where: { id: requestId } });
+    if (!otpRequest) throw new NotFoundException('OTP request not found');
+    if (otpRequest.consumedAt) throw new BadRequestException('OTP already used');
+    if (otpRequest.expiresAt.getTime() < Date.now()) throw new BadRequestException('OTP expired');
+
+    const maxAttempts = Number(this.config.get('OTP_MAX_ATTEMPTS') ?? 5);
+    if (otpRequest.attempts >= maxAttempts) {
+      throw new BadRequestException('Too many incorrect attempts — request a new OTP');
+    }
+
+    const isMatch = this.verifyOtpCode(code, otpRequest.salt, otpRequest.codeHash);
+    if (!isMatch) {
+      await this.prisma.otpRequest.update({
+        where: { id: requestId },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException('Incorrect code');
+    }
+
+    await this.prisma.otpRequest.update({
+      where: { id: requestId },
+      data: { consumedAt: new Date() },
+    });
+
+    const user = await this.prisma.user.findUnique({ where: { phone: otpRequest.phone } });
+    if (!user) throw new NotFoundException('Account no longer exists for this phone number');
+
+    const accessToken = await this.jwt.signAsync({ sub: user.id, phone: user.phone });
+    return { accessToken, user: await this.getUser(user.id) };
+  }
+
+  // ---------------------------------------------------------------------
+  // IdentityPort — the cross-module interface
+  // ---------------------------------------------------------------------
+
+  async getUser(userId: string): Promise<IdentityUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { serviceOfferings: true, seekingCategories: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    return {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      roles: user.roleFlags as Role[],
+      kycStatus: user.kycStatus as KycStatus,
+      serviceOfferingSubmarketIds: user.serviceOfferings.map((o) => o.submarketId),
+      seekingCategorySubmarketIds: user.seekingCategories.map((c) => c.submarketId),
+    };
   }
 
   verifyIdentity(_userId: string, _input: unknown): Promise<KycStatus> {
     throw new NotImplementedException('IdentityService.verifyIdentity — slice 9 (KYC gate)');
   }
 
-  getPayoutDestination(_userId: string): Promise<PayoutDestination | null> {
-    throw new NotImplementedException('IdentityService.getPayoutDestination — slice 2');
+  async getPayoutDestination(userId: string): Promise<PayoutDestination | null> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.payoutBankCode || !user.payoutAccountNumber || !user.payoutAccountName) return null;
+    return {
+      bankCode: user.payoutBankCode,
+      accountNumber: user.payoutAccountNumber,
+      accountName: user.payoutAccountName,
+    };
   }
 
-  assertRole(_userId: string, _role: Role): Promise<void> {
-    throw new NotImplementedException('IdentityService.assertRole — slice 2');
+  async setPayoutDestination(userId: string, dest: PayoutDestination): Promise<PayoutDestination> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        payoutBankCode: dest.bankCode,
+        payoutAccountNumber: dest.accountNumber,
+        payoutAccountName: dest.accountName,
+      },
+    });
+    return dest;
+  }
+
+  async assertRole(userId: string, role: Role): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.roleFlags.includes(role)) {
+      throw new ForbiddenException(`This action requires the '${role}' role`);
+    }
   }
 
   /**
    * Enforces the registration rule from identity.interface.ts:
    * roles.includes('solver') requires serviceOfferingSubmarketIds.length >= 1;
    * roles.includes('payer') requires seekingCategorySubmarketIds.length >= 1.
-   * Hybrid (both roles, the default) requires both — reject with a 400 if
-   * either required list is missing/empty, don't silently skip it.
-   *
-   * Writes User.roleFlags plus the SolverServiceOffering / PayerSeekingCategory
-   * join rows inside one transaction — partial writes here would leave a
-   * solver-flagged user with no offerings, which breaks any future matching
-   * that assumes the invariant holds.
+   * Hybrid (both roles) requires both — reject with 400 if either required
+   * list is missing/empty, never silently skip it.
    */
-  completeRoleProfile(_userId: string, _input: CompleteRoleProfileInput): Promise<IdentityUser> {
-    throw new NotImplementedException('IdentityService.completeRoleProfile — slice 2');
+  async completeRoleProfile(userId: string, input: CompleteRoleProfileInput): Promise<IdentityUser> {
+    const roles = input.roles;
+    if (!roles || roles.length === 0) {
+      throw new BadRequestException('roles must include at least one of "payer" or "solver"');
+    }
+    if (roles.some((r) => r !== 'payer' && r !== 'solver')) {
+      throw new BadRequestException('roles may only contain "payer" and/or "solver"');
+    }
+
+    const wantsSolver = roles.includes('solver');
+    const wantsPayer = roles.includes('payer');
+    const serviceOfferingIds = input.serviceOfferingSubmarketIds ?? [];
+    const seekingCategoryIds = input.seekingCategorySubmarketIds ?? [];
+
+    if (wantsSolver && serviceOfferingIds.length === 0) {
+      throw new BadRequestException('serviceOfferingSubmarketIds must have at least one entry for the "solver" role');
+    }
+    if (wantsPayer && seekingCategoryIds.length === 0) {
+      throw new BadRequestException('seekingCategorySubmarketIds must have at least one entry for the "payer" role');
+    }
+
+    const allSubmarketIds = [...new Set([...serviceOfferingIds, ...seekingCategoryIds])];
+    if (allSubmarketIds.length > 0) {
+      const found = await this.prisma.submarket.findMany({
+        where: { id: { in: allSubmarketIds } },
+        select: { id: true },
+      });
+      if (found.length !== allSubmarketIds.length) {
+        throw new BadRequestException('One or more submarket IDs do not exist');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { roleFlags: roles } });
+
+      // Replace-in-full rather than diff — simpler, and this call is rare
+      // (registration, or a deliberate profile edit) so the extra writes
+      // don't matter.
+      await tx.solverServiceOffering.deleteMany({ where: { userId } });
+      if (wantsSolver && serviceOfferingIds.length > 0) {
+        await tx.solverServiceOffering.createMany({
+          data: serviceOfferingIds.map((submarketId) => ({ userId, submarketId })),
+        });
+      }
+
+      await tx.payerSeekingCategory.deleteMany({ where: { userId } });
+      if (wantsPayer && seekingCategoryIds.length > 0) {
+        await tx.payerSeekingCategory.createMany({
+          data: seekingCategoryIds.map((submarketId) => ({ userId, submarketId })),
+        });
+      }
+    });
+
+    return this.getUser(userId);
+  }
+
+  // ---------------------------------------------------------------------
+  // OTP hashing — scrypt (Node built-in, no extra dependency). Codes are
+  // short (6 digits) and short-lived, so scrypt's cost here is about
+  // resisting a leaked-DB offline guess, not brute force over the wire
+  // (attempts/expiresAt already bound that).
+  // ---------------------------------------------------------------------
+
+  private hashOtpCode(code: string, salt: string): string {
+    return scryptSync(code, salt, SCRYPT_KEY_LENGTH).toString('hex');
+  }
+
+  private verifyOtpCode(code: string, salt: string, expectedHash: string): boolean {
+    const actual = scryptSync(code, salt, SCRYPT_KEY_LENGTH);
+    const expected = Buffer.from(expectedHash, 'hex');
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 }

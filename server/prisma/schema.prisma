@@ -61,6 +61,25 @@ model User {
   seekingCategories PayerSeekingCategory[]  // required when roleFlags includes "payer"
 }
 
+// Short-lived OTP codes for phone auth. Deliberately its own table, not
+// cached in Redis/memory — v1 has no queue/cache layer (HANDOFF.md §2), and
+// OTP volume is low enough that Postgres is fine. Never store the raw code:
+// codeHash is scrypt(code, salt), checked at verify time. attempts caps
+// brute-force guessing per request; expiresAt caps the request's lifetime
+// regardless of attempts left.
+model OtpRequest {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  salt       String
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([phone])
+}
+
 // ---------------------------------------------------------------------------
 // Taxonomy (§3.2 SEAM — TAXONOMY): domain/submarket/payer_type are data,
 // not enums hardcoded in logic. Growth is a seed-table insert, not a deploy.
