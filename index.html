@@ -22,6 +22,8 @@
 
   * { box-sizing: border-box; }
 
+  html { scroll-behavior: smooth; }
+
   html, body {
     margin: 0;
     padding: 0;
@@ -34,13 +36,23 @@
   a { color: inherit; }
 
   .wrap {
-    max-width: 1120px;
+    max-width: 1160px;
     margin: 0 auto;
     padding: 0 24px;
   }
 
+  /* ---------- header ---------- */
+
   header {
-    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 20px 0;
+    background: rgba(244, 250, 248, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .2s ease;
   }
 
   header .wrap {
@@ -52,18 +64,18 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     text-decoration: none;
   }
 
   .brand svg { display: block; }
 
   .wordmark {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    font-size: 20px;
+    font-size: 19px;
     color: var(--text-primary);
   }
 
@@ -72,177 +84,487 @@
     color: var(--text-body);
     font-size: 14px;
     font-weight: 600;
-    margin-left: 28px;
+    margin-left: 30px;
+    transition: color .15s ease;
   }
 
   nav a:hover { color: var(--green-primary); }
 
+  /* ---------- hero ---------- */
+
   .hero {
-    padding: 72px 0 56px;
-    text-align: center;
+    position: relative;
+    padding: 88px 0 40px;
+    overflow: hidden;
   }
 
-  .hero .wordmark-lg {
-    font-family: Georgia, "Times New Roman", serif;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-size: clamp(40px, 8vw, 72px);
-    color: var(--text-primary);
-    margin: 0 0 8px;
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -220px;
+    right: -160px;
+    width: 620px;
+    height: 620px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--green-mint-bg), transparent 70%);
+    opacity: 0.9;
+    pointer-events: none;
   }
 
-  .tagline {
-    font-size: clamp(18px, 3vw, 22px);
-    color: var(--green-deep);
+  .hero::after {
+    content: "";
+    position: absolute;
+    bottom: -260px;
+    left: -220px;
+    width: 520px;
+    height: 520px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 60% 40%, var(--green-mint-pale), transparent 72%);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .hero-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px 7px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
     font-weight: 600;
-    margin: 0 0 20px;
+    color: var(--green-deep);
+    margin-bottom: 22px;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04);
+  }
+
+  .eyebrow .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  .hero h1 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-size: clamp(38px, 4.6vw, 58px);
+    line-height: 1.08;
+    color: var(--text-primary);
+    margin: 0 0 18px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--green-primary);
   }
 
   .subhead {
-    max-width: 560px;
-    margin: 0 auto 36px;
+    max-width: 480px;
+    margin: 0 0 32px;
     font-size: 17px;
-    line-height: 1.6;
+    line-height: 1.65;
     color: var(--text-body);
   }
 
   .cta-form {
     display: flex;
     gap: 10px;
-    justify-content: center;
     flex-wrap: wrap;
     max-width: 440px;
-    margin: 0 auto;
+    margin: 0 0 14px;
   }
 
   .cta-form input[type="email"] {
     flex: 1;
     min-width: 220px;
     padding: 14px 16px;
-    border-radius: 10px;
+    border-radius: 11px;
     border: 1px solid var(--border);
     background: var(--surface);
     font-size: 15px;
     color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(12,31,27,0.03);
   }
 
   .cta-form input[type="email"]:focus {
-    outline: 2px solid var(--green-bright);
-    outline-offset: 1px;
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
   }
 
   .btn {
-    padding: 14px 22px;
-    border-radius: 10px;
+    padding: 14px 24px;
+    border-radius: 11px;
     border: none;
-    background: var(--green-primary);
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
     color: #fff;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 6px 16px -6px rgba(2,122,97,0.55);
+    transition: transform .15s ease, box-shadow .15s ease;
   }
 
-  .btn:hover { background: var(--green-deep); }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 10px 22px -8px rgba(2,122,97,0.6); }
+  .btn:active { transform: translateY(0); }
 
   .form-note {
-    margin-top: 12px;
+    margin: 0;
     font-size: 13px;
     color: var(--text-muted);
   }
 
   .form-note[data-state="sent"] { color: var(--green-primary); font-weight: 600; }
 
-  .how-it-works {
-    padding: 56px 0;
-  }
+  /* ---------- hero visual: escrow card ---------- */
 
-  .how-it-works h2 {
-    text-align: center;
-    font-size: 26px;
-    color: var(--text-primary);
-    margin: 0 0 40px;
-  }
-
-  .steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-  }
-
-  @media (max-width: 720px) {
-    .steps { grid-template-columns: 1fr; }
-  }
-
-  .step {
+  .escrow-card {
+    position: relative;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px 24px;
+    border-radius: 20px;
+    padding: 26px 26px 22px;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04), 0 24px 48px -20px rgba(12,31,27,0.22);
+    max-width: 400px;
+    margin: 0 auto;
   }
 
-  .step .num {
-    display: inline-flex;
+  .escrow-card .card-head {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    background: var(--green-mint-bg);
-    color: var(--green-deep);
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .escrow-card .card-tag {
+    font-size: 11.5px;
     font-weight: 700;
-    font-size: 14px;
-    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--green-deep);
+    background: var(--green-mint-bg);
+    padding: 5px 9px;
+    border-radius: 7px;
   }
 
-  .step h3 {
-    margin: 0 0 8px;
-    font-size: 17px;
+  .escrow-card .card-state {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .escrow-card .card-state .led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-bright);
+  }
+
+  .escrow-card .job-title {
+    font-size: 15.5px;
+    font-weight: 700;
     color: var(--text-primary);
+    margin: 0 0 2px;
   }
 
-  .step p {
-    margin: 0;
+  .escrow-card .job-loc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 20px;
+  }
+
+  .escrow-card .row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
     font-size: 14px;
-    line-height: 1.55;
+  }
+
+  .escrow-card .row:first-of-type { border-top: none; }
+
+  .escrow-card .row .k { color: var(--text-muted); }
+  .escrow-card .row .v { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .escrow-card .row.total .v { color: var(--green-deep); font-weight: 700; }
+
+  .escrow-card .divider {
+    border-top: 1px dashed var(--border);
+    margin: 4px 0;
+  }
+
+  .escrow-card .lock-note {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
     color: var(--text-muted);
   }
 
+  /* ---------- sections ---------- */
+
+  section { position: relative; }
+
+  .section-head {
+    max-width: 560px;
+    margin: 0 0 44px;
+  }
+
+  .section-head .kicker {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--green-primary);
+    margin: 0 0 10px;
+  }
+
+  .section-head h2 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: clamp(26px, 3vw, 32px);
+    color: var(--text-primary);
+    margin: 0 0 12px;
+    line-height: 1.2;
+  }
+
+  .section-head p {
+    font-size: 15.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* ---------- how it works ---------- */
+
+  .how-it-works { padding: 96px 0 20px; }
+
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    position: relative;
+  }
+
+  @media (max-width: 860px) {
+    .flow { grid-template-columns: 1fr; gap: 16px; }
+    .flow-step::after { display: none; }
+  }
+
+  .flow-step {
+    position: relative;
+    padding: 0 22px 0 0;
+  }
+
+  .flow-step:first-child { padding-left: 0; }
+
+  .flow-step::after {
+    content: "";
+    position: absolute;
+    top: 27px;
+    right: -6px;
+    width: 34px;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 10px);
+  }
+
+  .flow-step:last-child::after { display: none; }
+
+  .flow-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 15px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--green-primary);
+    margin-bottom: 20px;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04);
+  }
+
+  .flow-step h3 {
+    font-size: 16.5px;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+  }
+
+  .flow-step p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    max-width: 300px;
+  }
+
+  /* ---------- math section ---------- */
+
+  .math {
+    padding: 100px 0;
+  }
+
+  .math-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04), 0 30px 60px -30px rgba(12,31,27,0.18);
+  }
+
+  @media (max-width: 860px) {
+    .math-panel { grid-template-columns: 1fr; padding: 28px; }
+  }
+
+  .math-copy .kicker {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--green-primary);
+    margin: 0 0 10px;
+  }
+
+  .math-copy h3 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 26px;
+    color: var(--text-primary);
+    margin: 0 0 14px;
+    line-height: 1.25;
+  }
+
+  .math-copy p {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .receipt {
+    background: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+  }
+
+  .receipt .r-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    padding: 9px 0;
+  }
+
+  .receipt .r-row .k { color: var(--text-body); }
+  .receipt .r-row .v { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .receipt .r-row.sub .k { color: var(--text-muted); padding-left: 14px; font-size: 13.5px; }
+  .receipt .r-row.sub .v { color: var(--text-muted); font-weight: 500; font-size: 13.5px; }
+  .receipt hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+  .receipt .r-row.final .k, .receipt .r-row.final .v { color: var(--green-deep); font-weight: 700; font-size: 15px; }
+
+  /* ---------- trust ---------- */
+
   .trust {
-    padding: 12px 0 64px;
+    padding: 20px 0 110px;
   }
 
   .trust-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    text-align: center;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 760px) {
     .trust-grid { grid-template-columns: 1fr; }
   }
 
   .trust-item {
-    padding: 20px;
+    background: var(--surface);
+    padding: 30px 28px;
+  }
+
+  .trust-item .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
   }
 
   .trust-item .label {
     font-weight: 700;
     color: var(--text-primary);
-    font-size: 15px;
-    margin-bottom: 4px;
+    font-size: 15.5px;
+    margin-bottom: 6px;
   }
 
   .trust-item .desc {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+  }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+  }
+
+  footer .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  footer .f-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 13px;
     color: var(--text-muted);
   }
 
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 28px 0;
-    text-align: center;
+  footer .f-brand .wordmark {
+    font-size: 13px;
+    color: var(--text-body);
+  }
+
+  footer .f-copy {
     font-size: 13px;
     color: var(--text-muted);
   }
@@ -253,7 +575,7 @@
 <header>
   <div class="wrap">
     <a class="brand" href="/">
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <rect width="28" height="28" rx="8" fill="#C8FFF6"/>
         <path d="M8 14.5L12 18.5L20 9.5" stroke="#027A61" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
@@ -261,46 +583,110 @@
     </a>
     <nav>
       <a href="#how-it-works">How it works</a>
+      <a href="#math">Pricing</a>
     </nav>
   </div>
 </header>
 
 <section class="hero">
-  <div class="wrap">
-    <h1 class="wordmark-lg">SORTED</h1>
-    <p class="tagline">Consider it sorted.</p>
-    <p class="subhead">
-      Post a job. Fund it into escrow. Pay only once the work is verified
-      done. Sorted holds the money in the middle so payers and solvers don't
-      have to trust each other — they trust the process.
-    </p>
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow"><span class="dot"></span> Escrow-protected · Nigeria-first</span>
+      <h1>Get the job done.<br>Pay when it&rsquo;s <em>actually</em> done.</h1>
+      <p class="subhead">
+        Sorted holds the money in the middle. Post a gig, fund it into escrow,
+        and release payment only once the work meets the criteria you set —
+        no chasing, no guessing, no trust required on either side.
+      </p>
 
-    <form class="cta-form" id="waitlist-form">
-      <input type="email" id="waitlist-email" placeholder="you@email.com" required aria-label="Email address" />
-      <button class="btn" type="submit">Get notified</button>
-    </form>
-    <p class="form-note" id="waitlist-note">Be first to know when Sorted launches.</p>
+      <form class="cta-form" id="waitlist-form">
+        <input type="email" id="waitlist-email" placeholder="you@email.com" required aria-label="Email address" />
+        <button class="btn" type="submit">Get notified</button>
+      </form>
+      <p class="form-note" id="waitlist-note">Be first to know when Sorted launches.</p>
+    </div>
+
+    <div class="escrow-card" aria-hidden="true">
+      <div class="card-head">
+        <span class="card-tag">Escrow</span>
+        <span class="card-state"><span class="led"></span>Funded</span>
+      </div>
+      <p class="job-title">Fix leaking kitchen pipe</p>
+      <p class="job-loc">Lekki Phase 1 &middot; Physical &middot; Individual</p>
+
+      <div class="row">
+        <span class="k">Bounty funded</span>
+        <span class="v">&#8358;85,000</span>
+      </div>
+      <div class="row">
+        <span class="k">Solver stake (held)</span>
+        <span class="v">&#8358;8,500</span>
+      </div>
+      <div class="divider"></div>
+      <div class="row total">
+        <span class="k">Released on sign-off</span>
+        <span class="v">&#8358;85,000</span>
+      </div>
+
+      <div class="lock-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Criteria locked at publish — no changes after funding
+      </div>
+    </div>
   </div>
 </section>
 
 <section class="how-it-works" id="how-it-works">
   <div class="wrap">
-    <h2>How it works</h2>
-    <div class="steps">
-      <div class="step">
-        <span class="num">1</span>
+    <div class="section-head">
+      <p class="kicker">How it works</p>
+      <h2>Three steps. Money moves only on the last one.</h2>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/></svg>
+        </div>
         <h3>Post a gig</h3>
-        <p>Describe the job and set the criteria that define "done." Once published, those criteria are locked.</p>
+        <p>Describe the job and the criteria that define &ldquo;done.&rdquo; Once published, those criteria lock — no moving the goalposts.</p>
       </div>
-      <div class="step">
-        <span class="num">2</span>
+      <div class="flow-step">
+        <div class="flow-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
         <h3>Fund it in escrow</h3>
-        <p>The bounty is held in escrow before anyone starts work — not with Sorted, not with the payer, safely in the middle.</p>
+        <p>The bounty is held before anyone starts work — not with Sorted, not with the payer. Safely in the middle, always.</p>
       </div>
-      <div class="step">
-        <span class="num">3</span>
+      <div class="flow-step">
+        <div class="flow-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
         <h3>Sign off, get paid</h3>
-        <p>The payer confirms each criterion is met. Escrow releases automatically — solver gets paid, stake returned.</p>
+        <p>The payer confirms each criterion is met. Escrow releases automatically — solver paid, stake returned.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="math" id="math">
+  <div class="wrap">
+    <div class="math-panel">
+      <div class="math-copy">
+        <p class="kicker">Transparent by design</p>
+        <h3>Every naira, accounted for before work even starts.</h3>
+        <p>No hidden cuts. Sorted's fee is fixed and shown up front — the
+        same math the payer sees when funding, and the solver sees when
+        claiming. Nothing changes after criteria are locked.</p>
+      </div>
+      <div class="receipt">
+        <div class="r-row"><span class="k">Payer funds</span><span class="v">&#8358;85,000</span></div>
+        <div class="r-row sub"><span class="k">Solver stake (10%)</span><span class="v">&#8358;8,500</span></div>
+        <hr>
+        <div class="r-row"><span class="k">On sign-off &mdash; solver receives</span><span class="v">&#8358;76,500</span></div>
+        <div class="r-row sub"><span class="k">+ stake returned</span><span class="v">&#8358;8,500</span></div>
+        <div class="r-row"><span class="k">Sorted fee (10%)</span><span class="v">&#8358;8,500</span></div>
+        <hr>
+        <div class="r-row final"><span class="k">Solver walks away with</span><span class="v">&#8358;85,000</span></div>
       </div>
     </div>
   </div>
@@ -310,16 +696,25 @@
   <div class="wrap">
     <div class="trust-grid">
       <div class="trust-item">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8.6 8 11 4.5-2.4 8-6 8-11V5l-8-3Z"/></svg>
+        </div>
         <div class="label">Escrow-protected</div>
-        <div class="desc">Money moves only when work is verified — never before.</div>
+        <div class="desc">Money moves only when work is verified — never before, never without a record.</div>
       </div>
       <div class="trust-item">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
+        </div>
         <div class="label">Built for Nigeria</div>
         <div class="desc">Naira-first, phone + OTP sign-in, no card required to get started.</div>
       </div>
       <div class="trust-item">
-        <div class="label">Every naira accounted for</div>
-        <div class="desc">A full, append-only record of every payment on every gig.</div>
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4M9 13h6M9 17h6"/></svg>
+        </div>
+        <div class="label">Every gig, on record</div>
+        <div class="desc">A full, append-only ledger of every payment on every gig — nothing edited, nothing lost.</div>
       </div>
     </div>
   </div>
@@ -327,7 +722,14 @@
 
 <footer>
   <div class="wrap">
-    &copy; <span id="year"></span> Sorted. All rights reserved.
+    <div class="f-brand">
+      <svg width="18" height="18" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="28" height="28" rx="8" fill="#C8FFF6"/>
+        <path d="M8 14.5L12 18.5L20 9.5" stroke="#027A61" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="wordmark">Sorted</span>
+    </div>
+    <span class="f-copy">&copy; <span id="year"></span> Sorted. Consider it sorted.</span>
   </div>
 </footer>
 
