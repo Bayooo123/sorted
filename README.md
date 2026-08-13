@@ -24,8 +24,22 @@ Start here:
 ## Landing page
 
 `index.html` at the repo root. No dependencies, no build. Edit it directly.
-The waitlist form is client-side only right now — see the comment in its
-`<script>` tag; it isn't wired to a real signup endpoint yet.
+
+It's an installable PWA: `manifest.json`, `sw.js` (network-first for the
+page, cache-first for static assets), and icons in `icons/` +
+`apple-touch-icon.png`. Note this is a deviation from `HANDOFF.md` §2,
+which specifies React Native (Expo) for the actual product — PWA was
+chosen for the landing page specifically to ship an installable "front
+door" without an app-store review cycle. The real transacting app (post a
+gig, escrow, sign-off) still doesn't exist as a frontend anywhere yet;
+this is marketing/waitlist only.
+
+The waitlist form is live: it inserts into `public.waitlist` in a
+dedicated Supabase project (org REFORMA, project `sorted`) via PostgREST,
+using a publishable key that's safe to expose client-side. RLS on that
+table allows INSERT only for `anon` — no SELECT policy exists, so the
+signup list isn't readable through the public key, only via the Supabase
+dashboard or service-role key.
 
 ## API
 
