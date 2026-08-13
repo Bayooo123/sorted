@@ -57,8 +57,49 @@ slice" — it's the one to build before anything money-related.
 - OTP issuance + verification flow: request OTP → SMS sent → verify code →
   session/JWT issued. `OTP_TOKEN_TTL_SECONDS` from `.env.example` bounds
   validity.
-- Role assignment: a phone number can hold both `payer` and `solver` flags
-  simultaneously (per schema: `User.roleFlags String[]`).
+- Registration step 2 — account type (see full writeup below).
+
+### Registration: account type
+
+Agreed after `HANDOFF.md` was written, not in the original doc — captured
+here as the decision record. Three account types, all backed by the same
+`User.roleFlags String[]` (no schema change needed for the type itself —
+this already existed as the §3.1 seam for "new actor types are additive"):
+
+| Type | `roleFlags` | Required at signup |
+|---|---|---|
+| Professional | `['solver']` | ≥1 `serviceOfferingSubmarketIds` |
+| User | `['payer']` | ≥1 `seekingCategorySubmarketIds` |
+| Hybrid (**default**) | `['payer','solver']` | **both** lists, ≥1 each |
+
+Decided explicitly: hybrid is not a lighter-touch path. Signing up as
+hybrid (the default — a signup does nothing to narrow it) still requires
+filling in both "service you offer" and "what you're most likely looking
+to get done" before registration completes. No "fill in later" deferral.
+
+Both fields are **structured picks from the `Submarket` taxonomy**, the
+same one `Gig.submarket` uses (`HANDOFF.md` §3.2 TAXONOMY seam) — not free
+text. Two new join tables carry this (`server/prisma/schema.prisma`):
+`SolverServiceOffering` and `PayerSeekingCategory`, each `(userId,
+submarketId)`. Reusing the Gigs taxonomy here means "I fix pipes" is a
+`Submarket` row a solver can be matched against later (`MatchingStrategy`,
+§3.3, is exactly the seam that would consume this), not a string nothing
+else in the system can read.
+
+This is the one place this repo's module boundary needed a judgment call:
+`Submarket` was written for Gigs, but Identity now has a direct Prisma
+relation into it too. Treated as fine because the taxonomy tables are
+shared reference/lookup data (seeded, effectively read-only at runtime),
+not another module's business state — the "no cross-module table access"
+rule in `HANDOFF.md` §9 is about state like `Gig`/`EscrowRecord`, which
+still only their owning module touches.
+
+`IdentityService.completeRoleProfile()` (see
+`server/src/modules/identity/identity.interface.ts` and
+`identity.service.ts`) is the enforcement point: it validates the
+roles-vs-lists rule above and writes `User.roleFlags` plus both join
+tables' rows in one transaction, so a solver-flagged user can never exist
+with zero offerings.
 
 **Endpoints (all in an `IdentityController`, module stays HTTP-free
 otherwise per the "modules talk through interfaces" rule — the controller
@@ -68,13 +109,19 @@ POST /auth/otp/request     { phone }                    -> { requestId }
 POST /auth/otp/verify      { requestId, code }           -> { accessToken, user }
 GET  /me                   (auth'd)                      -> IdentityUser
 PATCH /me/payout-destination (auth'd) { bankCode, accountNumber } -> PayoutDestination
-POST /me/roles             (auth'd) { role: 'payer'|'solver' } -> IdentityUser
+POST /me/role-profile       (auth'd) CompleteRoleProfileInput -> IdentityUser
+GET  /taxonomy/submarkets                                -> Submarket[]  (populate the picker)
 ```
 
-**Screens backed:** onboarding / phone entry / OTP verification screens
-(not numbered in the mockup list available to this session — `/screens`
-wasn't part of this upload; Jude/founding team to confirm mockup numbers
-against `SPEC.md` when available).
+`POST /me/role-profile` is registration step 2, called right after OTP
+verification succeeds and before the account is usable — the client
+should treat a user with no completed role profile as still mid-signup,
+not as a fully registered account.
+
+**Screens backed:** onboarding / phone entry / OTP verification / account
+type + category picker screens (not numbered in the mockup list available
+to this session — `/screens` wasn't part of this upload; Jude/founding
+team to confirm mockup numbers against `SPEC.md` when available).
 
 **Out of scope for this slice:** KYC verification itself (`IdentityVerifier`
 strategy, `verifyIdentity` body) — that's slice 9, gating payouts only.

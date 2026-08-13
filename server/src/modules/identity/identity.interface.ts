@@ -13,12 +13,38 @@ export interface IdentityUser {
   name: string | null;
   roles: Role[];
   kycStatus: KycStatus;
+  /** Populated when roles includes 'solver'. Submarket IDs — see CompleteRoleProfileInput. */
+  serviceOfferingSubmarketIds: string[];
+  /** Populated when roles includes 'payer'. Submarket IDs — see CompleteRoleProfileInput. */
+  seekingCategorySubmarketIds: string[];
 }
 
 export interface PayoutDestination {
   bankCode: string;
   accountNumber: string;
   accountName: string;
+}
+
+/**
+ * Registration: account type (agreed after HANDOFF.md — not in the original
+ * doc; see PLAN.md "Registration: account type" for the full writeup).
+ *
+ * Every account defaults to hybrid: roles = ['payer', 'solver']. A signup
+ * can narrow to just one. Whichever roles end up set, the matching
+ * category picks are REQUIRED, hybrid included — there is no "fill in
+ * later" path:
+ *   - roles includes 'solver'  => serviceOfferingSubmarketIds.length >= 1
+ *   - roles includes 'payer'   => seekingCategorySubmarketIds.length >= 1
+ *
+ * Categories are structured picks from the same Submarket taxonomy Gigs
+ * uses (HANDOFF.md §3.2 TAXONOMY seam) — not free text — so "I fix pipes"
+ * becomes a Submarket row a solver can be matched against later, not a
+ * string nothing else in the system can read.
+ */
+export interface CompleteRoleProfileInput {
+  roles: Role[];
+  serviceOfferingSubmarketIds?: string[];
+  seekingCategorySubmarketIds?: string[];
 }
 
 /**
@@ -38,4 +64,11 @@ export interface IdentityPort {
   verifyIdentity(userId: string, input: unknown): Promise<KycStatus>;
   getPayoutDestination(userId: string): Promise<PayoutDestination | null>;
   assertRole(userId: string, role: Role): Promise<void>;
+  /**
+   * Registration step 2 (after phone+OTP creates the bare account).
+   * Validates the roles/category rule documented on CompleteRoleProfileInput
+   * and rejects the call if a required category list is missing or empty —
+   * this is the enforcement point for "hybrid still requires both."
+   */
+  completeRoleProfile(userId: string, input: CompleteRoleProfileInput): Promise<IdentityUser>;
 }

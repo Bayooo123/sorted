@@ -51,11 +51,26 @@ model User {
   disputesRaised  Dispute[]  @relation("DisputeRaisedBy")
   disputesRuled   Dispute[]  @relation("DisputeNeutral")
   gigTemplates    GigTemplate[]
+
+  // Registration decision (not in the original HANDOFF.md — agreed in a
+  // later product session, see PLAN.md "Registration: account type"):
+  // every account defaults to hybrid (both role flags). Whichever flags are
+  // set, the matching profile below is required — enforced in
+  // IdentityService.completeRoleProfile, not by the schema.
+  serviceOfferings  SolverServiceOffering[] // required when roleFlags includes "solver"
+  seekingCategories PayerSeekingCategory[]  // required when roleFlags includes "payer"
 }
 
 // ---------------------------------------------------------------------------
 // Taxonomy (§3.2 SEAM — TAXONOMY): domain/submarket/payer_type are data,
 // not enums hardcoded in logic. Growth is a seed-table insert, not a deploy.
+//
+// Shared reference data, not Gigs-owned business state: Identity also reads
+// Submarket (below) to tag a user's offered/sought service categories. A
+// direct Prisma relation from User into Submarket is fine here — the "no
+// cross-module table access" rule (HANDOFF.md §9) is about one module
+// reaching into another's business state (Gig, EscrowRecord, etc.), not
+// shared, effectively-read-only lookup tables both modules reference.
 // ---------------------------------------------------------------------------
 
 model Domain {
@@ -74,7 +89,36 @@ model Submarket {
   domainId String?
   domain   Domain? @relation(fields: [domainId], references: [id])
 
-  gigs Gig[]
+  gigs                     Gig[]
+  offeredBySolvers         SolverServiceOffering[]
+  soughtByPayers           PayerSeekingCategory[]
+}
+
+// Registration: which categories a solver says they offer services in.
+// Required (>=1 row) at signup when roleFlags includes "solver" — see
+// PLAN.md "Registration: account type" for the full rule, including hybrid.
+model SolverServiceOffering {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  submarketId String
+  submarket   Submarket @relation(fields: [submarketId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, submarketId])
+}
+
+// Registration: which categories a payer says they're most likely to post
+// gigs in. Required (>=1 row) at signup when roleFlags includes "payer".
+model PayerSeekingCategory {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  submarketId String
+  submarket   Submarket @relation(fields: [submarketId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, submarketId])
 }
 
 model PayerTypeRef {

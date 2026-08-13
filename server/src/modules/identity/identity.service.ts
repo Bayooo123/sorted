@@ -1,6 +1,7 @@
 import { Injectable, NotImplementedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  CompleteRoleProfileInput,
   IdentityPort,
   IdentityUser,
   KycStatus,
@@ -31,5 +32,21 @@ export class IdentityService implements IdentityPort {
 
   assertRole(_userId: string, _role: Role): Promise<void> {
     throw new NotImplementedException('IdentityService.assertRole — slice 2');
+  }
+
+  /**
+   * Enforces the registration rule from identity.interface.ts:
+   * roles.includes('solver') requires serviceOfferingSubmarketIds.length >= 1;
+   * roles.includes('payer') requires seekingCategorySubmarketIds.length >= 1.
+   * Hybrid (both roles, the default) requires both — reject with a 400 if
+   * either required list is missing/empty, don't silently skip it.
+   *
+   * Writes User.roleFlags plus the SolverServiceOffering / PayerSeekingCategory
+   * join rows inside one transaction — partial writes here would leave a
+   * solver-flagged user with no offerings, which breaks any future matching
+   * that assumes the invariant holds.
+   */
+  completeRoleProfile(_userId: string, _input: CompleteRoleProfileInput): Promise<IdentityUser> {
+    throw new NotImplementedException('IdentityService.completeRoleProfile — slice 2');
   }
 }
