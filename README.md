@@ -8,6 +8,9 @@ Start here:
 - [`PLAN.md`](./PLAN.md) — endpoints/interfaces/screens plan for slices 1–3,
   written per `HANDOFF.md` §10. Stop-for-review point before any
   Payments/Escrow logic.
+- [`web/`](./web) — the marketing/waitlist landing page. See
+  [`web/README.md`](./web/README.md) for why this is a separate folder and
+  how to point Vercel at it.
 
 ## Status
 
