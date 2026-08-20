@@ -17,6 +17,18 @@ are written and validated, not applied. Whoever sets `DATABASE_URL`
 (Postgres-compatible) needs to run `npx prisma migrate dev` and
 `npm run prisma:seed` before slice 2 actually works end-to-end.
 
+**Terminology debt (flagged, not yet fixed):** `HANDOFF.md`'s Aug 2026
+revision locks `Client`/`Professional` as the naming and adds it to §9's
+non-negotiable checklist ("no `payer`/`solver` remnants"). The code as
+implemented for slices 1–3 below still uses `payer`/`solver` throughout —
+Prisma schema (`Gig.payerId`, `Claim.solverId`, etc.), module interfaces
+(`GigsPort`, `MatchingStrategy`), DTOs, and endpoint payloads (19 files as
+of this note). Because no migration has run against a live DB, this is a
+clean rename now (schema + code, no data migration risk) but is real
+scope — not folded into this note. Do it as its own pass before slice 4
+so Payments/Escrow (§5, which already spec `refundClient`/
+`releaseToProfessional`) aren't built against the old names.
+
 ---
 
 ## Slice 1 — Foundation

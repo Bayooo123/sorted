@@ -67,7 +67,7 @@ migration run yet. `npx nest build` and `npx prisma validate` both pass.
 |---|---|---|---|
 | Identity | users, auth, KYC, payout dest | `IdentityPort` | `IdentityVerifier` strategy |
 | Gigs | gig entity, lifecycle, criteria | `GigsPort` | `GigIntake` (source), `GigTemplate` (recurrence) |
-| Matching | pricing + solver assignment | `MatchingStrategy` | swap `FixedPriceAccept` for auction/dynamic pricing |
+| Matching | pricing + professional assignment | `MatchingStrategy` | swap `FixedPriceAccept` for auction/dynamic pricing |
 | Payments | the money rail (Monnify) | `PaymentsProvider` | swap/add providers |
 | Escrow ★ | hold-and-release state machine | `EscrowPort` | `platform_fee_bps` config per gig |
 | Verification | proof collection + evaluation | `VerificationStrategy` | swap per gig type |
