@@ -20,6 +20,11 @@ Start here:
 - [`PLAN.md`](./PLAN.md) — endpoints/interfaces/screens plan for slices 1–3,
   written per `HANDOFF.md` §10. Stop-for-review point before any
   Payments/Escrow logic.
+- [`PRD.md`](./PRD.md) — product requirements for the mobile app (the
+  actual product — this landing page is waitlist-only). Screens, flows,
+  and mobile-specific requirements derived from `HANDOFF.md`/`PLAN.md`;
+  flags where `SPEC.md`/`/screens` (referenced by `HANDOFF.md` but not in
+  this repo) still need to be reconciled in.
 
 ## Landing page
 
