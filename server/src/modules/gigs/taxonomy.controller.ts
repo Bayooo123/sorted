@@ -24,4 +24,9 @@ export class TaxonomyController {
       include: { domain: true },
     });
   }
+
+  @Get('client-types')
+  listClientTypes() {
+    return this.prisma.clientTypeRef.findMany({ orderBy: { label: 'asc' } });
+  }
 }

@@ -144,6 +144,10 @@ PATCH /me/payout-destination (auth'd) { bankCode, accountNumber, accountName } -
 POST /me/role-profile       (auth'd) CompleteRoleProfileInput -> IdentityUser
 GET  /taxonomy/submarkets                                -> Submarket[]  (populate the picker)
 GET  /taxonomy/domains                                   -> Domain[]
+GET  /taxonomy/client-types                              -> ClientTypeRef[]  (added for the Post-a-gig
+                                                             form's clientType picker — same read-only,
+                                                             no-gig-lifecycle-logic rationale as the
+                                                             other two taxonomy endpoints)
 ```
 
 `POST /me/role-profile` is registration step 2, called right after OTP
