@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Sorted",
+    "slug": "sorted",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F4FAF8",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Sorted uses your camera to capture proof photos for gig criteria.",
+        "NSLocationWhenInUseUsageDescription": "Sorted uses your location for GPS check-in at gig arrival/start, part of the dispute evidence pack."
+      }
+    },
+    "android": {
+      "package": "com.sorted.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F4FAF8",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Sorted uses your camera to capture proof photos for gig criteria."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Sorted uses your location for GPS check-in at gig arrival/start, part of the dispute evidence pack."
+        }
+      ]
+    ]
+  }
+}

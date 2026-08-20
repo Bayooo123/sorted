@@ -1,8 +1,7 @@
 # Sorted
 
-This repo has two independent deployables, split at the top level so each
-can deploy with its platform's zero-config defaults — no dashboard
-overrides needed on either side:
+This repo holds three independent pieces, split at the top level so each
+deploys/runs on its own terms — no dashboard overrides needed:
 
 - **`/` (repo root)** — the marketing/waitlist landing page. Plain static
   HTML (`index.html`), no build step, no `package.json` at this level.
@@ -13,6 +12,10 @@ overrides needed on either side:
 - **`server/`** — the NestJS + Prisma API described in `HANDOFF.md`. Per
   `HANDOFF.md` §2 this deploys to Railway/Render, not Vercel; when that's
   set up, point that service's root directory at `server/`.
+- **`mobile/`** — the React Native (Expo) app. This is the actual product
+  (`HANDOFF.md` §2) — the landing page above is waitlist-only. See
+  [`mobile/README.md`](./mobile/README.md) for what's wired to the real
+  API vs. still mocked, screen by screen.
 
 Start here:
 - [`HANDOFF.md`](./HANDOFF.md) — the CTO handoff: architecture decision, the
@@ -20,11 +23,12 @@ Start here:
 - [`PLAN.md`](./PLAN.md) — endpoints/interfaces/screens plan for slices 1–3,
   written per `HANDOFF.md` §10. Stop-for-review point before any
   Payments/Escrow logic.
-- [`PRD.md`](./PRD.md) — product requirements for the mobile app (the
-  actual product — this landing page is waitlist-only). Screens, flows,
-  and mobile-specific requirements derived from `HANDOFF.md`/`PLAN.md`;
-  flags where `SPEC.md`/`/screens` (referenced by `HANDOFF.md` but not in
-  this repo) still need to be reconciled in.
+- [`PRD.md`](./PRD.md) — product requirements for the mobile app. Screens,
+  flows, and mobile-specific requirements derived from `HANDOFF.md`/
+  `PLAN.md`; flags where `SPEC.md`/`/screens` (referenced by `HANDOFF.md`
+  but not in this repo) still need to be reconciled in.
+- [`mobile/README.md`](./mobile/README.md) — what's actually built:
+  screen-by-screen, which ones are wired to the real API vs. mocked.
 
 ## Landing page
 
@@ -56,10 +60,15 @@ npx prisma generate
 npx nest start --watch
 ```
 
-Skeleton only: nine Nest modules (`server/src/modules/*`), each exposing
-just its documented interface as typed stubs, plus the full Prisma schema
-(`server/prisma/schema.prisma`). No business logic, no HTTP routes, no
-migration run yet. `npx nest build` and `npx prisma validate` both pass.
+Nine Nest modules (`server/src/modules/*`), each exposing only its
+documented interface. **Identity, Gigs, and Taxonomy are implemented for
+real** (HTTP routes, business logic, Prisma-backed) — the other six
+(Matching's assignment step, Payments, Escrow, Verification, Disputes,
+Ledger, Reputation) are still typed stub methods
+(`NotImplementedException`), no HTTP routes. Full Prisma schema
+(`server/prisma/schema.prisma`) is in place. No migration run against a
+live DB yet. `npx nest build` and `npx prisma validate` both pass. See
+`PLAN.md` for the slice-by-slice detail and exact endpoint list.
 
 ### Module map
 

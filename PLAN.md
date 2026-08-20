@@ -36,6 +36,18 @@ unchanged, only field names (e.g. `payerId` → `clientId` in
 `CreateGigInput`/`GigRecord`, `roles: ['payer','solver']` →
 `roles: ['client','professional']`).
 
+**Mobile app scaffolded — see `mobile/README.md` for full detail.** React
+Native (Expo, TypeScript) under `mobile/`, built against this plan's real
+endpoints plus the Aug 2026 mobile screens handoff (11 screens). Screens
+01–03 and 05 are fully wired to the real Identity/Gigs/Taxonomy API;
+screens 04 and 10 read from a session-only local cache
+(`GigsCacheContext`) since `listGigs` is still a stub; screens 06–09 and
+11 render real UI with actions disabled, since Payments/Escrow/
+Verification/Ledger/Reputation have no HTTP controller yet. `npx tsc
+--noEmit` passes. Not built: gig detail (pre-claim), dispute flow, KYC
+gate, withdraw flow, timeout notice — the handoff's own "screens not yet
+started" list.
+
 ---
 
 ## Slice 1 — Foundation

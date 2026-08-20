@@ -1,0 +1,95 @@
+/**
+ * Mirrors server/src/modules/identity/identity.interface.ts and
+ * server/src/modules/gigs/gigs.interface.ts exactly (post client/
+ * professional rename) — kept as plain types here since the mobile app
+ * doesn't share a package with the server (HANDOFF.md's modules are
+ * server-internal boundaries; the app is just another client of the
+ * published HTTP contract).
+ */
+
+export type Role = 'client' | 'professional';
+export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+
+export interface IdentityUser {
+  id: string;
+  phone: string;
+  name: string | null;
+  roles: Role[];
+  kycStatus: KycStatus;
+  serviceOfferingSubmarketIds: string[];
+  seekingCategorySubmarketIds: string[];
+}
+
+export interface PayoutDestination {
+  bankCode: string;
+  accountNumber: string;
+  accountName: string;
+}
+
+export interface OtpRequestResult {
+  requestId: string;
+}
+
+export interface OtpVerifyResult {
+  accessToken: string;
+  user: IdentityUser;
+}
+
+export interface Domain {
+  id: string;
+  key: string;
+  label: string;
+}
+
+export interface Submarket {
+  id: string;
+  key: string;
+  label: string;
+  domainId: string | null;
+  domain: Domain | null;
+}
+
+export interface ClientTypeRef {
+  id: string;
+  key: string;
+  label: string;
+}
+
+export type GigStatus =
+  | 'draft'
+  | 'escrow_pending'
+  | 'open'
+  | 'claimed'
+  | 'in_progress'
+  | 'submitted'
+  | 'signed_off'
+  | 'disputed'
+  | 'released'
+  | 'refunded'
+  | 'cancelled';
+
+export type MaterialsMode = 'bounty_covers' | 'professional_supplies';
+
+export interface CreateGigInput {
+  title: string;
+  description: string;
+  domain: string;
+  submarket: string;
+  clientType: string;
+  locationText: string;
+  locationGeo?: { lat: number; lng: number };
+  materialsMode: MaterialsMode;
+  bountyKobo: number;
+  criteria: string[];
+  templateId?: string;
+}
+
+export interface GigRecord {
+  id: string;
+  clientId: string;
+  source: 'self_posted';
+  templateId: string | null;
+  status: GigStatus;
+  bountyKobo: number;
+  matchingStrategy: string;
+}

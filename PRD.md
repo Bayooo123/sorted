@@ -9,17 +9,18 @@ Reconcile against those artifacts once available.
 
 **Terminology lock:** roles are **Client** (posts and pays for gigs) and
 **Professional** (claims and does the work) — not "payer"/"solver". This
-PRD uses Client/Professional throughout. The implemented backend (slices
-1–3, see §13) still uses `payer`/`solver` in code and schema — that's
-flagged as terminology debt in `PLAN.md`, not yet fixed. Mobile
-engineering should build screens and API contracts against
-Client/Professional naming; expect the API's field names to catch up
-before slice 4.
+PRD uses Client/Professional throughout, and so does the implemented
+backend and mobile app — `payer`/`solver` were renamed across slices 1–3
+in the same pass that scaffolded the mobile app (see `PLAN.md`).
 
 **Primary surface: the mobile app.** The repo root's `index.html` is a
 waitlist landing page only — it is not the product. The product is the
-React Native (Expo) app described below. Nothing about escrow, gigs, or
-sign-off exists as a frontend yet; this PRD defines what to build.
+React Native (Expo) app under `mobile/`. Escrow and sign-off don't exist
+as working flows yet — Payments/Escrow/Verification have no HTTP
+controller server-side — but screens for them now exist in the app,
+UI-built with actions disabled and each one flagged with exactly which
+backend slice unblocks it; see `mobile/README.md` for the current
+real-vs-mocked split, screen by screen.
 
 ---
 
@@ -83,13 +84,16 @@ Explicitly deferred — see §14 for where each plugs back in later:
 |---|---|---|
 | **Client** | Posts gigs, funds escrow, signs off on completion | `client` |
 | **Professional** | Claims gigs, stakes, does the work, submits proof | `professional` |
+| **Hybrid** | Both — recommended default at signup | `client` + `professional` |
 
 Both roles are trackable on one `User` (flags-based per `HANDOFF.md` §3.1
-— a user isn't locked into one role by schema). Whether v1 signup exposes
-a combined Client+Professional account type — as the prior naming
-(Payer/Solver/Hybrid) draft had it — isn't restated in the Aug 2026
-revision; confirm with `SPEC.md`/founding team before assuming it still
-applies under the new names (open question, §12).
+— a user isn't locked into one role by schema). The mobile screens
+handoff confirms Hybrid ships in v1 as the recommended default account
+type (resolving the open question the prior PRD draft flagged here) —
+signup is a Professional / Client / Hybrid picker, and Hybrid still
+requires filling in both the service-offering and seeking-category lists,
+no "fill in later" (matches `PLAN.md`'s existing registration rule, just
+renamed).
 
 Auth is **phone + OTP** — phone-first market, no email/password in v1.
 
@@ -136,9 +140,9 @@ Numbered mockups below are as cited in `HANDOFF.md` §7/§5 only — not
 independently verified since `/screens` wasn't part of this repo. Treat
 numbers as provisional pending `SPEC.md`.
 
-1. **Onboarding** — phone entry → OTP verify → role/account setup →
-   submarket picker(s) (structured picks, not free text). Exact
-   role-selection UX pending confirmation (§12).
+1. **Onboarding** — phone entry → OTP verify → Professional / Client /
+   Hybrid picker → submarket picker(s), required for whichever role(s)
+   are selected including Hybrid (structured picks, not free text; §5).
 2. **Post a gig** (mockups 02–05) — gig basics (title, description,
    domain/submarket/client type, location, materials mode) → criteria
    entry (ordered list, locks at publish) → review → escrow-pending
@@ -281,14 +285,15 @@ mobile work on that specific screen, not the whole app.
    only after Client selects), B (stake at claim, auto-refund losers), or
    C (small non-refundable interest fee at claim, full stake on
    selection). **[blocks shortlist-selection UI, §7 item 5]**
-3. **Client-facing word for "gig"** — not decided alongside the naming
-   lock. **[blocks copy on nearly every screen]** — don't hardcode
-   "gig" into user-facing strings yet; keep it in a copy layer that's
-   cheap to swap.
-4. **Whether v1 keeps a combined Client+Professional account type**
-   (the prior Payer/Solver/Hybrid signup decision) under the new naming —
-   not restated in the Aug 2026 revision. **[blocks onboarding
-   role-selection screen, §7 item 1]**
+3. **Client-facing word for "gig"** — not formally decided alongside the
+   naming lock, though the mobile screens handoff itself uses "gig"
+   throughout its copy without flagging it as provisional, and the
+   mobile app (`mobile/`) follows suit rather than inventing a different
+   placeholder. Treat "gig" as the working term unless `SPEC.md` says
+   otherwise — not blocking, just not formally locked.
+4. ~~Whether v1 keeps a combined Client+Professional account type~~ —
+   **resolved**: the mobile screens handoff confirms Hybrid ships as the
+   recommended default (§5 above).
 5. **Logistics scope for v1** — depends on whether the first wedge
    submarket's jobs are on-site or off-site; may mean logistics is
    deferrable entirely. No mobile impact either way until resolved.
@@ -316,25 +321,24 @@ mobile work on that specific screen, not the whole app.
 
 ## 13. What's already built vs. what this PRD is scoping
 
-Per `PLAN.md`, as of this writing:
+Per `PLAN.md`/`mobile/README.md`, as of this writing:
 
-- **Backend only**, no mobile frontend exists yet.
-- Slice 1 (foundation), Slice 2 (Identity — OTP, roles, role-profile) and
-  Slice 3 (Gigs — create/publish, criteria lock, `FixedPriceAccept`) are
-  implemented server-side. No migration has been run against a live DB.
-- **The implemented code still uses `payer`/`solver` naming** (schema,
-  interfaces, DTOs, endpoints) — `HANDOFF.md`'s Aug 2026 revision locks
-  Client/Professional instead and adds it to the non-negotiable checklist
-  (§9). This is flagged as unresolved terminology debt in `PLAN.md`, to
-  be renamed before slice 4. Mobile screens/copy should use
-  Client/Professional regardless of what the API currently returns —
-  don't propagate the old names into new UI.
-- Slice 4 (Payments/Escrow funding) is the next slice and is explicitly
-  gated — "first money slice — supervise" per `HANDOFF.md` §7.
-- This PRD's screens map onto slices 1–7 (§7 above); the mobile app can
-  start build against the Identity and Gigs endpoints already implemented
-  while Payments/Escrow is reviewed, keeping in mind the terminology
-  rename may change field names before that's final.
+- Server: Slice 1 (foundation), Slice 2 (Identity — OTP, roles,
+  role-profile), and Slice 3 (Gigs — create/publish, criteria lock,
+  `FixedPriceAccept`) are implemented, Client/Professional-named
+  throughout. No migration has been run against a live DB. Slice 4
+  (Payments/Escrow funding) is next and explicitly gated — "first money
+  slice — supervise" per `HANDOFF.md` §7.
+- Mobile: scaffolded under `mobile/` (React Native/Expo). Screens 01–03
+  and 05 (§7 above) are fully wired to the real Identity/Gigs/Taxonomy
+  API. Screens 04 and 10 render real UI but read from a session-only
+  local cache, not the server — `listGigs` is still a stub. Screens
+  06–09 and 11 render real UI with actions disabled, since Payments/
+  Escrow/Verification/Ledger/Reputation have no HTTP controller yet —
+  each one is flagged in-app with exactly which slice unblocks it. Not
+  built at all: gig detail (pre-claim), dispute flow, KYC gate, withdraw
+  flow, timeout notice (§7 doesn't cover these; the handoff's own
+  "screens not yet started" list does).
 
 ## 14. Known-future seams (not built in v1, referenced so mobile doesn't box itself in)
 
