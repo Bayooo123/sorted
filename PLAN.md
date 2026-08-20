@@ -17,17 +17,24 @@ are written and validated, not applied. Whoever sets `DATABASE_URL`
 (Postgres-compatible) needs to run `npx prisma migrate dev` and
 `npm run prisma:seed` before slice 2 actually works end-to-end.
 
-**Terminology debt (flagged, not yet fixed):** `HANDOFF.md`'s Aug 2026
-revision locks `Client`/`Professional` as the naming and adds it to §9's
-non-negotiable checklist ("no `payer`/`solver` remnants"). The code as
-implemented for slices 1–3 below still uses `payer`/`solver` throughout —
-Prisma schema (`Gig.payerId`, `Claim.solverId`, etc.), module interfaces
-(`GigsPort`, `MatchingStrategy`), DTOs, and endpoint payloads (19 files as
-of this note). Because no migration has run against a live DB, this is a
-clean rename now (schema + code, no data migration risk) but is real
-scope — not folded into this note. Do it as its own pass before slice 4
-so Payments/Escrow (§5, which already spec `refundClient`/
-`releaseToProfessional`) aren't built against the old names.
+**Terminology debt — resolved.** `HANDOFF.md`'s Aug 2026 revision locked
+`Client`/`Professional` as the naming and added it to §9's non-negotiable
+checklist ("no `payer`/`solver` remnants"). The code implemented for
+slices 1–3 originally used `payer`/`solver` throughout — Prisma schema
+(`Gig.payerId`, `Claim.solverId`, etc.), module interfaces (`GigsPort`,
+`MatchingStrategy`), DTOs, and endpoint payloads (19 files). Since no
+migration had run against a live DB, this was a clean mechanical rename
+(schema + code, verified with `npx prisma validate` and `npx nest build`,
+both pass) — done as its own pass before slice 4, so Payments/Escrow (§5)
+is built against `refundClient`/`releaseToProfessional` from the start,
+not the old names. `PayerTypeRef` → `ClientTypeRef`, `SolverServiceOffering`
+→ `ProfessionalServiceOffering`, `PayerSeekingCategory` →
+`ClientSeekingCategory`, `payer-signoff.strategy.ts` →
+`client-signoff.strategy.ts`, and all method/field/enum names below are
+updated accordingly — endpoint paths and request/response *shapes* are
+unchanged, only field names (e.g. `payerId` → `clientId` in
+`CreateGigInput`/`GigRecord`, `roles: ['payer','solver']` →
+`roles: ['client','professional']`).
 
 ---
 
@@ -42,7 +49,7 @@ so Payments/Escrow (§5, which already spec `refundClient`/
 - `prisma/schema.prisma` — full data model from §4, including every seam
   field (`Gig.source`, `Gig.templateId`, `Criterion.verificationStrategy`,
   `EscrowRecord.platformFeeBps`, taxonomy tables `Domain`/`Submarket`/
-  `PayerTypeRef`) and every money-integrity constraint (§9): `BigInt` kobo
+  `ClientTypeRef`) and every money-integrity constraint (§9): `BigInt` kobo
   fields, `LedgerEntry.eventId` unique, no `updatedAt` on `LedgerEntry`.
 - `PrismaModule` (global, shared infra — not one of the nine business
   modules) so each module can reach its own tables without a second DB
@@ -87,9 +94,15 @@ this already existed as the §3.1 seam for "new actor types are additive"):
 
 | Type | `roleFlags` | Required at signup |
 |---|---|---|
-| Professional | `['solver']` | ≥1 `serviceOfferingSubmarketIds` |
-| User | `['payer']` | ≥1 `seekingCategorySubmarketIds` |
-| Hybrid (**default**) | `['payer','solver']` | **both** lists, ≥1 each |
+| Professional | `['professional']` | ≥1 `serviceOfferingSubmarketIds` |
+| Client | `['client']` | ≥1 `seekingCategorySubmarketIds` |
+| Hybrid (**default**) | `['client','professional']` | **both** lists, ≥1 each |
+
+(Renamed from the original Professional/User/Hybrid + payer/solver draft to
+match `HANDOFF.md`'s Aug 2026 Client/Professional terminology lock — see
+the note at the top of this file. Whether Hybrid itself still ships as a
+v1 account type isn't restated in that revision; flagged as open in
+`PRD.md` §12.)
 
 Decided explicitly: hybrid is not a lighter-touch path. Signing up as
 hybrid (the default — a signup does nothing to narrow it) still requires
@@ -99,11 +112,11 @@ to get done" before registration completes. No "fill in later" deferral.
 Both fields are **structured picks from the `Submarket` taxonomy**, the
 same one `Gig.submarket` uses (`HANDOFF.md` §3.2 TAXONOMY seam) — not free
 text. Two new join tables carry this (`server/prisma/schema.prisma`):
-`SolverServiceOffering` and `PayerSeekingCategory`, each `(userId,
+`ProfessionalServiceOffering` and `ClientSeekingCategory`, each `(userId,
 submarketId)`. Reusing the Gigs taxonomy here means "I fix pipes" is a
-`Submarket` row a solver can be matched against later (`MatchingStrategy`,
-§3.3, is exactly the seam that would consume this), not a string nothing
-else in the system can read.
+`Submarket` row a Professional can be matched against later
+(`MatchingStrategy`, §3.3, is exactly the seam that would consume this),
+not a string nothing else in the system can read.
 
 This is the one place this repo's module boundary needed a judgment call:
 `Submarket` was written for Gigs, but Identity now has a direct Prisma
@@ -117,8 +130,8 @@ still only their owning module touches.
 `server/src/modules/identity/identity.interface.ts` and
 `identity.service.ts`) is the enforcement point: it validates the
 roles-vs-lists rule above and writes `User.roleFlags` plus both join
-tables' rows in one transaction, so a solver-flagged user can never exist
-with zero offerings.
+tables' rows in one transaction, so a professional-flagged user can never
+exist with zero offerings.
 
 **Endpoints — IMPLEMENTED (all in `IdentityController`, module stays
 HTTP-free otherwise per the "modules talk through interfaces" rule — the
@@ -134,10 +147,12 @@ GET  /taxonomy/domains                                   -> Domain[]
 ```
 
 `POST /me/role-profile` is registration step 2, called right after OTP
-verification succeeds and before the account is usable — the client
+verification succeeds and before the account is usable — the mobile app
 should treat a user with `roles: []` (empty) as still mid-signup, not as a
 fully registered account. `GET /me` returns that empty-roles state as-is,
-by design — it's the client's signal to route back into onboarding.
+by design — it's the app's signal to route back into onboarding. (Using
+"the mobile app" here, not "the client", to avoid colliding with the
+Client *role* name.)
 
 Implementation notes:
 - OTP codes: 6 digits, scrypt-hashed (Node built-in, no new dependency —
@@ -155,8 +170,8 @@ Implementation notes:
   circular dependency (Identity already imports Notifications to send
   OTPs). Fixed by having the caller pass the phone in (`NotifyTarget`),
   since Identity already has it.
-- `npm run prisma:seed` populates `Domain`/`Submarket`/`PayerTypeRef` with
-  a starting taxonomy (10 physical + 10 digital submarkets, 4 payer
+- `npm run prisma:seed` populates `Domain`/`Submarket`/`ClientTypeRef` with
+  a starting taxonomy (10 physical + 10 digital submarkets, 4 client
   types) — a starting set, not final; adding more is a seed re-run, not a
   deploy, per the TAXONOMY seam.
 
@@ -187,18 +202,18 @@ team to confirm mockup numbers against `SPEC.md` when available).
   `transitionStatus`. (`listGigs` stays a stub — that's slice 5,
   market/browse.)
 - `GigIntake` (§3.2 seam): exactly one implementation,
-  `source: 'self_posted'`, driven by a payer filling out the create-gig
+  `source: 'self_posted'`, driven by a Client filling out the create-gig
   form. This is the seam other intake sources plug into later (§8) — the
   controller below is intentionally the *only* caller of
   `GigsService.createGig`, so a second intake source (e.g. a future signal
   detector) is a second caller of the same method, not a code change to it.
 - `MatchingStrategy.priceGig` (§3.3): `FixedPriceAcceptStrategy` becomes a
   real (if trivial) implementation — v1 pricing is a pass-through of the
-  payer-supplied `bountyKobo`, no auction, no adjustment.
+  Client-supplied `bountyKobo`, no auction, no adjustment.
 
 **New pieces:**
 - Taxonomy seed migration: `Domain` (`physical`, `digital`), `Submarket`,
-  `PayerTypeRef` rows. Exact submarket/payer-type lists come from
+  `ClientTypeRef` rows. Exact submarket/client-type lists come from
   `SPEC.md` (not in this upload) — placeholder seed data only until then.
 - `Gig.status` transitions enforced against an explicit allowed-transition
   map (§9) — e.g. `draft -> escrow_pending` only via `publishGig()`, never a
@@ -212,8 +227,8 @@ team to confirm mockup numbers against `SPEC.md` when available).
 
 **Endpoints (`GigsController`):**
 ```
-POST /gigs                  (auth'd, payer) CreateGigInput -> GigRecord (status=draft)
-POST /gigs/:id/publish       (auth'd, payer, owner)         -> GigRecord (status=escrow_pending, criteria locked)
+POST /gigs                  (auth'd, client) CreateGigInput -> GigRecord (status=draft)
+POST /gigs/:id/publish       (auth'd, client, owner)         -> GigRecord (status=escrow_pending, criteria locked)
 GET  /gigs/:id                                              -> GigRecord
 ```
 
@@ -228,14 +243,14 @@ those are slice 4 and require the "first money slice — supervise" review
 gate per HANDOFF.md §7/§9.
 
 **Implementation notes:**
-- `domain`/`submarket`/`payerType` on `CreateGigInput` are taxonomy
+- `domain`/`submarket`/`clientType` on `CreateGigInput` are taxonomy
   **keys** (e.g. `"plumbing"`, not a cuid) — `GigsService.createGig`
   resolves them to IDs and 400s on an unknown key. Matches how
   `GET /taxonomy/submarkets` returns them.
-- `payerId` is never trusted from the request body — `GigsController`
-  takes it from the verified JWT (`@CurrentUser()`), so a client can't
+- `clientId` is never trusted from the request body — `GigsController`
+  takes it from the verified JWT (`@CurrentUser()`), so a caller can't
   post a gig as someone else by editing JSON.
-- `createGig` calls `IdentityService.assertRole(payerId, 'payer')` before
+- `createGig` calls `IdentityService.assertRole(clientId, 'client')` before
   anything else — the cross-module call `IdentityPort.assertRole` exists
   for exactly this.
 - Extracted `common/auth/` (`AuthModule`, `JwtAuthGuard`,

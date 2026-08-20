@@ -160,30 +160,30 @@ export class IdentityService implements IdentityPort {
 
   /**
    * Enforces the registration rule from identity.interface.ts:
-   * roles.includes('solver') requires serviceOfferingSubmarketIds.length >= 1;
-   * roles.includes('payer') requires seekingCategorySubmarketIds.length >= 1.
+   * roles.includes('professional') requires serviceOfferingSubmarketIds.length >= 1;
+   * roles.includes('client') requires seekingCategorySubmarketIds.length >= 1.
    * Hybrid (both roles) requires both — reject with 400 if either required
    * list is missing/empty, never silently skip it.
    */
   async completeRoleProfile(userId: string, input: CompleteRoleProfileInput): Promise<IdentityUser> {
     const roles = input.roles;
     if (!roles || roles.length === 0) {
-      throw new BadRequestException('roles must include at least one of "payer" or "solver"');
+      throw new BadRequestException('roles must include at least one of "client" or "professional"');
     }
-    if (roles.some((r) => r !== 'payer' && r !== 'solver')) {
-      throw new BadRequestException('roles may only contain "payer" and/or "solver"');
+    if (roles.some((r) => r !== 'client' && r !== 'professional')) {
+      throw new BadRequestException('roles may only contain "client" and/or "professional"');
     }
 
-    const wantsSolver = roles.includes('solver');
-    const wantsPayer = roles.includes('payer');
+    const wantsProfessional = roles.includes('professional');
+    const wantsClient = roles.includes('client');
     const serviceOfferingIds = input.serviceOfferingSubmarketIds ?? [];
     const seekingCategoryIds = input.seekingCategorySubmarketIds ?? [];
 
-    if (wantsSolver && serviceOfferingIds.length === 0) {
-      throw new BadRequestException('serviceOfferingSubmarketIds must have at least one entry for the "solver" role');
+    if (wantsProfessional && serviceOfferingIds.length === 0) {
+      throw new BadRequestException('serviceOfferingSubmarketIds must have at least one entry for the "professional" role');
     }
-    if (wantsPayer && seekingCategoryIds.length === 0) {
-      throw new BadRequestException('seekingCategorySubmarketIds must have at least one entry for the "payer" role');
+    if (wantsClient && seekingCategoryIds.length === 0) {
+      throw new BadRequestException('seekingCategorySubmarketIds must have at least one entry for the "client" role');
     }
 
     const allSubmarketIds = [...new Set([...serviceOfferingIds, ...seekingCategoryIds])];
@@ -203,16 +203,16 @@ export class IdentityService implements IdentityPort {
       // Replace-in-full rather than diff — simpler, and this call is rare
       // (registration, or a deliberate profile edit) so the extra writes
       // don't matter.
-      await tx.solverServiceOffering.deleteMany({ where: { userId } });
-      if (wantsSolver && serviceOfferingIds.length > 0) {
-        await tx.solverServiceOffering.createMany({
+      await tx.professionalServiceOffering.deleteMany({ where: { userId } });
+      if (wantsProfessional && serviceOfferingIds.length > 0) {
+        await tx.professionalServiceOffering.createMany({
           data: serviceOfferingIds.map((submarketId) => ({ userId, submarketId })),
         });
       }
 
-      await tx.payerSeekingCategory.deleteMany({ where: { userId } });
-      if (wantsPayer && seekingCategoryIds.length > 0) {
-        await tx.payerSeekingCategory.createMany({
+      await tx.clientSeekingCategory.deleteMany({ where: { userId } });
+      if (wantsClient && seekingCategoryIds.length > 0) {
+        await tx.clientSeekingCategory.createMany({
           data: seekingCategoryIds.map((submarketId) => ({ userId, submarketId })),
         });
       }

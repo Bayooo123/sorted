@@ -16,15 +16,15 @@ export class GigsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateGigDto) {
-    // payerId always comes from the verified token, never the request body
+    // clientId always comes from the verified token, never the request body
     // — a client can't post a gig as someone else by editing JSON.
     return this.gigs.createGig({
-      payerId: user.userId,
+      clientId: user.userId,
       title: dto.title,
       description: dto.description,
       domain: dto.domain,
       submarket: dto.submarket,
-      payerType: dto.payerType,
+      clientType: dto.clientType,
       locationText: dto.locationText,
       locationGeo: dto.locationGeo,
       materialsMode: dto.materialsMode,
@@ -38,7 +38,7 @@ export class GigsController {
   @Post(':id/publish')
   async publish(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const gig = await this.gigs.getGig(id);
-    if (gig.payerId !== user.userId) {
+    if (gig.clientId !== user.userId) {
       throw new ForbiddenException('Only the gig owner can publish it');
     }
     return this.gigs.publishGig(id);

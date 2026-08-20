@@ -33,17 +33,17 @@ export interface EscrowRecordView {
 export interface EscrowPort {
   /** PUBLISH: creates the holding account via PaymentsProvider. */
   fundGig(gigId: string): Promise<EscrowRecordView>;
-  /** CLAIM+STAKE: solver's ~10% stake is held. */
-  holdStake(gigId: string, solverId: string, stakeKobo: Kobo): Promise<EscrowRecordView>;
-  /** SIGN-OFF happy path: disburse solver 90% + Sorted fee, return stake. */
-  releaseToSolver(gigId: string): Promise<EscrowRecordView>;
-  /** Payer-side refund (payer bad-faith withholding is a penalty, not this). */
-  refundPayer(gigId: string): Promise<EscrowRecordView>;
+  /** CLAIM+STAKE: professional's ~10% stake is held. */
+  holdStake(gigId: string, professionalId: string, stakeKobo: Kobo): Promise<EscrowRecordView>;
+  /** SIGN-OFF happy path: disburse professional 90% + Sorted fee, return stake. */
+  releaseToProfessional(gigId: string): Promise<EscrowRecordView>;
+  /** Client-side refund (client bad-faith withholding is a penalty, not this). */
+  refundClient(gigId: string): Promise<EscrowRecordView>;
   /** DISPUTE: state = dispute_hold. Release becomes impossible while set. */
   freezeForDispute(gigId: string): Promise<EscrowRecordView>;
-  /** Applies a neutral's ruling (for_solver | for_payer | split) post-freeze. */
+  /** Applies a neutral's ruling (for_professional | for_client | split) post-freeze. */
   resolveFrozen(
     gigId: string,
-    ruling: 'for_solver' | 'for_payer' | 'split',
+    ruling: 'for_professional' | 'for_client' | 'split',
   ): Promise<EscrowRecordView>;
 }

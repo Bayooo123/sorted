@@ -1,6 +1,6 @@
 /**
  * HANDOFF.md §3.3 — Matching
- * Owns: how a gig gets a price and a solver.
+ * Owns: how a gig gets a price and a professional.
  *
  * SEAM: this is the cleanest, highest-value seam in the system — protect it.
  * Pricing/assignment lives ONLY here, never in the Gig model. Known futures
@@ -19,7 +19,7 @@ export interface GigForPricing {
 
 export interface ClaimAttempt {
   gigId: string;
-  solverId: string;
+  professionalId: string;
   staked: boolean;
 }
 
@@ -29,13 +29,13 @@ export interface PricingResult {
 
 export interface AssignmentResult {
   gigId: string;
-  solverId: string;
+  professionalId: string;
 }
 
 export interface MatchingStrategy {
   readonly name: string;
   priceGig(gig: GigForPricing): Promise<PricingResult>;
-  assignSolver(gig: GigForPricing, claim: ClaimAttempt): Promise<AssignmentResult>;
+  assignProfessional(gig: GigForPricing, claim: ClaimAttempt): Promise<AssignmentResult>;
 }
 
 export const MATCHING_STRATEGY = 'MATCHING_STRATEGY';

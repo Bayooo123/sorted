@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { VERIFICATION_STRATEGY } from './verification.interface';
-import { PayerSignoffStrategy } from './strategies/payer-signoff.strategy';
+import { ClientSignoffStrategy } from './strategies/client-signoff.strategy';
 
 @Module({
   providers: [
-    PayerSignoffStrategy,
-    { provide: VERIFICATION_STRATEGY, useExisting: PayerSignoffStrategy },
+    ClientSignoffStrategy,
+    { provide: VERIFICATION_STRATEGY, useExisting: ClientSignoffStrategy },
   ],
   exports: [VERIFICATION_STRATEGY],
 })

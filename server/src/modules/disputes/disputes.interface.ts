@@ -11,7 +11,7 @@
  */
 import { Kobo } from '../../common/money';
 
-export type DisputeRuling = 'for_solver' | 'for_payer' | 'split';
+export type DisputeRuling = 'for_professional' | 'for_client' | 'split';
 export type DisputeStatus = 'open' | 'assigned' | 'ruled' | 'closed';
 
 export interface DisputeRecord {

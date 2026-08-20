@@ -39,7 +39,7 @@ export class CreateGigDto {
 
   /** Taxonomy `key`, e.g. "individual". */
   @IsString()
-  payerType!: string;
+  clientType!: string;
 
   @IsString()
   @Length(1, 500)
@@ -50,8 +50,8 @@ export class CreateGigDto {
   @Type(() => LocationGeoDto)
   locationGeo?: LocationGeoDto;
 
-  @IsIn(['bounty_covers', 'solver_supplies'])
-  materialsMode!: 'bounty_covers' | 'solver_supplies';
+  @IsIn(['bounty_covers', 'professional_supplies'])
+  materialsMode!: 'bounty_covers' | 'professional_supplies';
 
   @IsInt()
   @Min(1)

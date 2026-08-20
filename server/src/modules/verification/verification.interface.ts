@@ -2,7 +2,7 @@
  * HANDOFF.md §3.6 — Verification
  * Owns: deciding whether a criterion is "met."
  *
- * SEAM: v1 = PayerSignoff. Known futures (tamper-evident media, third-party
+ * SEAM: v1 = ClientSignoff. Known futures (tamper-evident media, third-party
  * inspection, automated per-problem-type checks) are alternate strategies
  * behind this interface. "How done is proven" is isolated here so richer
  * verification never touches Escrow or Gigs. Different gig types can carry

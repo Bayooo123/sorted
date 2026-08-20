@@ -30,16 +30,16 @@ export class EscrowService implements EscrowPort {
     throw new NotImplementedException('EscrowService.fundGig — slice 4');
   }
 
-  holdStake(_gigId: string, _solverId: string, _stakeKobo: Kobo): Promise<EscrowRecordView> {
+  holdStake(_gigId: string, _professionalId: string, _stakeKobo: Kobo): Promise<EscrowRecordView> {
     throw new NotImplementedException('EscrowService.holdStake — slice 6');
   }
 
-  releaseToSolver(_gigId: string): Promise<EscrowRecordView> {
-    throw new NotImplementedException('EscrowService.releaseToSolver — slice 7');
+  releaseToProfessional(_gigId: string): Promise<EscrowRecordView> {
+    throw new NotImplementedException('EscrowService.releaseToProfessional — slice 7');
   }
 
-  refundPayer(_gigId: string): Promise<EscrowRecordView> {
-    throw new NotImplementedException('EscrowService.refundPayer — slice 8 (disputes)');
+  refundClient(_gigId: string): Promise<EscrowRecordView> {
+    throw new NotImplementedException('EscrowService.refundClient — slice 8 (disputes)');
   }
 
   freezeForDispute(_gigId: string): Promise<EscrowRecordView> {
@@ -48,7 +48,7 @@ export class EscrowService implements EscrowPort {
 
   resolveFrozen(
     _gigId: string,
-    _ruling: 'for_solver' | 'for_payer' | 'split',
+    _ruling: 'for_professional' | 'for_client' | 'split',
   ): Promise<EscrowRecordView> {
     throw new NotImplementedException('EscrowService.resolveFrozen — slice 8');
   }

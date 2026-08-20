@@ -37,7 +37,7 @@ model User {
   id                  String   @id @default(cuid())
   phone               String   @unique
   name                String?
-  roleFlags           String[] // e.g. ["payer","solver"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
+  roleFlags           String[] // e.g. ["client","professional"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
   kycStatus           KycStatus @default(unverified)
   identityRef         String? // SEAM (§3.1): opaque ref into whichever IdentityVerifier produced kycStatus
   monnifyCustomerRef  String?
@@ -46,7 +46,7 @@ model User {
   payoutAccountName   String?
   createdAt           DateTime @default(now())
 
-  gigsAsPayer     Gig[]      @relation("PayerGigs")
+  gigsAsClient     Gig[]      @relation("ClientGigs")
   claims          Claim[]
   disputesRaised  Dispute[]  @relation("DisputeRaisedBy")
   disputesRuled   Dispute[]  @relation("DisputeNeutral")
@@ -57,8 +57,8 @@ model User {
   // every account defaults to hybrid (both role flags). Whichever flags are
   // set, the matching profile below is required — enforced in
   // IdentityService.completeRoleProfile, not by the schema.
-  serviceOfferings  SolverServiceOffering[] // required when roleFlags includes "solver"
-  seekingCategories PayerSeekingCategory[]  // required when roleFlags includes "payer"
+  serviceOfferings  ProfessionalServiceOffering[] // required when roleFlags includes "professional"
+  seekingCategories ClientSeekingCategory[]  // required when roleFlags includes "client"
 }
 
 // Short-lived OTP codes for phone auth. Deliberately its own table, not
@@ -81,7 +81,7 @@ model OtpRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Taxonomy (§3.2 SEAM — TAXONOMY): domain/submarket/payer_type are data,
+// Taxonomy (§3.2 SEAM — TAXONOMY): domain/submarket/client_type are data,
 // not enums hardcoded in logic. Growth is a seed-table insert, not a deploy.
 //
 // Shared reference data, not Gigs-owned business state: Identity also reads
@@ -109,14 +109,14 @@ model Submarket {
   domain   Domain? @relation(fields: [domainId], references: [id])
 
   gigs                     Gig[]
-  offeredBySolvers         SolverServiceOffering[]
-  soughtByPayers           PayerSeekingCategory[]
+  offeredByProfessionals         ProfessionalServiceOffering[]
+  soughtByClients           ClientSeekingCategory[]
 }
 
-// Registration: which categories a solver says they offer services in.
-// Required (>=1 row) at signup when roleFlags includes "solver" — see
+// Registration: which categories a professional says they offer services in.
+// Required (>=1 row) at signup when roleFlags includes "professional" — see
 // PLAN.md "Registration: account type" for the full rule, including hybrid.
-model SolverServiceOffering {
+model ProfessionalServiceOffering {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id])
@@ -127,9 +127,9 @@ model SolverServiceOffering {
   @@unique([userId, submarketId])
 }
 
-// Registration: which categories a payer says they're most likely to post
-// gigs in. Required (>=1 row) at signup when roleFlags includes "payer".
-model PayerSeekingCategory {
+// Registration: which categories a client says they're most likely to post
+// gigs in. Required (>=1 row) at signup when roleFlags includes "client".
+model ClientSeekingCategory {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id])
@@ -140,7 +140,7 @@ model PayerSeekingCategory {
   @@unique([userId, submarketId])
 }
 
-model PayerTypeRef {
+model ClientTypeRef {
   id    String @id @default(cuid())
   key   String @unique // e.g. "individual" | "corporate" | "ngo" | "government"
   label String
@@ -158,7 +158,7 @@ enum GigSource {
 
 enum MaterialsMode {
   bounty_covers
-  solver_supplies
+  professional_supplies
 }
 
 enum GigStatus {
@@ -177,8 +177,8 @@ enum GigStatus {
 
 model GigTemplate {
   id         String   @id @default(cuid())
-  payerId    String
-  payer      User     @relation(fields: [payerId], references: [id])
+  clientId    String
+  client      User     @relation(fields: [clientId], references: [id])
   spec       Json
   recurrence Json? // SEAM (§3.2 RECURRENCE): unused in v1 — generate instances from this later
   createdAt  DateTime @default(now())
@@ -188,8 +188,8 @@ model GigTemplate {
 
 model Gig {
   id          String   @id @default(cuid())
-  payerId     String
-  payer       User     @relation("PayerGigs", fields: [payerId], references: [id])
+  clientId     String
+  client       User     @relation("ClientGigs", fields: [clientId], references: [id])
   source      GigSource @default(self_posted)
   templateId  String? // SEAM (§3.2 RECURRENCE): nullable, always null in v1
   template    GigTemplate? @relation(fields: [templateId], references: [id])
@@ -201,8 +201,8 @@ model Gig {
   domain       Domain       @relation(fields: [domainId], references: [id])
   submarketId  String
   submarket    Submarket    @relation(fields: [submarketId], references: [id])
-  payerTypeId  String
-  payerType    PayerTypeRef @relation(fields: [payerTypeId], references: [id])
+  clientTypeId  String
+  clientType    ClientTypeRef @relation(fields: [clientTypeId], references: [id])
 
   locationText   String
   locationGeoLat Float?
@@ -231,7 +231,7 @@ model Criterion {
   orderIndex            Int
   text                  String
   locked                Boolean @default(false) // ★ true at publish, immutable thereafter — server-enforced
-  verificationStrategy  String  @default("payer_signoff") // SEAM (§3.6): key into VerificationStrategy registry, settable per criterion
+  verificationStrategy  String  @default("client_signoff") // SEAM (§3.6): key into VerificationStrategy registry, settable per criterion
   proofUrl              String?
   met                   Boolean?
 }
@@ -251,8 +251,8 @@ model Claim {
   id        String      @id @default(cuid())
   gigId     String
   gig       Gig         @relation(fields: [gigId], references: [id])
-  solverId  String
-  solver    User        @relation(fields: [solverId], references: [id])
+  professionalId  String
+  professional    User        @relation(fields: [professionalId], references: [id])
   staked    Boolean     @default(false)
   status    ClaimStatus @default(pending)
   claimedAt DateTime    @default(now())
@@ -285,7 +285,7 @@ model EscrowRecord {
 
   platformFeeBps     Int // ★ config PER GIG (1000=10%, 500=launch rate) — never a constant
   feeKobo            BigInt? // ★
-  solverPayoutKobo   BigInt? // ★
+  professionalPayoutKobo   BigInt? // ★
 
   state              EscrowState @default(awaiting_funding)
   disbursementRef    String? // idempotency key for disbursement — double-release protection
@@ -298,8 +298,8 @@ model EscrowRecord {
 // ---------------------------------------------------------------------------
 
 enum DisputeRuling {
-  for_solver
-  for_payer
+  for_professional
+  for_client
   split
 }
 

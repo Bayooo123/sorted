@@ -42,7 +42,7 @@ export class GigsService implements GigsPort {
   ) {}
 
   async createGig(input: CreateGigInput): Promise<GigRecord> {
-    await this.identity.assertRole(input.payerId, 'payer');
+    await this.identity.assertRole(input.clientId, 'client');
 
     if (!input.criteria || input.criteria.length === 0) {
       throw new BadRequestException('A gig needs at least one criterion');
@@ -51,17 +51,17 @@ export class GigsService implements GigsPort {
       throw new BadRequestException('bountyKobo must be greater than zero');
     }
 
-    const [domain, submarket, payerType] = await Promise.all([
+    const [domain, submarket, clientType] = await Promise.all([
       this.prisma.domain.findUnique({ where: { key: input.domain } }),
       this.prisma.submarket.findUnique({ where: { key: input.submarket } }),
-      this.prisma.payerTypeRef.findUnique({ where: { key: input.payerType } }),
+      this.prisma.clientTypeRef.findUnique({ where: { key: input.clientType } }),
     ]);
     if (!domain) throw new BadRequestException(`Unknown domain "${input.domain}"`);
     if (!submarket) throw new BadRequestException(`Unknown submarket "${input.submarket}"`);
-    if (!payerType) throw new BadRequestException(`Unknown payerType "${input.payerType}"`);
+    if (!clientType) throw new BadRequestException(`Unknown clientType "${input.clientType}"`);
 
     // SEAM (§3.3): pricing always goes through MatchingStrategy, even
-    // though v1's FixedPriceAccept is a pass-through of the payer's
+    // though v1's FixedPriceAccept is a pass-through of the client's
     // number. Swapping to reverse-auction/dynamic pricing later changes
     // what this call resolves to, not this call site.
     const pricing = await this.matchingStrategy.priceGig({
@@ -73,14 +73,14 @@ export class GigsService implements GigsPort {
 
     const gig = await this.prisma.gig.create({
       data: {
-        payerId: input.payerId,
+        clientId: input.clientId,
         source: 'self_posted',
         templateId: input.templateId ?? null,
         title: input.title,
         description: input.description,
         domainId: domain.id,
         submarketId: submarket.id,
-        payerTypeId: payerType.id,
+        clientTypeId: clientType.id,
         locationText: input.locationText,
         locationGeoLat: input.locationGeo?.lat,
         locationGeoLng: input.locationGeo?.lng,
@@ -145,7 +145,7 @@ export class GigsService implements GigsPort {
   private toGigRecord(gig: Gig): GigRecord {
     return {
       id: gig.id,
-      payerId: gig.payerId,
+      clientId: gig.clientId,
       source: gig.source as GigRecord['source'],
       templateId: gig.templateId,
       status: gig.status as GigStatus,

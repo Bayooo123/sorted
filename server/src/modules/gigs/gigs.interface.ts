@@ -18,7 +18,7 @@ export type GigStatus =
   | 'cancelled';
 
 /**
- * SEAM (§3.2, INTAKE): a gig must not assume a human payer created it.
+ * SEAM (§3.2, INTAKE): a gig must not assume a human client created it.
  * v1 has exactly one source. Future feeders (signal detection, institutional
  * submissions, sensor triggers) add new GigIntake implementations that
  * produce gigs the rest of the system treats identically — this is the seam
@@ -32,15 +32,15 @@ export interface GigIntake {
 }
 
 export interface CreateGigInput {
-  payerId: string;
+  clientId: string;
   title: string;
   description: string;
   domain: string; // FK to taxonomy seed table — data, not a hardcoded enum
   submarket: string; // FK to taxonomy seed table
-  payerType: string; // FK to taxonomy seed table
+  clientType: string; // FK to taxonomy seed table
   locationText: string;
   locationGeo?: { lat: number; lng: number };
-  materialsMode: 'bounty_covers' | 'solver_supplies';
+  materialsMode: 'bounty_covers' | 'professional_supplies';
   bountyKobo: Kobo;
   criteria: string[];
   /** SEAM (§3.2, RECURRENCE): nullable — v1 always null. */
@@ -49,7 +49,7 @@ export interface CreateGigInput {
 
 export interface GigRecord {
   id: string;
-  payerId: string;
+  clientId: string;
   source: GigSource;
   templateId: string | null;
   status: GigStatus;
@@ -60,7 +60,7 @@ export interface GigRecord {
 export interface GigListFilter {
   domain?: string;
   submarket?: string;
-  payerType?: string;
+  clientType?: string;
   status?: GigStatus;
 }
 

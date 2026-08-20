@@ -68,14 +68,14 @@ async function main() {
   }
 
   for (const p of PAYER_TYPES) {
-    await prisma.payerTypeRef.upsert({
+    await prisma.clientTypeRef.upsert({
       where: { key: p.key },
       create: p,
       update: { label: p.label },
     });
   }
 
-  console.log(`Seeded ${DOMAINS.length} domains, ${SUBMARKETS.length} submarkets, ${PAYER_TYPES.length} payer types.`);
+  console.log(`Seeded ${DOMAINS.length} domains, ${SUBMARKETS.length} submarkets, ${PAYER_TYPES.length} client types.`);
 }
 
 main()

@@ -4,7 +4,7 @@ import { Role } from '../identity.interface';
 export class CompleteRoleProfileDto {
   @IsArray()
   @ArrayUnique()
-  @IsIn(['payer', 'solver'], { each: true })
+  @IsIn(['client', 'professional'], { each: true })
   roles!: Role[];
 
   @IsOptional()

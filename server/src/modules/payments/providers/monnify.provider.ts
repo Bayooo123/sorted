@@ -41,7 +41,7 @@ export class MonnifyProvider implements PaymentsProvider {
   }
 
   refund(_ref: string): Promise<RefundResult> {
-    throw new NotImplementedException('MonnifyProvider.refund — slice 8 (disputes: for_payer ruling)');
+    throw new NotImplementedException('MonnifyProvider.refund — slice 8 (disputes: for_client ruling)');
   }
 
   verifyWebhook(

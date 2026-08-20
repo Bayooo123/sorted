@@ -1,10 +1,10 @@
 /**
  * HANDOFF.md §3.1 — Identity
- * Owns: users, phone+OTP auth, roles (payer/solver), KYC status, payout bank
+ * Owns: users, phone+OTP auth, roles (client/professional), KYC status, payout bank
  * details, monnify_customer_ref.
  */
 
-export type Role = 'payer' | 'solver';
+export type Role = 'client' | 'professional';
 export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export interface IdentityUser {
@@ -13,9 +13,9 @@ export interface IdentityUser {
   name: string | null;
   roles: Role[];
   kycStatus: KycStatus;
-  /** Populated when roles includes 'solver'. Submarket IDs — see CompleteRoleProfileInput. */
+  /** Populated when roles includes 'professional'. Submarket IDs — see CompleteRoleProfileInput. */
   serviceOfferingSubmarketIds: string[];
-  /** Populated when roles includes 'payer'. Submarket IDs — see CompleteRoleProfileInput. */
+  /** Populated when roles includes 'client'. Submarket IDs — see CompleteRoleProfileInput. */
   seekingCategorySubmarketIds: string[];
 }
 
@@ -29,16 +29,16 @@ export interface PayoutDestination {
  * Registration: account type (agreed after HANDOFF.md — not in the original
  * doc; see PLAN.md "Registration: account type" for the full writeup).
  *
- * Every account defaults to hybrid: roles = ['payer', 'solver']. A signup
+ * Every account defaults to hybrid: roles = ['client', 'professional']. A signup
  * can narrow to just one. Whichever roles end up set, the matching
  * category picks are REQUIRED, hybrid included — there is no "fill in
  * later" path:
- *   - roles includes 'solver'  => serviceOfferingSubmarketIds.length >= 1
- *   - roles includes 'payer'   => seekingCategorySubmarketIds.length >= 1
+ *   - roles includes 'professional'  => serviceOfferingSubmarketIds.length >= 1
+ *   - roles includes 'client'   => seekingCategorySubmarketIds.length >= 1
  *
  * Categories are structured picks from the same Submarket taxonomy Gigs
  * uses (HANDOFF.md §3.2 TAXONOMY seam) — not free text — so "I fix pipes"
- * becomes a Submarket row a solver can be matched against later, not a
+ * becomes a Submarket row a professional can be matched against later, not a
  * string nothing else in the system can read.
  */
 export interface CompleteRoleProfileInput {
