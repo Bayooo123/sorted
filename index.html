@@ -1211,10 +1211,10 @@
   // HANDOFF.md §3.1 / PLAN.md slice 2. Not the waitlist Supabase project
   // above; this is the actual product's Identity module.
   (function () {
-    // TODO: set to the live deployed server/ URL (NaijaBase Sites, Railway,
-    // or Render — HANDOFF.md §2). Nothing in this block will work until this
-    // points at a real, reachable instance of server/.
-    var API_BASE_URL = 'REPLACE_WITH_LIVE_BACKEND_URL';
+    // Live server/ deployment (NaijaBase Sites). This sandbox's own network
+    // policy blocks that host, so this couldn't be curl-verified from here —
+    // confirm end-to-end in an actual browser once this is deployed.
+    var API_BASE_URL = 'https://sorted.sites.naijabase.dev';
     var TOKEN_KEY = 'sorted_access_token';
 
     var modal = document.getElementById('auth-modal');
