@@ -652,6 +652,204 @@
     color: rgba(255,255,255,0.6);
     padding: 9px 8px;
   }
+
+  /* ---------- header auth button ---------- */
+
+  .btn-nav {
+    padding: 9px 18px;
+    font-size: 13.5px;
+    margin-left: 22px;
+    border-radius: 999px;
+  }
+
+  @media (max-width: 560px) {
+    nav a { display: none; }
+    .btn-nav { margin-left: 0; }
+  }
+
+  /* ---------- auth modal ---------- */
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(12,31,27,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay[hidden] { display: none; }
+
+  .modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    box-shadow: 0 24px 60px -20px rgba(12,31,27,0.4);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .modal-card h3 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+
+  .modal-sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin: 0 0 22px;
+  }
+
+  .modal-error {
+    font-size: 13px;
+    color: #B3261E;
+    font-weight: 600;
+    margin: -8px 0 14px;
+    min-height: 0;
+  }
+
+  .modal-error:empty { display: none; }
+
+  .phone-row { display: flex; gap: 8px; margin-bottom: 4px; }
+
+  .phone-row input {
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .phone-prefix { width: 64px; text-align: center; color: var(--text-muted); }
+  #auth-phone { flex: 1; min-width: 0; }
+
+  .phone-row input:focus, .otp-input:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  .otp-input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 22px;
+    letter-spacing: 10px;
+    text-align: center;
+    color: var(--text-primary);
+    margin: 4px 0 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .btn-block { width: 100%; margin-top: 4px; }
+  .btn-block:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .modal-link {
+    text-align: center;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--green-primary);
+    margin: 16px 0 0;
+    cursor: pointer;
+  }
+
+  .type-row { display: flex; gap: 8px; margin-bottom: 20px; }
+
+  .type-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 12px 6px;
+    border-radius: 13px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-body);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .type-card span {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--green-deep);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .type-card-active { border-color: var(--green-primary); background: var(--green-mint-bg); color: var(--green-deep); }
+
+  .cat-section { margin-bottom: 18px; }
+  .cat-section[hidden] { display: none; }
+
+  .cat-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+  }
+
+  .cat-sub {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+  }
+
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .chip {
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 12.5px;
+    color: var(--text-body);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .chip-active { border-color: var(--green-bright); background: var(--green-mint-bg); color: var(--green-deep); font-weight: 600; }
+
+  .done-check {
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 16px;
+  }
 </style>
 </head>
 <body>
@@ -668,6 +866,7 @@
     <nav>
       <a href="#how-it-works">How it works</a>
       <a href="#math">Pricing</a>
+      <button class="btn btn-nav" id="open-auth-modal" type="button">Log in / Sign up</button>
     </nav>
   </div>
 </header>
@@ -830,6 +1029,63 @@
   <button class="ib-dismiss" id="install-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>
 </div>
 
+<div id="auth-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <button class="modal-close" id="auth-modal-close" type="button" aria-label="Close">&times;</button>
+
+    <div class="auth-step" data-step="phone">
+      <h3 id="auth-modal-title">Log in or sign up</h3>
+      <p class="modal-sub">Enter your phone number — no email or password, just an OTP.</p>
+      <div class="phone-row">
+        <input value="+234" disabled class="phone-prefix" aria-label="Country code" />
+        <input type="tel" id="auth-phone" placeholder="801 234 5678" aria-label="Phone number" />
+      </div>
+      <p class="modal-error" id="auth-phone-error"></p>
+      <button class="btn btn-block" id="auth-phone-submit" type="button">Continue</button>
+    </div>
+
+    <div class="auth-step" data-step="otp" hidden>
+      <h3>Enter the code</h3>
+      <p class="modal-sub" id="auth-otp-sub"></p>
+      <input type="text" inputmode="numeric" maxlength="6" id="auth-otp-code" class="otp-input" placeholder="000000" aria-label="6-digit code" />
+      <p class="modal-error" id="auth-otp-error"></p>
+      <button class="btn btn-block" id="auth-otp-submit" type="button">Verify</button>
+      <p class="modal-link" id="auth-otp-resend">Didn&rsquo;t get a code? Resend</p>
+    </div>
+
+    <div class="auth-step" data-step="account-type" hidden>
+      <h3>What brings you to Sorted?</h3>
+      <p class="modal-sub">Hybrid is recommended — you can post gigs and get hired.</p>
+      <div class="type-row" id="auth-type-row">
+        <button class="type-card" data-type="professional" type="button">Professional</button>
+        <button class="type-card" data-type="client" type="button">Client</button>
+        <button class="type-card" data-type="hybrid" type="button">Hybrid<span>Recommended</span></button>
+      </div>
+      <div class="cat-section" id="auth-offering-section">
+        <p class="cat-label">What services do you offer?</p>
+        <p class="cat-sub">Pick at least one — required.</p>
+        <div class="chip-wrap" id="auth-offering-chips"></div>
+      </div>
+      <div class="cat-section" id="auth-seeking-section">
+        <p class="cat-label">What are you most likely to post gigs for?</p>
+        <p class="cat-sub">Pick at least one — required.</p>
+        <div class="chip-wrap" id="auth-seeking-chips"></div>
+      </div>
+      <p class="modal-error" id="auth-type-error"></p>
+      <button class="btn btn-block" id="auth-type-submit" type="button">Finish setup</button>
+    </div>
+
+    <div class="auth-step" data-step="done" hidden>
+      <div class="done-check">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h3>You&rsquo;re in.</h3>
+      <p class="modal-sub" id="auth-done-message"></p>
+      <button class="btn btn-block" id="auth-done-close" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 
@@ -948,6 +1204,279 @@
       banner.classList.remove('visible');
       try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
     });
+  })();
+
+  // ---------- auth modal: real phone+OTP against server/'s Identity API ----------
+  // Same endpoints the mobile app uses (mobile/src/api/identity.ts) — see
+  // HANDOFF.md §3.1 / PLAN.md slice 2. Not the waitlist Supabase project
+  // above; this is the actual product's Identity module.
+  (function () {
+    // TODO: set to the live deployed server/ URL (NaijaBase Sites, Railway,
+    // or Render — HANDOFF.md §2). Nothing in this block will work until this
+    // points at a real, reachable instance of server/.
+    var API_BASE_URL = 'REPLACE_WITH_LIVE_BACKEND_URL';
+    var TOKEN_KEY = 'sorted_access_token';
+
+    var modal = document.getElementById('auth-modal');
+    var closeBtn = document.getElementById('auth-modal-close');
+    var openBtn = document.getElementById('open-auth-modal');
+    var steps = modal.querySelectorAll('.auth-step');
+
+    var state = {
+      phone: null,
+      requestId: null,
+      accessToken: null,
+      submarkets: [], // loaded lazily before the account-type step
+      accountType: 'hybrid',
+      offering: {},
+      seeking: {},
+    };
+
+    function showStep(name) {
+      steps.forEach(function (el) {
+        el.hidden = el.getAttribute('data-step') !== name;
+      });
+    }
+
+    function openModal() {
+      modal.hidden = false;
+      showStep('phone');
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+    }
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+
+    function api(path, opts) {
+      opts = opts || {};
+      var headers = { 'Content-Type': 'application/json' };
+      if (opts.auth && state.accessToken) headers.Authorization = 'Bearer ' + state.accessToken;
+      return fetch(API_BASE_URL + path, {
+        method: opts.method || 'GET',
+        headers: headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      }).then(function (res) {
+        return res.text().then(function (text) {
+          var data = text ? JSON.parse(text) : undefined;
+          if (!res.ok) {
+            var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+            throw new Error(Array.isArray(message) ? message.join(', ') : message);
+          }
+          return data;
+        });
+      });
+    }
+
+    // ---- step: phone ----
+    var phoneInput = document.getElementById('auth-phone');
+    var phoneError = document.getElementById('auth-phone-error');
+    var phoneSubmit = document.getElementById('auth-phone-submit');
+
+    phoneSubmit.addEventListener('click', function () {
+      var local = phoneInput.value.replace(/\s/g, '').replace(/^0+/, '');
+      if (!/^\d{7,11}$/.test(local)) {
+        phoneError.textContent = 'Enter a valid Nigerian phone number.';
+        return;
+      }
+      phoneError.textContent = '';
+      var phone = '+234' + local;
+      phoneSubmit.disabled = true;
+      phoneSubmit.textContent = 'Sending…';
+
+      api('/auth/otp/request', { method: 'POST', body: { phone: phone } })
+        .then(function (res) {
+          state.phone = phone;
+          state.requestId = res.requestId;
+          document.getElementById('auth-otp-sub').textContent = 'We sent a 6-digit code to ' + phone;
+          document.getElementById('auth-otp-code').value = '';
+          document.getElementById('auth-otp-error').textContent = '';
+          showStep('otp');
+        })
+        .catch(function (err) {
+          phoneError.textContent = err.message;
+        })
+        .finally(function () {
+          phoneSubmit.disabled = false;
+          phoneSubmit.textContent = 'Continue';
+        });
+    });
+
+    // ---- step: otp ----
+    var otpInput = document.getElementById('auth-otp-code');
+    var otpError = document.getElementById('auth-otp-error');
+    var otpSubmit = document.getElementById('auth-otp-submit');
+    var otpResend = document.getElementById('auth-otp-resend');
+
+    function submitOtp() {
+      var code = otpInput.value.trim();
+      if (code.length !== 6) {
+        otpError.textContent = 'Enter the 6-digit code.';
+        return;
+      }
+      otpError.textContent = '';
+      otpSubmit.disabled = true;
+      otpSubmit.textContent = 'Verifying…';
+
+      api('/auth/otp/verify', { method: 'POST', body: { requestId: state.requestId, code: code } })
+        .then(function (res) {
+          state.accessToken = res.accessToken;
+          try { localStorage.setItem(TOKEN_KEY, res.accessToken); } catch (e) {}
+
+          if (!res.user.roles || res.user.roles.length === 0) {
+            loadSubmarketsAndShowAccountType();
+          } else {
+            document.getElementById('auth-done-message').textContent =
+              'Welcome back — the Sorted mobile app is where you post and claim gigs; this account is ready to go there.';
+            showStep('done');
+          }
+        })
+        .catch(function (err) {
+          otpInput.value = '';
+          otpError.textContent = err.message;
+        })
+        .finally(function () {
+          otpSubmit.disabled = false;
+          otpSubmit.textContent = 'Verify';
+        });
+    }
+
+    otpSubmit.addEventListener('click', submitOtp);
+    otpInput.addEventListener('input', function () {
+      otpInput.value = otpInput.value.replace(/\D/g, '').slice(0, 6);
+      if (otpInput.value.length === 6) submitOtp();
+    });
+    otpResend.addEventListener('click', function () {
+      otpResend.textContent = 'Sending…';
+      api('/auth/otp/request', { method: 'POST', body: { phone: state.phone } })
+        .then(function (res) {
+          state.requestId = res.requestId;
+          otpInput.value = '';
+          otpResend.textContent = "Didn't get a code? Resend";
+        })
+        .catch(function (err) {
+          otpError.textContent = err.message;
+          otpResend.textContent = "Didn't get a code? Resend";
+        });
+    });
+
+    // ---- step: account-type ----
+    var ROLES_BY_TYPE = {
+      professional: ['professional'],
+      client: ['client'],
+      hybrid: ['client', 'professional'],
+    };
+    var typeRow = document.getElementById('auth-type-row');
+    var offeringSection = document.getElementById('auth-offering-section');
+    var seekingSection = document.getElementById('auth-seeking-section');
+    var offeringChips = document.getElementById('auth-offering-chips');
+    var seekingChips = document.getElementById('auth-seeking-chips');
+    var typeError = document.getElementById('auth-type-error');
+    var typeSubmit = document.getElementById('auth-type-submit');
+
+    function loadSubmarketsAndShowAccountType() {
+      showStep('account-type');
+      setAccountType('hybrid');
+      if (state.submarkets.length > 0) {
+        renderChips();
+        return;
+      }
+      offeringChips.textContent = 'Loading…';
+      seekingChips.textContent = 'Loading…';
+      api('/taxonomy/submarkets')
+        .then(function (submarkets) {
+          state.submarkets = submarkets;
+          renderChips();
+        })
+        .catch(function (err) {
+          typeError.textContent = err.message;
+        });
+    }
+
+    function renderChips() {
+      offeringChips.innerHTML = '';
+      seekingChips.innerHTML = '';
+      state.submarkets.forEach(function (s) {
+        offeringChips.appendChild(makeChip(s, state.offering, offeringChips));
+        seekingChips.appendChild(makeChip(s, state.seeking, seekingChips));
+      });
+    }
+
+    function makeChip(submarket, selectionMap) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = submarket.label;
+      chip.addEventListener('click', function () {
+        selectionMap[submarket.id] = !selectionMap[submarket.id];
+        chip.classList.toggle('chip-active', !!selectionMap[submarket.id]);
+      });
+      return chip;
+    }
+
+    function setAccountType(type) {
+      state.accountType = type;
+      Array.prototype.forEach.call(typeRow.children, function (btn) {
+        btn.classList.toggle('type-card-active', btn.getAttribute('data-type') === type);
+      });
+      var roles = ROLES_BY_TYPE[type];
+      offeringSection.hidden = roles.indexOf('professional') === -1;
+      seekingSection.hidden = roles.indexOf('client') === -1;
+    }
+
+    Array.prototype.forEach.call(typeRow.children, function (btn) {
+      btn.addEventListener('click', function () {
+        setAccountType(btn.getAttribute('data-type'));
+      });
+    });
+
+    typeSubmit.addEventListener('click', function () {
+      var roles = ROLES_BY_TYPE[state.accountType];
+      var offeringIds = Object.keys(state.offering).filter(function (id) { return state.offering[id]; });
+      var seekingIds = Object.keys(state.seeking).filter(function (id) { return state.seeking[id]; });
+
+      if (roles.indexOf('professional') !== -1 && offeringIds.length === 0) {
+        typeError.textContent = 'Pick at least one service you offer.';
+        return;
+      }
+      if (roles.indexOf('client') !== -1 && seekingIds.length === 0) {
+        typeError.textContent = 'Pick at least one category you’re posting gigs for.';
+        return;
+      }
+      typeError.textContent = '';
+      typeSubmit.disabled = true;
+      typeSubmit.textContent = 'Finishing…';
+
+      api('/me/role-profile', {
+        method: 'POST',
+        auth: true,
+        body: {
+          roles: roles,
+          serviceOfferingSubmarketIds: offeringIds,
+          seekingCategorySubmarketIds: seekingIds,
+        },
+      })
+        .then(function () {
+          document.getElementById('auth-done-message').textContent =
+            "You're set up — the Sorted mobile app is where you post and claim gigs; this account is ready to go there.";
+          showStep('done');
+        })
+        .catch(function (err) {
+          typeError.textContent = err.message;
+        })
+        .finally(function () {
+          typeSubmit.disabled = false;
+          typeSubmit.textContent = 'Finish setup';
+        });
+    });
+
+    // ---- step: done ----
+    document.getElementById('auth-done-close').addEventListener('click', closeModal);
   })();
 </script>
 
