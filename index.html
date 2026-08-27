@@ -1126,6 +1126,21 @@
           note.textContent = "Thanks — we'll let you know.";
           note.dataset.state = 'sent';
           form.reset();
+
+          // Only send the welcome email on a genuinely new signup (201),
+          // not on a 409 replay of an address already on the list — they
+          // already got it once. Fire-and-forget: a failure here must
+          // never surface as a failed signup, the insert already
+          // succeeded above.
+          if (res.status === 201) {
+            fetch('/api/send-welcome-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: email }),
+            }).catch(function () {
+              // Swallow — the waitlist signup itself already succeeded.
+            });
+          }
         } else {
           throw new Error('Request failed: ' + res.status);
         }
