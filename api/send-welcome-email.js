@@ -12,11 +12,12 @@
 // Required env var (Vercel project -> Settings -> Environment Variables,
 // Production + Preview): RESEND_API_KEY, from the Resend dashboard.
 //
-// Optional: RESEND_FROM_EMAIL, e.g. "Sorted <hello@yourdomain.com>".
-// Without a verified sending domain in Resend, mail can only go out from
-// onboarding@resend.dev and can only be DELIVERED to the Resend account's
-// own verified email — fine for testing this endpoint, not for real
-// waitlist signups. Verify a domain in Resend, then set this.
+// Optional: RESEND_FROM_EMAIL, e.g. "Sorted <hello@sorted.com.ng>" (the
+// domain being verified in Resend as of this writing — DKIM/SPF/DMARC
+// DNS records pending). Without a verified sending domain, mail can only
+// go out from onboarding@resend.dev and can only be DELIVERED to the
+// Resend account's own verified email — fine for testing this endpoint,
+// not for real waitlist signups. Set this once sorted.com.ng verifies.
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
