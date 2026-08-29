@@ -1,32 +1,80 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Banner, Body, Button, Card, Heading, Screen, Subtext } from '../components/ui';
+import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext } from '../components/ui';
 import { useGigsCache } from '../state/GigsCacheContext';
 import { GigStackParamList } from '../navigation/types';
+import { fundGig, getEscrow } from '../api/escrow';
+import { ApiError } from '../api/client';
+import { EscrowRecordView, FundGigResult } from '../api/types';
 import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
 
-/** Illustrative only — real platform_fee_bps is config PER GIG (HANDOFF.md
- * §3.5), returned by EscrowService.fundGig() once slice 4 exists. There is
- * no Escrow HTTP controller yet, so this can't be fetched for real. */
-const ILLUSTRATIVE_FEE_BPS = 1000; // 10%, matches the worked example in HANDOFF.md §5
-const ILLUSTRATIVE_STAKE_BPS = 1000; // ~10%, HANDOFF.md §3.5 "why the stake exists"
+const POLL_INTERVAL_MS = 4000;
 
 function formatNaira(kobo: number) {
   return (kobo / 100).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 });
 }
 
-/** Screen 06 — Fund escrow ★. Client view, money slice (handoff §06). */
+/**
+ * Screen 06 — Fund escrow ★. Wired to the manual-pilot funding flow
+ * (server/src/modules/escrow/escrow.controller.ts): there is no automated
+ * payment rail yet, so this screen requests a transfer target, shows it,
+ * then polls for the founder to manually confirm the transfer landed.
+ *
+ * The disclosure copy below is load-bearing, not decoration — the account
+ * shown is the founder's own personal Opay account during this pilot
+ * (confirmed explicitly, not a registered Sorted business account), so the
+ * screen must never claim automated or business-grade escrow protection.
+ */
 export default function FundEscrowScreen({
   route,
 }: NativeStackScreenProps<GigStackParamList, 'FundEscrow'>) {
   const { gigId } = route.params;
   const { gigs } = useGigsCache();
   const gig = gigs.find((g) => g.id === gigId);
-
   const bountyKobo = gig?.bountyKobo ?? 0;
-  const feeKobo = Math.round((bountyKobo * ILLUSTRATIVE_FEE_BPS) / 10_000);
-  const stakeKobo = Math.round((bountyKobo * ILLUSTRATIVE_STAKE_BPS) / 10_000);
+
+  const [result, setResult] = useState<FundGigResult | null>(null);
+  const [escrow, setEscrow] = useState<EscrowRecordView | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
+
+  const requestTransfer = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fundGig(gigId);
+      setResult(res);
+      setEscrow(res);
+      stopPolling();
+      pollRef.current = setInterval(async () => {
+        try {
+          const state = await getEscrow(gigId);
+          setEscrow(state);
+          if (state.state !== 'awaiting_funding') stopPolling();
+        } catch {
+          // transient poll failure — next tick tries again, nothing to surface
+        }
+      }, POLL_INTERVAL_MS);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not start funding — try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [gigId, stopPolling]);
+
+  const feeKobo = result ? Math.round((result.bountyKobo * result.platformFeeBps) / 10_000) : 0;
+  const confirmed = escrow?.state === 'funded' || (escrow && escrow.state !== 'awaiting_funding');
 
   return (
     <Screen>
@@ -34,30 +82,55 @@ export default function FundEscrowScreen({
       <Subtext>Your gig is published and criteria are locked.</Subtext>
 
       <Banner tone="warning">
-        ★ Money slice — not wired to the server yet. EscrowService.fundGig
-        and the Payments module have no HTTP route (PLAN.md: slice 4,
-        "first money slice — supervise"). The numbers below are
-        illustrative at a 10% fee / 10% stake, matching HANDOFF.md §5's
-        worked example — they must bind to the real per-gig
-        platform_fee_bps once that slice ships, not stay hardcoded.
+        Sorted is running a manual funding pilot while our licensed payment
+        provider onboarding is pending. There is no automated escrow yet:
+        the account below is held personally by Sorted&apos;s founder, and
+        funding is confirmed by hand once the transfer is seen — not
+        released automatically. Treat this as a disclosed, temporary
+        stopgap, not business-grade payment protection.
       </Banner>
 
-      <Card>
-        <Row label="Bounty" value={formatNaira(bountyKobo)} />
-        <Row label="Professional stake (returned on sign-off)" value={formatNaira(stakeKobo)} muted />
-        <Row label="Platform fee" value={formatNaira(feeKobo)} muted />
-        <View style={styles.divider} />
-        <Row label="You pay now" value={formatNaira(bountyKobo)} bold />
-      </Card>
+      {!result ? (
+        <>
+          <Card>
+            <Row label="Bounty" value={formatNaira(bountyKobo)} bold />
+          </Card>
+          <View style={{ height: spacing.lg }} />
+          {error ? <Body style={styles.errorText}>{error}</Body> : null}
+          <Button title="Get transfer details" onPress={requestTransfer} loading={loading} />
+        </>
+      ) : (
+        <>
+          <Card>
+            <Row label="Bounty" value={formatNaira(result.bountyKobo)} />
+            <Row label="Platform fee (deducted at release)" value={formatNaira(feeKobo)} muted />
+            <View style={styles.divider} />
+            <Row label="Send exactly" value={formatNaira(result.bountyKobo)} bold />
+          </Card>
 
-      <View style={{ height: spacing.lg }} />
-      <Body style={{ marginBottom: spacing.md }}>
-        Payment method: real screen needs Monnify's funding UI (virtual
-        account / bank transfer instructions) once slice 4 wires it up —
-        not a card-style selector.
-      </Body>
+          <View style={{ height: spacing.lg }} />
 
-      <Button title="Authorize funding" onPress={() => {}} disabled />
+          <Card>
+            <Text style={styles.transferLabel}>Transfer to</Text>
+            <Text selectable style={styles.transferAccount}>{result.transferInstructions.accountNumber}</Text>
+            <Text style={styles.transferBank}>{result.transferInstructions.bankName}</Text>
+          </Card>
+
+          <View style={{ height: spacing.lg }} />
+
+          <View style={styles.statusRow}>
+            <Pill
+              label={confirmed ? 'Funding confirmed' : 'Waiting for confirmation'}
+              tone={confirmed ? 'active' : 'neutral'}
+            />
+          </View>
+          <Body style={{ marginTop: spacing.sm }}>
+            {confirmed
+              ? 'The founder has confirmed your transfer. Your gig is now open to professionals.'
+              : "Once you've sent the transfer, this updates automatically after the founder confirms it landed — usually within a few hours."}
+          </Body>
+        </>
+      )}
     </Screen>
   );
 }
@@ -78,4 +151,9 @@ const styles = StyleSheet.create({
   rowValue: { fontFamily: fonts.sansMedium, fontSize: fontSizes.base, color: colors.textPrimary },
   rowValueBold: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
+  transferLabel: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted, marginBottom: spacing.xs },
+  transferAccount: { fontFamily: fonts.serifBold, fontSize: fontSizes.xl, color: colors.textPrimary },
+  transferBank: { fontFamily: fonts.sans, fontSize: fontSizes.base, color: colors.textBody, marginTop: spacing.xs },
+  statusRow: { flexDirection: 'row' },
+  errorText: { color: colors.error, marginBottom: spacing.md },
 });

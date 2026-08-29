@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { AdminGuard } from './admin.guard';
 
 /**
  * Shared infrastructure, like PrismaModule — not one of the nine business
@@ -21,7 +22,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       }),
     }),
   ],
-  providers: [JwtAuthGuard],
-  exports: [JwtModule, JwtAuthGuard],
+  providers: [JwtAuthGuard, AdminGuard],
+  exports: [JwtModule, JwtAuthGuard, AdminGuard],
 })
 export class AuthModule {}

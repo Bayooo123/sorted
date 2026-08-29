@@ -8,6 +8,7 @@
  * clean ledger + gig-ownership, not a data migration. Build it rigorously.
  */
 import { Kobo } from '../../common/money';
+import { PrismaTx } from '../../common/prisma-tx';
 
 export type LedgerEntryType = 'fund' | 'stake' | 'release' | 'refund' | 'fee' | 'penalty' | 'payout';
 export type LedgerDirection = 'in' | 'out';
@@ -29,7 +30,13 @@ export interface LedgerEntryView extends LedgerEntryInput {
 
 /** The only surface other modules may call into Ledger through. Append-only. */
 export interface LedgerPort {
-  record(entry: LedgerEntryInput): Promise<LedgerEntryView>;
+  /**
+   * tx: pass the caller's Prisma transaction client when this write must
+   * be atomic with other changes (e.g. Escrow confirming funding also
+   * transitions Gig status — see PrismaTx's doc comment). Omit for a
+   * standalone call.
+   */
+  record(entry: LedgerEntryInput, tx?: PrismaTx): Promise<LedgerEntryView>;
   getGigLedger(gigId: string): Promise<LedgerEntryView[]>;
   getBalance(gigId: string): Promise<Kobo>;
 }

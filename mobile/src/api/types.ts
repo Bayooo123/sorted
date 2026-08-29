@@ -93,3 +93,35 @@ export interface GigRecord {
   bountyKobo: number;
   matchingStrategy: string;
 }
+
+export type EscrowState =
+  | 'awaiting_funding'
+  | 'funded'
+  | 'stake_held'
+  | 'releasing'
+  | 'released'
+  | 'refunded'
+  | 'dispute_hold';
+
+export interface EscrowRecordView {
+  gigId: string;
+  state: EscrowState;
+  bountyKobo: number;
+  stakeKobo: number;
+  platformFeeBps: number;
+}
+
+/**
+ * Only present on the response from POST /gigs/:id/fund — the manual-pilot
+ * transfer target to show the client (server/src/modules/payments/
+ * providers/manual-pilot.provider.ts). Swaps to real Monnify virtual-
+ * account instructions later with no shape change the app needs to know
+ * about beyond this same field.
+ */
+export interface FundGigResult extends EscrowRecordView {
+  transferInstructions: {
+    accountNumber: string;
+    bankName: string;
+    provider: string;
+  };
+}

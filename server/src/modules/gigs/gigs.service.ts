@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interface';
 import { kobo } from '../../common/money';
+import { PrismaTx } from '../../common/prisma-tx';
 import {
   CreateGigInput,
   GigListFilter,
@@ -123,12 +124,13 @@ export class GigsService implements GigsPort {
     return this.toGigRecord(gig);
   }
 
-  async transitionStatus(gigId: string, to: GigStatus): Promise<GigRecord> {
-    const gig = await this.prisma.gig.findUnique({ where: { id: gigId } });
+  async transitionStatus(gigId: string, to: GigStatus, tx?: PrismaTx): Promise<GigRecord> {
+    const client = tx ?? this.prisma;
+    const gig = await client.gig.findUnique({ where: { id: gigId } });
     if (!gig) throw new NotFoundException('Gig not found');
     this.assertTransitionAllowed(gig.status as GigStatus, to);
 
-    const updated = await this.prisma.gig.update({ where: { id: gigId }, data: { status: to } });
+    const updated = await client.gig.update({ where: { id: gigId }, data: { status: to } });
     return this.toGigRecord(updated);
   }
 

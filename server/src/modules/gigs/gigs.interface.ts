@@ -3,6 +3,7 @@
  * Owns: the gig entity, its lifecycle/status machine, and the locked criteria.
  */
 import { Kobo } from '../../common/money';
+import { PrismaTx } from '../../common/prisma-tx';
 
 export type GigStatus =
   | 'draft'
@@ -70,6 +71,7 @@ export interface GigsPort {
   /** Locks Criterion.locked = true; transitions draft -> escrow_pending. */
   publishGig(gigId: string): Promise<GigRecord>;
   getGig(gigId: string): Promise<GigRecord>;
-  transitionStatus(gigId: string, to: GigStatus): Promise<GigRecord>;
+  /** tx: pass the caller's transaction client for an atomic cross-module write — see PrismaTx. */
+  transitionStatus(gigId: string, to: GigStatus, tx?: PrismaTx): Promise<GigRecord>;
   listGigs(filter: GigListFilter): Promise<GigRecord[]>;
 }

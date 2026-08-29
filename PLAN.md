@@ -331,6 +331,118 @@ against a live database — see the note at the top of this file.
 
 ---
 
+## Slice 4 (partial) — Manual escrow pilot (funding) — IMPLEMENTED
+
+**Goal:** let a gig actually get funded and move `escrow_pending -> open`,
+without waiting on Monnify's business KYC. This is **not** slice 4 proper —
+`holdStake`, `releaseToProfessional`, `refundClient`, `freezeForDispute`,
+`resolveFrozen` all stay `NotImplementedException` stubs. Only the funding
+half is real.
+
+**Why manual, not "just send it to a personal Opay account" as originally
+asked:** the request was to fund gigs by clients sending money straight to
+the founder's personal Opay account and calling that "escrow." That is not
+escrow — there's no hold-and-release enforcement, it directly contradicts
+the "money never with us" pitch, and it carries real regulatory risk (a
+personal account receiving pooled client funds looks like unlicensed money
+transmission under Nigerian financial regulation, and can get frozen). The
+founder chose, explicitly and with that risk explained, to run this as a
+**disclosed** manual pilot rather than build it silently or hold off
+entirely — and confirmed the account is genuinely personal, not a
+registered business account. Every user-facing string this slice adds says
+so plainly (see `manual-pilot.provider.ts`, `FundEscrowScreen.tsx`); none
+of them claim automated or business-grade escrow.
+
+**Module interfaces implemented:**
+- `PaymentsProvider` (§3.4 SEAM, exactly as designed — "Monnify is an
+  implementation, not the interface"): `ManualPilotProvider`, a second
+  class behind the same interface. `createHoldingAccount` returns one
+  fixed account (config, not a real per-gig virtual account — there's no
+  rail to generate one); `confirmFunding`/`verifyWebhook` are unused by
+  this flow (nothing to verify against, just a human reading their own
+  bank app) and either return a placeholder or throw, kept only for
+  interface completeness; `disburse`/`refund` log a "send this by hand"
+  warning and return a no-op reference — no money moves in code anywhere
+  in this slice.
+- `PaymentsModule` now binds `PAYMENTS_PROVIDER` via a factory keyed on
+  `PAYMENTS_PROVIDER_KEY` (default `manual_pilot`) — flipping to
+  `monnify` once real credentials exist changes zero lines in
+  `EscrowService` or anywhere above it. That's the whole point of the seam
+  being there already.
+- `EscrowPort` gained `confirmFunding(gigId, providerRef)` and
+  `getEscrow(gigId)`. `confirmFunding` is written provider-agnostic (a
+  webhook handler calls it in production; an admin action calls it during
+  this pilot) — it does not know or care that there's no real rail behind
+  it today.
+
+**Money-integrity (§9), specifically:**
+- `EscrowService.confirmFunding` does the `EscrowRecord` state change, the
+  `Gig.status` transition, and the `LedgerEntry` write inside **one**
+  `prisma.$transaction` — not three round-trips. This needed a new
+  `PrismaTx` type (`common/prisma-tx.ts`) threaded as an optional last
+  argument through `GigsPort.transitionStatus` and `LedgerPort.record`,
+  because those services otherwise use their own injected `PrismaService`
+  and would silently escape the caller's transaction. Ports stay the only
+  way modules call each other — this doesn't reach into another module's
+  Prisma tables, it lets a cross-module Port call participate in the
+  caller's transaction.
+- `LedgerEntry.eventId` for a funding confirmation is deterministic
+  (`fund:${gigId}`) and `LedgerService.record` upserts on it — a duplicate
+  `confirmFunding` call (admin double-click, or later a real webhook
+  retry) is a no-op, never a double-credit.
+- `EscrowService.confirmFunding` is idempotent past that too: if the
+  record isn't `awaiting_funding` any more, it just returns current state
+  instead of erroring.
+- `EscrowService.fundGig` is idempotent per gig: re-requesting transfer
+  instructions for a gig that already has an `EscrowRecord` returns the
+  existing one rather than opening a second holding account.
+
+**Endpoints (`EscrowController`, under `/gigs` — addressed by gig, same as
+`GigsController`):**
+```
+POST /gigs/:id/fund              (auth'd, client, owner) -> EscrowRecordView + manual transfer instructions
+POST /gigs/:id/confirm-funding   (admin: x-admin-key header) { providerRef } -> EscrowRecordView
+GET  /gigs/:id/escrow            (auth'd)                 -> EscrowRecordView
+```
+`AdminGuard` (`common/auth/admin.guard.ts`) is a shared-secret check
+against `ADMIN_API_KEY` — there's no admin-role system, this is a stopgap
+sized for one operator during a pilot, documented as such in its own doc
+comment.
+
+**Env (`server/.env.example`):** `PAYMENTS_PROVIDER_KEY`,
+`MANUAL_PILOT_ACCOUNT_NUMBER`/`_ACCOUNT_NAME`/`_BANK`, `ADMIN_API_KEY` —
+real values live only in the gitignored `server/.env` (and must be set the
+same way in NaijaBase's environment-variable settings for the deployed
+server; they are not in this repo).
+
+**Screens backed:** screen 06, Fund escrow. Requests transfer instructions
+on demand (not funded automatically on gig publish), shows them, then
+polls `GET /gigs/:id/escrow` every 4s until state leaves
+`awaiting_funding`. Copy is explicit pilot-disclosure, not a fee-math
+mockup — see the file's own doc comment for why that copy is load-bearing.
+
+**Explicitly deferred — not this slice:**
+- **Release/sign-off.** No symmetric admin action exists yet to pay a
+  professional once a client signs off — `releaseToProfessional` is still
+  a stub, and `ReviewSignOffScreen`'s "Approve & release payment" stays
+  disabled until it's built. Funding money in without a way to pay it out
+  is half a system; this is next.
+- **Delivery/dispatch for physical gigs** (pickup/dropoff location,
+  size-based cost, motorbike courier, return cost) — ties to `HANDOFF.md`
+  §11's already-flagged "logistics scope for v1" open decision. Not
+  started.
+- **Price-setting/recommendation flow** (client sets a price vs. a
+  recommended price vs. a professional proposes one) — ties to §11's
+  shortlist-matching/staking-timing open decision. `MatchingStrategy` seam
+  already exists (slice 3) for exactly this to plug into later; v1's
+  `FixedPriceAcceptStrategy` is still a pass-through. Not started.
+- **Physical vs. digital gig distinction** beyond the existing `Domain`
+  taxonomy (`physical`/`digital` already seeded, slice 3) — no
+  domain-specific behavior (e.g. requiring a delivery leg for physical
+  gigs) is wired up yet.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
