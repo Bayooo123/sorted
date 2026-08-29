@@ -2,6 +2,12 @@
  * HANDOFF.md §3.1 — Identity
  * Owns: users, phone+OTP auth, roles (client/professional), KYC status, payout bank
  * details, monnify_customer_ref.
+ *
+ * Not in HANDOFF.md: email-OTP was added as an alternative signup channel
+ * (Resend has no SMS/OTP-to-phone product; phone-based SMS OTP via
+ * Africa's Talking remains the intended eventual-compulsory identifier,
+ * per a later product decision — see PLAN.md). Both User.phone and
+ * User.email are nullable; exactly one is required at requestOtp() time.
  */
 
 export type Role = 'client' | 'professional';
@@ -9,7 +15,9 @@ export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export interface IdentityUser {
   id: string;
-  phone: string;
+  /** Both nullable — exactly one is required at signup, see requestOtp. */
+  phone: string | null;
+  email: string | null;
   name: string | null;
   roles: Role[];
   kycStatus: KycStatus;
@@ -56,6 +64,17 @@ export interface CompleteRoleProfileInput {
 export interface IdentityVerifier {
   readonly name: string;
   verify(userId: string, input: unknown): Promise<KycStatus>;
+}
+
+/**
+ * Exactly one of phone/email — enforced in IdentityService.requestOtp
+ * (BadRequestException on zero or both), not expressible as a TS union
+ * the DTO layer can validate declaratively against class-validator, so
+ * both stay optional here and validation lives in the service.
+ */
+export interface RequestOtpInput {
+  phone?: string;
+  email?: string;
 }
 
 export interface OtpRequestResult {

@@ -733,9 +733,10 @@
 
   .modal-error:empty { display: none; }
 
-  .phone-row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .field-row { display: flex; gap: 8px; margin-bottom: 4px; }
 
-  .phone-row input {
+  .field-row input {
+    width: 100%;
     padding: 13px 14px;
     border-radius: 11px;
     border: 1px solid var(--border);
@@ -744,10 +745,7 @@
     color: var(--text-primary);
   }
 
-  .phone-prefix { width: 64px; text-align: center; color: var(--text-muted); }
-  #auth-phone { flex: 1; min-width: 0; }
-
-  .phone-row input:focus, .otp-input:focus {
+  .field-row input:focus, .otp-input:focus {
     outline: none;
     border-color: var(--green-bright);
     box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
@@ -990,7 +988,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
         </div>
         <div class="label">Built for Nigeria</div>
-        <div class="desc">Naira-first, phone + OTP sign-in, no card required to get started.</div>
+        <div class="desc">Naira-first, no password sign-in, no card required to get started.</div>
       </div>
       <div class="trust-item">
         <div class="icon">
@@ -1033,15 +1031,14 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
     <button class="modal-close" id="auth-modal-close" type="button" aria-label="Close">&times;</button>
 
-    <div class="auth-step" data-step="phone">
+    <div class="auth-step" data-step="email">
       <h3 id="auth-modal-title">Log in or sign up</h3>
-      <p class="modal-sub">Enter your phone number — no email or password, just an OTP.</p>
-      <div class="phone-row">
-        <input value="+234" disabled class="phone-prefix" aria-label="Country code" />
-        <input type="tel" id="auth-phone" placeholder="801 234 5678" aria-label="Phone number" />
+      <p class="modal-sub">Enter your email — no password, just a code. (Phone number sign-in is coming soon.)</p>
+      <div class="field-row">
+        <input type="email" id="auth-email" placeholder="you@email.com" aria-label="Email address" />
       </div>
-      <p class="modal-error" id="auth-phone-error"></p>
-      <button class="btn btn-block" id="auth-phone-submit" type="button">Continue</button>
+      <p class="modal-error" id="auth-email-error"></p>
+      <button class="btn btn-block" id="auth-email-submit" type="button">Continue</button>
     </div>
 
     <div class="auth-step" data-step="otp" hidden>
@@ -1221,10 +1218,15 @@
     });
   })();
 
-  // ---------- auth modal: real phone+OTP against server/'s Identity API ----------
-  // Same endpoints the mobile app uses (mobile/src/api/identity.ts) — see
-  // HANDOFF.md §3.1 / PLAN.md slice 2. Not the waitlist Supabase project
-  // above; this is the actual product's Identity module.
+  // ---------- auth modal: real email+OTP against server/'s Identity API ----------
+  // Same /auth/otp/* endpoints the mobile app uses for phone+OTP
+  // (mobile/src/api/identity.ts) — the server accepts either phone or
+  // email (exactly one) for requestOtp, see identity.interface.ts's
+  // note. This surface uses email since Resend has no SMS/phone-OTP
+  // product; phone stays the intended eventual-compulsory identifier,
+  // added as a later step (product decision, not in HANDOFF.md). Not
+  // the waitlist Supabase project above; this is the actual product's
+  // Identity module.
   (function () {
     // Live server/ deployment (NaijaBase Sites). This sandbox's own network
     // policy blocks that host, so this couldn't be curl-verified from here —
@@ -1238,7 +1240,7 @@
     var steps = modal.querySelectorAll('.auth-step');
 
     var state = {
-      phone: null,
+      email: null,
       requestId: null,
       accessToken: null,
       submarkets: [], // loaded lazily before the account-type step
@@ -1255,7 +1257,7 @@
 
     function openModal() {
       modal.hidden = false;
-      showStep('phone');
+      showStep('email');
     }
 
     function closeModal() {
@@ -1288,37 +1290,37 @@
       });
     }
 
-    // ---- step: phone ----
-    var phoneInput = document.getElementById('auth-phone');
-    var phoneError = document.getElementById('auth-phone-error');
-    var phoneSubmit = document.getElementById('auth-phone-submit');
+    // ---- step: email ----
+    var emailInput = document.getElementById('auth-email');
+    var emailError = document.getElementById('auth-email-error');
+    var emailSubmit = document.getElementById('auth-email-submit');
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    phoneSubmit.addEventListener('click', function () {
-      var local = phoneInput.value.replace(/\s/g, '').replace(/^0+/, '');
-      if (!/^\d{7,11}$/.test(local)) {
-        phoneError.textContent = 'Enter a valid Nigerian phone number.';
+    emailSubmit.addEventListener('click', function () {
+      var email = emailInput.value.trim();
+      if (!EMAIL_RE.test(email)) {
+        emailError.textContent = 'Enter a valid email address.';
         return;
       }
-      phoneError.textContent = '';
-      var phone = '+234' + local;
-      phoneSubmit.disabled = true;
-      phoneSubmit.textContent = 'Sending…';
+      emailError.textContent = '';
+      emailSubmit.disabled = true;
+      emailSubmit.textContent = 'Sending…';
 
-      api('/auth/otp/request', { method: 'POST', body: { phone: phone } })
+      api('/auth/otp/request', { method: 'POST', body: { email: email } })
         .then(function (res) {
-          state.phone = phone;
+          state.email = email;
           state.requestId = res.requestId;
-          document.getElementById('auth-otp-sub').textContent = 'We sent a 6-digit code to ' + phone;
+          document.getElementById('auth-otp-sub').textContent = 'We sent a 6-digit code to ' + email;
           document.getElementById('auth-otp-code').value = '';
           document.getElementById('auth-otp-error').textContent = '';
           showStep('otp');
         })
         .catch(function (err) {
-          phoneError.textContent = err.message;
+          emailError.textContent = err.message;
         })
         .finally(function () {
-          phoneSubmit.disabled = false;
-          phoneSubmit.textContent = 'Continue';
+          emailSubmit.disabled = false;
+          emailSubmit.textContent = 'Continue';
         });
     });
 
@@ -1368,7 +1370,7 @@
     });
     otpResend.addEventListener('click', function () {
       otpResend.textContent = 'Sending…';
-      api('/auth/otp/request', { method: 'POST', body: { phone: state.phone } })
+      api('/auth/otp/request', { method: 'POST', body: { email: state.email } })
         .then(function (res) {
           state.requestId = res.requestId;
           otpInput.value = '';

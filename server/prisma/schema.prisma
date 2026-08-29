@@ -35,7 +35,15 @@ enum KycStatus {
 
 model User {
   id                  String   @id @default(cuid())
-  phone               String   @unique
+  // Both nullable: phone was the only identifier in v1 (HANDOFF.md §2,
+  // "phone-first market"); email-OTP was added as an alternative signup
+  // channel (product decision, not in HANDOFF.md — phone stays the
+  // intended eventual-compulsory identifier, added as a later step for
+  // email-first signups; see PLAN.md). Exactly one is required at
+  // requestOtp() time — enforced in IdentityService, not the schema,
+  // since a user may complete signup with only one and add the other later.
+  phone               String?  @unique
+  email               String?  @unique
   name                String?
   roleFlags           String[] // e.g. ["client","professional"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
   kycStatus           KycStatus @default(unverified)
@@ -69,7 +77,8 @@ model User {
 // regardless of attempts left.
 model OtpRequest {
   id         String    @id @default(cuid())
-  phone      String
+  phone      String? // exactly one of phone/email set — IdentityService.requestOtp validates this
+  email      String?
   codeHash   String
   salt       String
   attempts   Int       @default(0)
@@ -78,6 +87,7 @@ model OtpRequest {
   createdAt  DateTime  @default(now())
 
   @@index([phone])
+  @@index([email])
 }
 
 // ---------------------------------------------------------------------------

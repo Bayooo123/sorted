@@ -20,6 +20,7 @@ import {
   OtpRequestResult,
   OtpVerifyResult,
   PayoutDestination,
+  RequestOtpInput,
   Role,
 } from './identity.interface';
 
@@ -40,15 +41,19 @@ export class IdentityService implements IdentityPort {
   // at the bottom of identity.interface.ts)
   // ---------------------------------------------------------------------
 
-  async requestOtp(phone: string): Promise<OtpRequestResult> {
-    // Upsert so a first-time phone number gets a bare account (empty
+  async requestOtp(input: RequestOtpInput): Promise<OtpRequestResult> {
+    const phone = input.phone?.trim() || undefined;
+    const email = input.email?.trim().toLowerCase() || undefined;
+    if ((phone && email) || (!phone && !email)) {
+      throw new BadRequestException('Provide exactly one of phone or email');
+    }
+
+    // Upsert so a first-time phone/email gets a bare account (empty
     // roleFlags — registration step 2, completeRoleProfile, fills that in)
-    // and a returning phone number just reuses its existing row.
-    const user = await this.prisma.user.upsert({
-      where: { phone },
-      create: { phone, roleFlags: [] },
-      update: {},
-    });
+    // and a returning phone/email just reuses its existing row.
+    const user = phone
+      ? await this.prisma.user.upsert({ where: { phone }, create: { phone, roleFlags: [] }, update: {} })
+      : await this.prisma.user.upsert({ where: { email }, create: { email, roleFlags: [] }, update: {} });
 
     const code = randomInt(0, 10 ** OTP_CODE_DIGITS).toString().padStart(OTP_CODE_DIGITS, '0');
     const salt = randomBytes(16).toString('hex');
@@ -57,14 +62,15 @@ export class IdentityService implements IdentityPort {
 
     const otpRequest = await this.prisma.otpRequest.create({
       data: {
-        phone,
+        phone: phone ?? null,
+        email: email ?? null,
         codeHash,
         salt,
         expiresAt: new Date(Date.now() + ttlSeconds * 1000),
       },
     });
 
-    await this.notifications.notify({ userId: user.id, phone }, { kind: 'otp', code });
+    await this.notifications.notify({ userId: user.id, phone, email }, { kind: 'otp', code });
 
     return { requestId: otpRequest.id };
   }
@@ -94,10 +100,12 @@ export class IdentityService implements IdentityPort {
       data: { consumedAt: new Date() },
     });
 
-    const user = await this.prisma.user.findUnique({ where: { phone: otpRequest.phone } });
-    if (!user) throw new NotFoundException('Account no longer exists for this phone number');
+    const user = otpRequest.phone
+      ? await this.prisma.user.findUnique({ where: { phone: otpRequest.phone } })
+      : await this.prisma.user.findUnique({ where: { email: otpRequest.email! } });
+    if (!user) throw new NotFoundException('Account no longer exists for this phone number or email');
 
-    const accessToken = await this.jwt.signAsync({ sub: user.id, phone: user.phone });
+    const accessToken = await this.jwt.signAsync({ sub: user.id });
     return { accessToken, user: await this.getUser(user.id) };
   }
 
@@ -115,6 +123,7 @@ export class IdentityService implements IdentityPort {
     return {
       id: user.id,
       phone: user.phone,
+      email: user.email,
       name: user.name,
       roles: user.roleFlags as Role[],
       kycStatus: user.kycStatus as KycStatus,

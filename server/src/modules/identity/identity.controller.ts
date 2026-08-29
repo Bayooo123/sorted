@@ -19,7 +19,7 @@ export class IdentityController {
 
   @Post('auth/otp/request')
   requestOtp(@Body() dto: RequestOtpDto) {
-    return this.identity.requestOtp(dto.phone);
+    return this.identity.requestOtp({ phone: dto.phone, email: dto.email });
   }
 
   @Post('auth/otp/verify')

@@ -149,7 +149,7 @@ exist with zero offerings.
 HTTP-free otherwise per the "modules talk through interfaces" rule — the
 controller is the only thing that touches Express/Nest HTTP primitives):**
 ```
-POST /auth/otp/request     { phone }                    -> { requestId }
+POST /auth/otp/request     { phone } or { email } (exactly one) -> { requestId }
 POST /auth/otp/verify      { requestId, code }           -> { accessToken, user }
 GET  /me                   (auth'd)                      -> IdentityUser
 PATCH /me/payout-destination (auth'd) { bankCode, accountNumber, accountName } -> PayoutDestination
@@ -196,10 +196,53 @@ Implementation notes:
   gate), gating payouts only.
 - Rate limiting on `/auth/otp/request` beyond the per-request attempt cap
   — nothing currently stops someone spamming OTP requests at a phone
-  number. Worth a guard (e.g. max N requests per phone per hour) before
-  this is exposed to real traffic at any volume, not just a demo.
+  number or email. Worth a guard (e.g. max N requests per identifier per
+  hour) before this is exposed to real traffic at any volume, not just a
+  demo.
 - No migration has been run against a real database — see the note at the
   top of this file.
+
+### Email-OTP signup (alternative to phone) — IMPLEMENTED
+
+Agreed after `HANDOFF.md` was written, not in the original doc — captured
+here as the decision record, same as "Registration: account type" above.
+Resend (the landing page's email provider, see the "Rework landing page"
+history) has no SMS/phone-OTP product, and NaijaBase's phone-OTP is a
+paid-plan feature not yet in use. Rather than block signup on that,
+`requestOtp` now accepts **either** `phone` **or** `email` (exactly
+one — 400s on zero or both). Phone stays the intended eventual
+identifier product-wise (add it as a later, "compulsory" step for
+email-first signups) — this isn't a replacement of phone+OTP, it's a
+second channel into the same flow.
+
+**Schema:** `User.phone` and `User.email` are both now nullable+unique
+(was `phone String @unique`, no `email` column at all). `OtpRequest`
+gained a nullable `email` column alongside the now-nullable `phone`.
+Migration `20260829000000_add_email_otp` — generated offline via `prisma
+migrate diff --from-schema-datamodel <prior schema> --to-schema-datamodel
+prisma/schema.prisma --script` (no DB connection needed, unlike
+`--from-migrations` which requires a shadow database) — same "couldn't
+apply it from this session" situation as the init migration; apply with
+`npx prisma migrate deploy` wherever there's real Postgres connectivity.
+
+**Notifications:** `NotifyTarget.phone`/`.email` are both now optional;
+`NotificationsService.notify()`'s `'otp'` case branches to email (Resend,
+direct REST call, same pattern as `api/send-welcome-email.js` but a
+separate `RESEND_API_KEY` — this is the server's own deployment, not the
+landing page's Vercel env) when `email` is set, SMS otherwise. This is
+exactly the "push/WhatsApp/email are added channels behind the same
+`notify()` call" seam `HANDOFF.md` §3.9 already specified — no interface
+redesign needed, just a new branch.
+
+**JWT:** payload dropped `phone` (was `{sub, phone}`, now `{sub}` only) —
+phone is no longer guaranteed to exist on every user, and nothing
+downstream read `AuthenticatedUser.phone` off the guard (checked before
+removing it).
+
+**Mobile app and its phone+OTP screens are untouched** — `requestOtp`
+still accepts `{phone}` exactly as before; email is additive, not a
+replacement. Only the landing page's login/signup modal (`index.html`)
+was switched to send `{email}` instead of `{phone}`.
 
 **Screens backed:** onboarding / phone entry / OTP verification / account
 type + category picker screens (not numbered in the mockup list available
