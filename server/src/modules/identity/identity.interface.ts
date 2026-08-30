@@ -1,13 +1,13 @@
 /**
  * HANDOFF.md §3.1 — Identity
- * Owns: users, phone+OTP auth, roles (client/professional), KYC status, payout bank
- * details, monnify_customer_ref.
+ * Owns: users, password-based auth, roles (client/professional), KYC status,
+ * payout bank details, monnify_customer_ref.
  *
- * Not in HANDOFF.md: email-OTP was added as an alternative signup channel
- * (Resend has no SMS/OTP-to-phone product; phone-based SMS OTP via
- * Africa's Talking remains the intended eventual-compulsory identifier,
- * per a later product decision — see PLAN.md). Both User.phone and
- * User.email are nullable; exactly one is required at requestOtp() time.
+ * Not in HANDOFF.md: originally phone+OTP (then email-OTP added
+ * alongside), replaced by email/phone + password — product decision, see
+ * PLAN.md "Password-based auth". Both User.phone and User.email stay
+ * nullable at the DB level (see schema.prisma's note on User) but both are
+ * required at signup, enforced in SignupDto/IdentityService.
  */
 
 export type Role = 'client' | 'professional';
@@ -15,10 +15,10 @@ export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export interface IdentityUser {
   id: string;
-  /** Both nullable — exactly one is required at signup, see requestOtp. */
   phone: string | null;
   email: string | null;
   name: string | null;
+  state: string | null;
   roles: Role[];
   kycStatus: KycStatus;
   /** Populated when roles includes 'professional'. Submarket IDs — see CompleteRoleProfileInput. */
@@ -66,22 +66,21 @@ export interface IdentityVerifier {
   verify(userId: string, input: unknown): Promise<KycStatus>;
 }
 
-/**
- * Exactly one of phone/email — enforced in IdentityService.requestOtp
- * (BadRequestException on zero or both), not expressible as a TS union
- * the DTO layer can validate declaratively against class-validator, so
- * both stay optional here and validation lives in the service.
- */
-export interface RequestOtpInput {
-  phone?: string;
-  email?: string;
+export interface SignupInput {
+  email: string;
+  phone: string;
+  name: string;
+  state: string;
+  password: string;
 }
 
-export interface OtpRequestResult {
-  requestId: string;
+/** identifier is an email or a phone number — IdentityService looks up both columns. */
+export interface LoginInput {
+  identifier: string;
+  password: string;
 }
 
-export interface OtpVerifyResult {
+export interface AuthResult {
   accessToken: string;
   user: IdentityUser;
 }
@@ -102,9 +101,9 @@ export interface IdentityPort {
 }
 
 /**
- * requestOtp / verifyOtp / setPayoutDestination are NOT on IdentityPort —
- * they're triggered by HTTP (IdentityController), not called by other
- * modules. IdentityPort is specifically "what other modules may call";
- * these live as plain methods on IdentityService instead. Kept here as
- * named types so the controller and service share one definition.
+ * signup / login / setPayoutDestination are NOT on IdentityPort — they're
+ * triggered by HTTP (IdentityController), not called by other modules.
+ * IdentityPort is specifically "what other modules may call"; these live
+ * as plain methods on IdentityService instead. Kept here as named types so
+ * the controller and service share one definition.
  */

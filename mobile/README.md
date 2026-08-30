@@ -22,8 +22,8 @@ Payments, Escrow, Verification, Disputes, Ledger, Reputation are
 providers-only, no routes yet). This app is honest about that split:
 
 **Fully wired to the real API:**
-- Screen 01–02 — phone sign-in, OTP verify (`POST /auth/otp/request`,
-  `POST /auth/otp/verify`)
+- Screen 01 — sign in / sign up, combined (`POST /auth/login`,
+  `POST /auth/signup`)
 - Screen 03 — account type + category pickers (`POST /me/role-profile`,
   `GET /taxonomy/submarkets`)
 - Screen 05 — post a gig, including the multi-criterion list and

@@ -35,16 +35,17 @@ enum KycStatus {
 
 model User {
   id                  String   @id @default(cuid())
-  // Both nullable: phone was the only identifier in v1 (HANDOFF.md §2,
-  // "phone-first market"); email-OTP was added as an alternative signup
-  // channel (product decision, not in HANDOFF.md — phone stays the
-  // intended eventual-compulsory identifier, added as a later step for
-  // email-first signups; see PLAN.md). Exactly one is required at
-  // requestOtp() time — enforced in IdentityService, not the schema,
-  // since a user may complete signup with only one and add the other later.
+  // Password-based auth (product decision, not in HANDOFF.md — replaced
+  // phone/email + OTP; see PLAN.md "Password-based auth"). Both phone and
+  // email stay nullable at the DB level for the same reason as before
+  // (avoids another destructive NOT NULL migration on rows created under
+  // the old OTP flow) but both are required at signup — enforced in
+  // IdentityService/SignupDto, not the schema.
   phone               String?  @unique
   email               String?  @unique
   name                String?
+  passwordHash        String?
+  state               String? // Nigerian state — see common/nigerian-states.ts
   roleFlags           String[] // e.g. ["client","professional"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
   kycStatus           KycStatus @default(unverified)
   identityRef         String? // SEAM (§3.1): opaque ref into whichever IdentityVerifier produced kycStatus

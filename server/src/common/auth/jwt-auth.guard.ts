@@ -8,12 +8,11 @@ export interface AuthenticatedUser {
 
 /**
  * Guards every auth'd IdentityController route. Verifies the Bearer token
- * issued by IdentityService.verifyOtp() and attaches { userId } to
+ * issued by IdentityService.signup()/login() and attaches { userId } to
  * req.user for the route handler to read. The token deliberately carries
- * only sub (userId) — phone is no longer guaranteed to exist on every
- * user (email-OTP signups may have none), so it was dropped from the
- * payload rather than carried as possibly-null; nothing downstream read
- * user.phone off the guard anyway (checked before this change).
+ * only sub (userId), not phone/email — nothing downstream needs either off
+ * the guard, and it keeps the payload minimal regardless of which
+ * identifier a user signed up with.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {

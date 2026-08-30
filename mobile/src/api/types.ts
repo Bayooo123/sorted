@@ -12,8 +12,10 @@ export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export interface IdentityUser {
   id: string;
-  phone: string;
+  phone: string | null;
+  email: string | null;
   name: string | null;
+  state: string | null;
   roles: Role[];
   kycStatus: KycStatus;
   serviceOfferingSubmarketIds: string[];
@@ -26,11 +28,7 @@ export interface PayoutDestination {
   accountName: string;
 }
 
-export interface OtpRequestResult {
-  requestId: string;
-}
-
-export interface OtpVerifyResult {
+export interface AuthResult {
   accessToken: string;
   user: IdentityUser;
 }

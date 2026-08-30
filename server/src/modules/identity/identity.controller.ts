@@ -2,8 +2,8 @@ import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { IdentityService } from './identity.service';
 import { AuthenticatedUser, JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
-import { RequestOtpDto } from './dto/request-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { SignupDto } from './dto/signup.dto';
+import { LoginDto } from './dto/login.dto';
 import { CompleteRoleProfileDto } from './dto/complete-role-profile.dto';
 import { PayoutDestinationDto } from './dto/payout-destination.dto';
 
@@ -17,14 +17,14 @@ import { PayoutDestinationDto } from './dto/payout-destination.dto';
 export class IdentityController {
   constructor(private readonly identity: IdentityService) {}
 
-  @Post('auth/otp/request')
-  requestOtp(@Body() dto: RequestOtpDto) {
-    return this.identity.requestOtp({ phone: dto.phone, email: dto.email });
+  @Post('auth/signup')
+  signup(@Body() dto: SignupDto) {
+    return this.identity.signup(dto);
   }
 
-  @Post('auth/otp/verify')
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.identity.verifyOtp(dto.requestId, dto.code);
+  @Post('auth/login')
+  login(@Body() dto: LoginDto) {
+    return this.identity.login(dto);
   }
 
   @UseGuards(JwtAuthGuard)

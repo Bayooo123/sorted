@@ -1,6 +1,5 @@
 export type AuthStackParamList = {
-  PhoneSignIn: undefined;
-  OtpVerify: { phone: string; requestId: string };
+  SignIn: undefined;
   AccountType: undefined;
 };
 

@@ -1,21 +1,29 @@
 import { api } from './client';
 import {
+  AuthResult,
   ClientTypeRef,
   Domain,
   IdentityUser,
-  OtpRequestResult,
-  OtpVerifyResult,
   PayoutDestination,
   Role,
   Submarket,
 } from './types';
 
-export function requestOtp(phone: string) {
-  return api.post<OtpRequestResult>('auth/otp/request', { phone }, false);
+export interface SignupInput {
+  name: string;
+  email: string;
+  phone: string;
+  state: string;
+  password: string;
 }
 
-export function verifyOtp(requestId: string, code: string) {
-  return api.post<OtpVerifyResult>('auth/otp/verify', { requestId, code }, false);
+export function signup(input: SignupInput) {
+  return api.post<AuthResult>('auth/signup', input, false);
+}
+
+/** identifier is an email or a phone number — the server checks both columns. */
+export function login(identifier: string, password: string) {
+  return api.post<AuthResult>('auth/login', { identifier, password }, false);
 }
 
 export function getMe() {

@@ -745,25 +745,41 @@
     color: var(--text-primary);
   }
 
-  .field-row input:focus, .otp-input:focus {
+  .field-row select {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+    font-family: inherit;
+  }
+
+  .field-row input:focus, .field-row select:focus {
     outline: none;
     border-color: var(--green-bright);
     box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
   }
 
-  .otp-input {
-    width: 100%;
-    padding: 14px;
-    border-radius: 11px;
-    border: 1px solid var(--border);
-    background: var(--bg-app);
-    font-size: 22px;
-    letter-spacing: 10px;
-    text-align: center;
-    color: var(--text-primary);
-    margin: 4px 0 16px;
-    font-variant-numeric: tabular-nums;
+  .field-row input:disabled { color: var(--text-muted); background: var(--border); }
+
+  .auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--bg-app); border-radius: 12px; padding: 4px; }
+
+  .auth-tab {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
   }
+
+  .auth-tab-active { background: var(--surface); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
   .btn-block { width: 100%; margin-top: 4px; }
   .btn-block:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -988,7 +1004,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
         </div>
         <div class="label">Built for Nigeria</div>
-        <div class="desc">Naira-first, no password sign-in, no card required to get started.</div>
+        <div class="desc">Naira-first, no card required to get started.</div>
       </div>
       <div class="trust-item">
         <div class="icon">
@@ -1031,23 +1047,47 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
     <button class="modal-close" id="auth-modal-close" type="button" aria-label="Close">&times;</button>
 
-    <div class="auth-step" data-step="email">
+    <div class="auth-step" data-step="auth">
       <h3 id="auth-modal-title">Log in or sign up</h3>
-      <p class="modal-sub">Enter your email — no password, just a code. (Phone number sign-in is coming soon.)</p>
-      <div class="field-row">
-        <input type="email" id="auth-email" placeholder="you@email.com" aria-label="Email address" />
+      <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab auth-tab-active" data-mode="login" type="button">Log in</button>
+        <button class="auth-tab" data-mode="signup" type="button">Sign up</button>
       </div>
-      <p class="modal-error" id="auth-email-error"></p>
-      <button class="btn btn-block" id="auth-email-submit" type="button">Continue</button>
-    </div>
 
-    <div class="auth-step" data-step="otp" hidden>
-      <h3>Enter the code</h3>
-      <p class="modal-sub" id="auth-otp-sub"></p>
-      <input type="text" inputmode="numeric" maxlength="6" id="auth-otp-code" class="otp-input" placeholder="000000" aria-label="6-digit code" />
-      <p class="modal-error" id="auth-otp-error"></p>
-      <button class="btn btn-block" id="auth-otp-submit" type="button">Verify</button>
-      <p class="modal-link" id="auth-otp-resend">Didn&rsquo;t get a code? Resend</p>
+      <div id="auth-login-fields">
+        <div class="field-row">
+          <input type="text" id="auth-login-identifier" placeholder="Email or phone number" aria-label="Email or phone number" autocomplete="username" />
+        </div>
+        <div class="field-row">
+          <input type="password" id="auth-login-password" placeholder="Password" aria-label="Password" autocomplete="current-password" />
+        </div>
+      </div>
+
+      <div id="auth-signup-fields" hidden>
+        <div class="field-row">
+          <input type="text" id="auth-signup-name" placeholder="Full name" aria-label="Full name" autocomplete="name" />
+        </div>
+        <div class="field-row">
+          <input type="email" id="auth-signup-email" placeholder="you@email.com" aria-label="Email address" autocomplete="email" />
+        </div>
+        <div class="field-row">
+          <input type="tel" id="auth-signup-phone" placeholder="Phone number" aria-label="Phone number" autocomplete="tel" />
+        </div>
+        <div class="field-row">
+          <input type="text" value="Nigeria" disabled aria-label="Country" />
+        </div>
+        <div class="field-row">
+          <select id="auth-signup-state" aria-label="State">
+            <option value="">Select your state</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <input type="password" id="auth-signup-password" placeholder="Password (min. 8 characters)" aria-label="Password" autocomplete="new-password" />
+        </div>
+      </div>
+
+      <p class="modal-error" id="auth-form-error"></p>
+      <button class="btn btn-block" id="auth-form-submit" type="button">Log in</button>
     </div>
 
     <div class="auth-step" data-step="account-type" hidden>
@@ -1218,21 +1258,21 @@
     });
   })();
 
-  // ---------- auth modal: real email+OTP against server/'s Identity API ----------
-  // Same /auth/otp/* endpoints the mobile app uses for phone+OTP
-  // (mobile/src/api/identity.ts) — the server accepts either phone or
-  // email (exactly one) for requestOtp, see identity.interface.ts's
-  // note. This surface uses email since Resend has no SMS/phone-OTP
-  // product; phone stays the intended eventual-compulsory identifier,
-  // added as a later step (product decision, not in HANDOFF.md). Not
-  // the waitlist Supabase project above; this is the actual product's
-  // Identity module.
+  // ---------- auth modal: real email/phone + password against server/'s Identity API ----------
+  // Not the waitlist Supabase project above; this is the actual product's
+  // Identity module (server/src/modules/identity).
   (function () {
-    // Live server/ deployment (NaijaBase Sites). This sandbox's own network
-    // policy blocks that host, so this couldn't be curl-verified from here —
-    // confirm end-to-end in an actual browser once this is deployed.
     var API_BASE_URL = 'https://sorted-api.vercel.app';
     var TOKEN_KEY = 'sorted_access_token';
+
+    // Keep in sync with server/src/common/nigerian-states.ts.
+    var NIGERIAN_STATES = [
+      'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
+      'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT (Abuja)', 'Gombe',
+      'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+      'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto',
+      'Taraba', 'Yobe', 'Zamfara',
+    ];
 
     var modal = document.getElementById('auth-modal');
     var closeBtn = document.getElementById('auth-modal-close');
@@ -1240,8 +1280,7 @@
     var steps = modal.querySelectorAll('.auth-step');
 
     var state = {
-      email: null,
-      requestId: null,
+      mode: 'login',
       accessToken: null,
       submarkets: [], // loaded lazily before the account-type step
       accountType: 'hybrid',
@@ -1257,7 +1296,7 @@
 
     function openModal() {
       modal.hidden = false;
-      showStep('email');
+      showStep('auth');
     }
 
     function closeModal() {
@@ -1290,96 +1329,105 @@
       });
     }
 
-    // ---- step: email ----
-    var emailInput = document.getElementById('auth-email');
-    var emailError = document.getElementById('auth-email-error');
-    var emailSubmit = document.getElementById('auth-email-submit');
+    // ---- step: auth (login / signup) ----
     var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var authTabs = document.getElementById('auth-tabs');
+    var loginFields = document.getElementById('auth-login-fields');
+    var signupFields = document.getElementById('auth-signup-fields');
+    var formError = document.getElementById('auth-form-error');
+    var formSubmit = document.getElementById('auth-form-submit');
+    var stateSelect = document.getElementById('auth-signup-state');
 
-    emailSubmit.addEventListener('click', function () {
-      var email = emailInput.value.trim();
-      if (!EMAIL_RE.test(email)) {
-        emailError.textContent = 'Enter a valid email address.';
-        return;
-      }
-      emailError.textContent = '';
-      emailSubmit.disabled = true;
-      emailSubmit.textContent = 'Sending…';
-
-      api('/auth/otp/request', { method: 'POST', body: { email: email } })
-        .then(function (res) {
-          state.email = email;
-          state.requestId = res.requestId;
-          document.getElementById('auth-otp-sub').textContent = 'We sent a 6-digit code to ' + email;
-          document.getElementById('auth-otp-code').value = '';
-          document.getElementById('auth-otp-error').textContent = '';
-          showStep('otp');
-        })
-        .catch(function (err) {
-          emailError.textContent = err.message;
-        })
-        .finally(function () {
-          emailSubmit.disabled = false;
-          emailSubmit.textContent = 'Continue';
-        });
+    NIGERIAN_STATES.forEach(function (name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      stateSelect.appendChild(opt);
     });
 
-    // ---- step: otp ----
-    var otpInput = document.getElementById('auth-otp-code');
-    var otpError = document.getElementById('auth-otp-error');
-    var otpSubmit = document.getElementById('auth-otp-submit');
-    var otpResend = document.getElementById('auth-otp-resend');
+    function setMode(mode) {
+      state.mode = mode;
+      Array.prototype.forEach.call(authTabs.children, function (tab) {
+        tab.classList.toggle('auth-tab-active', tab.getAttribute('data-mode') === mode);
+      });
+      loginFields.hidden = mode !== 'login';
+      signupFields.hidden = mode !== 'signup';
+      formSubmit.textContent = mode === 'login' ? 'Log in' : 'Sign up';
+      formError.textContent = '';
+    }
 
-    function submitOtp() {
-      var code = otpInput.value.trim();
-      if (code.length !== 6) {
-        otpError.textContent = 'Enter the 6-digit code.';
+    Array.prototype.forEach.call(authTabs.children, function (tab) {
+      tab.addEventListener('click', function () {
+        setMode(tab.getAttribute('data-mode'));
+      });
+    });
+
+    function afterAuth(res) {
+      state.accessToken = res.accessToken;
+      try { localStorage.setItem(TOKEN_KEY, res.accessToken); } catch (e) {}
+
+      if (!res.user.roles || res.user.roles.length === 0) {
+        loadSubmarketsAndShowAccountType();
+      } else {
+        document.getElementById('auth-done-message').textContent =
+          'Welcome back — the Sorted mobile app is where you post and claim gigs; this account is ready to go there.';
+        showStep('done');
+      }
+    }
+
+    function submitLogin() {
+      var identifier = document.getElementById('auth-login-identifier').value.trim();
+      var password = document.getElementById('auth-login-password').value;
+      if (!identifier || !password) {
+        formError.textContent = 'Enter your email or phone number and password.';
         return;
       }
-      otpError.textContent = '';
-      otpSubmit.disabled = true;
-      otpSubmit.textContent = 'Verifying…';
+      formError.textContent = '';
+      formSubmit.disabled = true;
+      formSubmit.textContent = 'Logging in…';
 
-      api('/auth/otp/verify', { method: 'POST', body: { requestId: state.requestId, code: code } })
-        .then(function (res) {
-          state.accessToken = res.accessToken;
-          try { localStorage.setItem(TOKEN_KEY, res.accessToken); } catch (e) {}
-
-          if (!res.user.roles || res.user.roles.length === 0) {
-            loadSubmarketsAndShowAccountType();
-          } else {
-            document.getElementById('auth-done-message').textContent =
-              'Welcome back — the Sorted mobile app is where you post and claim gigs; this account is ready to go there.';
-            showStep('done');
-          }
-        })
+      api('/auth/login', { method: 'POST', body: { identifier: identifier, password: password } })
+        .then(afterAuth)
         .catch(function (err) {
-          otpInput.value = '';
-          otpError.textContent = err.message;
+          formError.textContent = err.message;
         })
         .finally(function () {
-          otpSubmit.disabled = false;
-          otpSubmit.textContent = 'Verify';
+          formSubmit.disabled = false;
+          formSubmit.textContent = 'Log in';
         });
     }
 
-    otpSubmit.addEventListener('click', submitOtp);
-    otpInput.addEventListener('input', function () {
-      otpInput.value = otpInput.value.replace(/\D/g, '').slice(0, 6);
-      if (otpInput.value.length === 6) submitOtp();
-    });
-    otpResend.addEventListener('click', function () {
-      otpResend.textContent = 'Sending…';
-      api('/auth/otp/request', { method: 'POST', body: { email: state.email } })
-        .then(function (res) {
-          state.requestId = res.requestId;
-          otpInput.value = '';
-          otpResend.textContent = "Didn't get a code? Resend";
-        })
+    function submitSignup() {
+      var name = document.getElementById('auth-signup-name').value.trim();
+      var email = document.getElementById('auth-signup-email').value.trim();
+      var phone = document.getElementById('auth-signup-phone').value.trim();
+      var stateName = stateSelect.value;
+      var password = document.getElementById('auth-signup-password').value;
+
+      if (!name) { formError.textContent = 'Enter your full name.'; return; }
+      if (!EMAIL_RE.test(email)) { formError.textContent = 'Enter a valid email address.'; return; }
+      if (!phone) { formError.textContent = 'Enter your phone number.'; return; }
+      if (!stateName) { formError.textContent = 'Select your state.'; return; }
+      if (password.length < 8) { formError.textContent = 'Password must be at least 8 characters.'; return; }
+
+      formError.textContent = '';
+      formSubmit.disabled = true;
+      formSubmit.textContent = 'Signing up…';
+
+      api('/auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, state: stateName, password: password } })
+        .then(afterAuth)
         .catch(function (err) {
-          otpError.textContent = err.message;
-          otpResend.textContent = "Didn't get a code? Resend";
+          formError.textContent = err.message;
+        })
+        .finally(function () {
+          formSubmit.disabled = false;
+          formSubmit.textContent = 'Sign up';
         });
+    }
+
+    formSubmit.addEventListener('click', function () {
+      if (state.mode === 'login') submitLogin();
+      else submitSignup();
     });
 
     // ---- step: account-type ----

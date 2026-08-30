@@ -1,109 +1,77 @@
-import { randomBytes, randomInt, scryptSync, timingSafeEqual } from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
   NotImplementedException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
+import { NIGERIAN_STATES } from '../../common/nigerian-states';
 import {
+  AuthResult,
   CompleteRoleProfileInput,
   IdentityPort,
   IdentityUser,
   KycStatus,
-  OtpRequestResult,
-  OtpVerifyResult,
+  LoginInput,
   PayoutDestination,
-  RequestOtpInput,
   Role,
+  SignupInput,
 } from './identity.interface';
 
-const OTP_CODE_DIGITS = 6;
-const SCRYPT_KEY_LENGTH = 64;
+const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class IdentityService implements IdentityPort {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
     private readonly jwt: JwtService,
-    @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
 
   // ---------------------------------------------------------------------
-  // Phone + OTP auth (not on IdentityPort — HTTP-triggered, see the note
-  // at the bottom of identity.interface.ts)
+  // Password auth (not on IdentityPort — HTTP-triggered, see the note at
+  // the bottom of identity.interface.ts)
   // ---------------------------------------------------------------------
 
-  async requestOtp(input: RequestOtpInput): Promise<OtpRequestResult> {
-    const phone = input.phone?.trim() || undefined;
-    const email = input.email?.trim().toLowerCase() || undefined;
-    if ((phone && email) || (!phone && !email)) {
-      throw new BadRequestException('Provide exactly one of phone or email');
+  async signup(input: SignupInput): Promise<AuthResult> {
+    const email = input.email.trim().toLowerCase();
+    const phone = input.phone.trim();
+    const name = input.name.trim();
+    const state = input.state.trim();
+
+    if (!(NIGERIAN_STATES as readonly string[]).includes(state)) {
+      throw new BadRequestException(`Unknown state "${state}"`);
     }
 
-    // Upsert so a first-time phone/email gets a bare account (empty
-    // roleFlags — registration step 2, completeRoleProfile, fills that in)
-    // and a returning phone/email just reuses its existing row.
-    const user = phone
-      ? await this.prisma.user.upsert({ where: { phone }, create: { phone, roleFlags: [] }, update: {} })
-      : await this.prisma.user.upsert({ where: { email }, create: { email, roleFlags: [] }, update: {} });
+    const existing = await this.prisma.user.findFirst({ where: { OR: [{ email }, { phone }] } });
+    if (existing) {
+      throw new ConflictException(
+        existing.email === email ? 'An account with this email already exists' : 'An account with this phone number already exists',
+      );
+    }
 
-    const code = randomInt(0, 10 ** OTP_CODE_DIGITS).toString().padStart(OTP_CODE_DIGITS, '0');
-    const salt = randomBytes(16).toString('hex');
-    const codeHash = this.hashOtpCode(code, salt);
-    const ttlSeconds = Number(this.config.get('OTP_TOKEN_TTL_SECONDS') ?? 300);
-
-    const otpRequest = await this.prisma.otpRequest.create({
-      data: {
-        phone: phone ?? null,
-        email: email ?? null,
-        codeHash,
-        salt,
-        expiresAt: new Date(Date.now() + ttlSeconds * 1000),
-      },
+    const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
+    const user = await this.prisma.user.create({
+      data: { email, phone, name, state, passwordHash, roleFlags: [] },
     });
 
-    await this.notifications.notify({ userId: user.id, phone, email }, { kind: 'otp', code });
-
-    return { requestId: otpRequest.id };
+    const accessToken = await this.jwt.signAsync({ sub: user.id });
+    return { accessToken, user: await this.getUser(user.id) };
   }
 
-  async verifyOtp(requestId: string, code: string): Promise<OtpVerifyResult> {
-    const otpRequest = await this.prisma.otpRequest.findUnique({ where: { id: requestId } });
-    if (!otpRequest) throw new NotFoundException('OTP request not found');
-    if (otpRequest.consumedAt) throw new BadRequestException('OTP already used');
-    if (otpRequest.expiresAt.getTime() < Date.now()) throw new BadRequestException('OTP expired');
-
-    const maxAttempts = Number(this.config.get('OTP_MAX_ATTEMPTS') ?? 5);
-    if (otpRequest.attempts >= maxAttempts) {
-      throw new BadRequestException('Too many incorrect attempts — request a new OTP');
-    }
-
-    const isMatch = this.verifyOtpCode(code, otpRequest.salt, otpRequest.codeHash);
-    if (!isMatch) {
-      await this.prisma.otpRequest.update({
-        where: { id: requestId },
-        data: { attempts: { increment: 1 } },
-      });
-      throw new UnauthorizedException('Incorrect code');
-    }
-
-    await this.prisma.otpRequest.update({
-      where: { id: requestId },
-      data: { consumedAt: new Date() },
+  async login(input: LoginInput): Promise<AuthResult> {
+    const identifier = input.identifier.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { OR: [{ email: identifier }, { phone: input.identifier.trim() }] },
     });
+    if (!user || !user.passwordHash) throw new UnauthorizedException('Incorrect email/phone or password');
 
-    const user = otpRequest.phone
-      ? await this.prisma.user.findUnique({ where: { phone: otpRequest.phone } })
-      : await this.prisma.user.findUnique({ where: { email: otpRequest.email! } });
-    if (!user) throw new NotFoundException('Account no longer exists for this phone number or email');
+    const isMatch = await bcrypt.compare(input.password, user.passwordHash);
+    if (!isMatch) throw new UnauthorizedException('Incorrect email/phone or password');
 
     const accessToken = await this.jwt.signAsync({ sub: user.id });
     return { accessToken, user: await this.getUser(user.id) };
@@ -125,6 +93,7 @@ export class IdentityService implements IdentityPort {
       phone: user.phone,
       email: user.email,
       name: user.name,
+      state: user.state,
       roles: user.roleFlags as Role[],
       kycStatus: user.kycStatus as KycStatus,
       serviceOfferingSubmarketIds: user.serviceOfferings.map((o) => o.submarketId),
@@ -228,22 +197,5 @@ export class IdentityService implements IdentityPort {
     });
 
     return this.getUser(userId);
-  }
-
-  // ---------------------------------------------------------------------
-  // OTP hashing — scrypt (Node built-in, no extra dependency). Codes are
-  // short (6 digits) and short-lived, so scrypt's cost here is about
-  // resisting a leaked-DB offline guess, not brute force over the wire
-  // (attempts/expiresAt already bound that).
-  // ---------------------------------------------------------------------
-
-  private hashOtpCode(code: string, salt: string): string {
-    return scryptSync(code, salt, SCRYPT_KEY_LENGTH).toString('hex');
-  }
-
-  private verifyOtpCode(code: string, salt: string, expectedHash: string): boolean {
-    const actual = scryptSync(code, salt, SCRYPT_KEY_LENGTH);
-    const expected = Buffer.from(expectedHash, 'hex');
-    return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 }

@@ -249,6 +249,98 @@ type + category picker screens (not numbered in the mockup list available
 to this session — `/screens` wasn't part of this upload; Jude/founding
 team to confirm mockup numbers against `SPEC.md` when available).
 
+**Superseded by "Password-based auth" below** — the whole phone/email +
+OTP model (including this section's mobile-untouched claim) was replaced.
+Kept here as the decision record for why email-OTP existed in the first
+place; not still true of the current auth flow.
+
+---
+
+### Password-based auth (replaces phone/email + OTP) — IMPLEMENTED
+
+Product decision, not in `HANDOFF.md`: OTP-based auth (phone, then email
+alongside it) is out; signup and login now use email/phone + password, on
+both the landing page and the mobile app. Requested directly, explicitly
+choosing the largest of three options (add profile fields to OTP; add
+password alongside OTP; replace OTP with password entirely) after the
+landing page's login modal was confirmed working end-to-end on OTP —
+this is a deliberate reversal of that design, not a bug fix.
+
+**Schema:** `User` gains `passwordHash String?` and `state String?`
+(Nigerian state — see `common/nigerian-states.ts`, a plain 37-item
+constant, not a taxonomy table, since it doesn't change and isn't matched
+against anything). `phone`/`email`/`name` stay nullable at the DB level
+(same reasoning as the email-OTP migration: avoids a NOT NULL migration
+against rows created under the old flow) — both email and phone are
+required at signup, enforced in `SignupDto`/`IdentityService`, not the
+schema. `OtpRequest` is no longer written to or read by any code path but
+was **not** dropped from the DB — an orphaned table costs nothing and
+dropping it would've meant another migration cycle for zero functional
+gain; safe to drop later in a cleanup pass. Migration
+`20260830210000_password_auth` — generated offline the same way as
+before (`prisma migrate diff --from-schema-datamodel <prior> --to-schema-
+datamodel prisma/schema.prisma --script`); apply via
+`npx prisma migrate deploy` or paste `migration.sql` into a SQL editor
+wherever there's real Postgres connectivity, same as every migration this
+project has needed so far.
+
+**Identity module:** `requestOtp`/`verifyOtp` replaced by `signup(input)`
+and `login(input)` on `IdentityService` (still not on `IdentityPort` —
+HTTP-triggered only, same as before). `signup` rejects a duplicate
+email/phone with 409, hashes the password with `bcryptjs` (12 rounds,
+picked over Node's native scrypt-based OTP hashing this replaces because
+passwords need a battle-tested adaptive hash, not a bespoke one — and
+over `bcrypt` because Vercel's serverless function bundler doesn't need
+to fight a native addon). `login` accepts an `identifier` (email or
+phone, checked against both columns in one query) plus `password`, and
+returns the same shape as signup (`{accessToken, user}`) so callers don't
+branch on which one they used. JWT payload is unchanged (`{sub}` only).
+
+**Endpoints (`IdentityController`):**
+```
+POST /auth/signup   { email, phone, name, state, password } -> { accessToken, user }
+POST /auth/login    { identifier, password } -> { accessToken, user }
+```
+Replaces `POST /auth/otp/request` and `POST /auth/otp/verify`, removed
+entirely (not kept as deprecated aliases — nothing depended on them
+existing past this change since both callers, the landing page and the
+mobile app, were updated in the same pass).
+
+**Notifications:** `NotificationsService.notify()`'s only implemented
+case (`'otp'`) is gone along with it, since nothing calls `notify()`
+anymore — every event kind now falls through to
+`NotImplementedException`, same as it already did for `gig_funded` etc.
+The Africa's Talking/Resend integration code that lived in
+`sendSms`/`sendOtpEmail` was deleted (dead code, not kept "just in
+case") — whichever gig/escrow/dispute slice needs a channel first
+re-adds it then, per the module's existing channel-agnostic seam
+(`HANDOFF.md` §3.9).
+
+**Landing page (`index.html`):** the single-step email+OTP modal became a
+two-tab Log in / Sign up form. Sign up collects name, email, phone,
+state (a fixed Nigeria-only picker — country isn't a free-choice field,
+just displayed), and password (min. 8 characters, validated client-side
+before the request goes out). Login takes one `identifier` field (email
+or phone) plus password. Post-auth routing (mid-signup → account-type
+step; already has roles → done) is unchanged from the OTP version — only
+how the token gets minted changed, not what happens after.
+
+**Mobile app:** `PhoneSignInScreen.tsx` and `OtpVerifyScreen.tsx` deleted,
+replaced by a single `SignInScreen.tsx` with the same Log in/Sign up tab
+pattern as the web modal (chip-based state picker, matching the app's
+existing `AccountTypeScreen` chip UI rather than adding a native picker
+dependency). `AuthStackParamList` now has one `SignIn` route instead of
+`PhoneSignIn`/`OtpVerify`. `api/identity.ts` gained `signup`/`login`,
+lost `requestOtp`/`verifyOtp`; `IdentityUser` gained `email`/`state` and
+`phone` became nullable to match the server type.
+
+**Explicitly not done:** no password-reset/forgot-password flow (a real
+gap for a production password system — flagged here, not silently
+skipped); no rate-limiting on login attempts beyond whatever the
+platform provides (OTP had `OTP_MAX_ATTEMPTS`, password auth currently
+has no equivalent lockout); `OtpRequest` table cleanup (see Schema note
+above).
+
 ---
 
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED

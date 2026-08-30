@@ -61,9 +61,10 @@ export function useAuth(): AuthContextValue {
 }
 
 /**
- * A user with roles: [] has completed OTP but not registration step 2
- * (PLAN.md: "the app should treat a user with roles: [] (empty) as still
- * mid-signup, not as a fully registered account").
+ * A user with roles: [] has signed up (or logged in) but not completed
+ * registration step 2 (PLAN.md: "the app should treat a user with
+ * roles: [] (empty) as still mid-signup, not as a fully registered
+ * account").
  */
 export function isMidSignup(user: IdentityUser | null | undefined): boolean {
   return !!user && user.roles.length === 0;

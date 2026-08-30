@@ -50,7 +50,9 @@ export default function ProfileScreen() {
 
       <Card style={{ marginBottom: spacing.xl }}>
         <Text style={styles.cardTitle}>Account</Text>
-        <StatRow label="Phone" value={user.phone} />
+        <StatRow label="Phone" value={user.phone ?? '—'} />
+        <StatRow label="Email" value={user.email ?? '—'} />
+        <StatRow label="State" value={user.state ?? '—'} />
         <StatRow label="Verification & ID" value="Not built yet" />
         <StatRow label="Payout accounts" value="Not built yet" />
         <StatRow label="Skills & services" value="Not built yet" />

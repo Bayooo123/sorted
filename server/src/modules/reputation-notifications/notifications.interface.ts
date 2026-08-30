@@ -1,15 +1,15 @@
 /**
  * HANDOFF.md §3.9 — Notifications
- * Owns: OTP, gig/escrow/dispute events.
+ * Owns: gig/escrow/dispute events. (Previously also OTP delivery — dropped
+ * when auth moved to email/phone + password; see PLAN.md "Password-based
+ * auth". No event kind is implemented yet — each lands with its owning
+ * slice, per the switch in NotificationsService.)
  *
  * SEAM: channel-agnostic. SMS in v1; push/WhatsApp/email are added channels
- * behind the same notify() call — callers never branch on channel. Email
- * (via Resend) was the first of those added, for the email-OTP signup
- * alternative (not in HANDOFF.md — see identity.interface.ts's note).
+ * behind the same notify() call — callers never branch on channel.
  */
 
 export type NotificationEvent =
-  | { kind: 'otp'; code: string }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }
@@ -23,13 +23,8 @@ export type NotificationEvent =
  * has no Prisma access to User (Identity owns that table); if it needed to
  * look up a phone/email from a userId, it would either read Identity's
  * table directly (forbidden — HANDOFF.md §9, "no cross-module table
- * access") or import IdentityModule and create a circular dependency
- * (IdentityModule already imports this module to send OTPs). Pushing the
- * destination up to the caller, who already has it, avoids both.
- *
- * Both optional since a user may have only one identifier (email-OTP
- * signups may have no phone yet, and vice versa) — the caller passes
- * whichever it has; notify() picks the channel from whichever is set.
+ * access") or import IdentityModule and create a circular dependency.
+ * Pushing the destination up to the caller, who already has it, avoids both.
  */
 export interface NotifyTarget {
   userId: string;
