@@ -1,21 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { corsOrigins } from './cors';
 
 /**
- * The landing page (sorted.com.ng) and this API (sorted.sites.naijabase.dev)
- * are different origins, so the browser needs an explicit CORS allowlist —
- * without this, every fetch from the landing page's login/signup modal
- * fails before it reaches a controller (Safari surfaces this as the opaque
- * "Load failed", easy to mistake for a dead backend). Mobile isn't affected
- * — React Native's fetch isn't browser-origin-checked.
+ * Entry point for running the API as a normal long-running process (local
+ * dev, or any non-serverless host). The deployed API on Vercel instead
+ * boots through api/index.ts, which wraps the same AppModule as a
+ * serverless function — see that file's doc comment for why.
  */
-function corsOrigins(): string[] {
-  const configured = process.env.CORS_ALLOWED_ORIGINS;
-  if (configured) return configured.split(',').map((o) => o.trim());
-  return ['https://sorted.com.ng', 'https://www.sorted.com.ng', 'http://localhost:3000', 'http://localhost:5173'];
-}
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({ origin: corsOrigins() });
