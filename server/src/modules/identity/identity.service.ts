@@ -3,7 +3,9 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   NotImplementedException,
   UnauthorizedException,
@@ -11,6 +13,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NIGERIAN_STATES } from '../../common/nigerian-states';
+import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
   AuthResult,
   CompleteRoleProfileInput,
@@ -27,9 +30,12 @@ const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class IdentityService implements IdentityPort {
+  private readonly logger = new Logger(IdentityService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -57,6 +63,13 @@ export class IdentityService implements IdentityPort {
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
     const user = await this.prisma.user.create({
       data: { email, phone, name, state, passwordHash, roleFlags: [] },
+    });
+
+    // Fire-and-log, not fire-and-fail: a Resend outage is real, but it
+    // must never turn an otherwise-successful signup into a 500 — the
+    // account already exists in the DB by this point.
+    this.notifications.notify({ userId: user.id, email }, { kind: 'user_signed_up', name }).catch((err) => {
+      this.logger.warn(`Welcome email failed for user ${user.id}: ${err instanceof Error ? err.message : err}`);
     });
 
     const accessToken = await this.jwt.signAsync({ sub: user.id });

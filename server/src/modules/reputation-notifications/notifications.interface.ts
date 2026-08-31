@@ -1,15 +1,17 @@
 /**
  * HANDOFF.md §3.9 — Notifications
- * Owns: gig/escrow/dispute events. (Previously also OTP delivery — dropped
- * when auth moved to email/phone + password; see PLAN.md "Password-based
- * auth". No event kind is implemented yet — each lands with its owning
- * slice, per the switch in NotificationsService.)
+ * Owns: gig/escrow/dispute events, plus the post-signup welcome email
+ * (product decision, not in HANDOFF.md — the only implemented event kind
+ * right now; see PLAN.md "Welcome email on signup"). Previously also OTP
+ * delivery, dropped when auth moved to email/phone + password (see
+ * PLAN.md "Password-based auth").
  *
  * SEAM: channel-agnostic. SMS in v1; push/WhatsApp/email are added channels
  * behind the same notify() call — callers never branch on channel.
  */
 
 export type NotificationEvent =
+  | { kind: 'user_signed_up'; name: string }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }

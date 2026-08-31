@@ -343,6 +343,34 @@ above).
 
 ---
 
+### Welcome email on signup — IMPLEMENTED
+
+Gap noticed right after password auth shipped: real signups
+(`POST /auth/signup`) sent no email at all — the only "welcome email"
+that existed was `api/send-welcome-email.js`, wired to the landing
+page's waitlist form, a completely different audience/deployment from
+an actual product signup. Fixed by making `NotificationsService`'s
+`'user_signed_up'` case the first (and, for now, only) implemented
+`NotificationEvent` — same Resend REST call pattern as the old OTP
+email and the waitlist one, reusing the server's already-verified
+`RESEND_API_KEY`/`RESEND_FROM_EMAIL`.
+
+**IdentityService.signup()** calls `notifications.notify()` after the
+`User` row is created, but doesn't `await` it into the response path —
+wrapped in `.catch()` that only logs. A Resend outage must not turn an
+otherwise-successful signup into a 500; the account already exists by
+the time the email would send. No email is sent if a signup somehow
+lacks one (not reachable today — `SignupDto` requires it — but the
+check exists rather than assuming).
+
+**Explicitly not done:** no retry-on-failure for the email itself (a
+failed send is logged and dropped, not queued); no similar email for
+login (only signup, matching what "welcome" means); the mobile app's
+signup calls the same `POST /auth/signup`, so it gets this for free —
+no separate mobile-side change needed.
+
+---
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to
