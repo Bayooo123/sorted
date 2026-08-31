@@ -487,6 +487,54 @@ signup tab, with Save/Cancel. Save calls `updateProfile` then
 PATCH response directly into local state — same pattern the rest of the
 app already uses after a mutation.
 
+---
+
+### Forgot password + password visibility toggle — IMPLEMENTED
+
+Surfaced by the founder's own account getting locked out: every account
+from the phone/email+OTP era has `passwordHash: null`, and `login()`
+rejects those unconditionally (`if (!user || !user.passwordHash) throw
+UnauthorizedException`) — there was no way back in once signed out, and
+no "forgot password" existed anywhere (flagged as an explicit gap in the
+"Password-based auth" section above). This closes it.
+
+**Flow:** emailed 6-digit code, not a link — mobile has no deep-link
+handling set up, and a typed code works identically on web and native
+with no extra infra. `POST /auth/forgot-password { identifier }` always
+returns the same generic message regardless of whether the identifier
+matched an account (`GENERIC_RESET_MESSAGE` — same account-enumeration
+defense `login`'s "Incorrect email/phone or password" already uses for
+this exact reason). If it matched, any outstanding unconsumed codes for
+that user are invalidated and a fresh code is emailed via the existing
+Resend integration; failure to send is logged, never surfaced to the
+caller, so the response stays identical to the no-such-account case.
+`POST /auth/reset-password { identifier, code, newPassword }` verifies
+the code (bcrypt-hashed at rest, 15-minute expiry, capped at 5 attempts
+before the token is burned) and sets `passwordHash` — this is also how a
+pre-password account gets its first password, not just how an existing
+one gets reset.
+
+**New table** `PasswordResetToken` (userId, codeHash, attempts,
+consumedAt, expiresAt) — same discipline as the old `OtpRequest` table
+(hash the code, cap attempts, time-box it) but scoped to a userId since a
+reset always targets one already-existing account, unlike OTP sign-in
+which had to key off a not-yet-verified phone/email.
+
+**Web + mobile:** both the login modal/screen and the login tab of
+`SignInScreen` gained a "Forgot password?" link -> enter identifier ->
+enter code + new password -> back to login, pre-filled, with a success
+message. Both also gained a Show/Hide toggle on every password field
+(login, signup, reset) — asked for in the same round, unrelated bug but
+same "can't see what you're typing into a money-adjacent form" complaint
+class.
+
+**Not done:** no rate limiting on `forgot-password` request volume
+(same gap as login's "no login rate-limiting", noted above) — a bcrypt
+cost of 12 on every hash operation and the 5-attempt cap on guessing a
+6-digit code are the only frictions in place right now.
+
+---
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to

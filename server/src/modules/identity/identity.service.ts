@@ -17,17 +17,26 @@ import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notificatio
 import {
   AuthResult,
   CompleteRoleProfileInput,
+  ForgotPasswordInput,
   IdentityPort,
   IdentityUser,
   KycStatus,
   LoginInput,
   PayoutDestination,
+  ResetPasswordInput,
   Role,
   SignupInput,
   UpdateProfileInput,
 } from './identity.interface';
 
 const BCRYPT_ROUNDS = 12;
+const RESET_CODE_TTL_MS = 15 * 60 * 1000;
+const RESET_CODE_MAX_ATTEMPTS = 5;
+const GENERIC_RESET_MESSAGE = { message: 'If an account exists for that email or phone, a reset code has been sent.' };
+
+function generateResetCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 /**
  * Accepts Nigerian local format (0-prefixed, e.g. "09031812675") as well
@@ -94,14 +103,7 @@ export class IdentityService implements IdentityPort {
   }
 
   async login(input: LoginInput): Promise<AuthResult> {
-    const identifier = input.identifier.trim().toLowerCase();
-    // Accept a phone typed either in local (0-prefixed) or E.164 form —
-    // same reasoning as updateProfile's normalization, since login is the
-    // same kind of raw text field.
-    const normalizedPhone = normalizeNigerianPhone(input.identifier);
-    const user = await this.prisma.user.findFirst({
-      where: { OR: [{ email: identifier }, { phone: input.identifier.trim() }, { phone: normalizedPhone }] },
-    });
+    const user = await this.findUserByIdentifier(input.identifier);
     if (!user || !user.passwordHash) throw new UnauthorizedException('Incorrect email/phone or password');
 
     const isMatch = await bcrypt.compare(input.password, user.passwordHash);
@@ -109,6 +111,90 @@ export class IdentityService implements IdentityPort {
 
     const accessToken = await this.jwt.signAsync({ sub: user.id });
     return { accessToken, user: await this.getUser(user.id) };
+  }
+
+  /**
+   * Shared by login/forgot-password/reset-password — accepts a phone typed
+   * either in local (0-prefixed) or E.164 form, same reasoning as
+   * updateProfile's normalization, since all three are the same kind of
+   * raw text field.
+   */
+  private findUserByIdentifier(identifier: string) {
+    const trimmed = identifier.trim();
+    return this.prisma.user.findFirst({
+      where: { OR: [{ email: trimmed.toLowerCase() }, { phone: trimmed }, { phone: normalizeNigerianPhone(trimmed) }] },
+    });
+  }
+
+  /**
+   * Always returns the same generic message whether or not the identifier
+   * matched an account — same account-enumeration defense login already
+   * uses, just for this surface too. When it does match, invalidates any
+   * outstanding codes and emails a fresh 6-digit one. This is exactly the
+   * gap that locks out every pre-password-era account (no passwordHash at
+   * all — login always fails, and there was previously no way back in):
+   * see PLAN.md "Forgot password".
+   */
+  async requestPasswordReset(input: ForgotPasswordInput): Promise<{ message: string }> {
+    const user = await this.findUserByIdentifier(input.identifier);
+    if (!user || !user.email) return GENERIC_RESET_MESSAGE;
+
+    const code = generateResetCode();
+    const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: { userId: user.id, codeHash, expiresAt: new Date(Date.now() + RESET_CODE_TTL_MS) },
+      }),
+    ]);
+
+    // Awaited (unlike signup's welcome email) — sending this email IS the
+    // action the caller is waiting on, not a side effect of one that
+    // already succeeded. A failure is only logged, never surfaced to the
+    // caller, so the response stays identical to the no-such-account case.
+    try {
+      await this.notifications.notify(
+        { userId: user.id, email: user.email },
+        { kind: 'password_reset_requested', code },
+      );
+    } catch (err) {
+      this.logger.warn(`Password reset email failed for user ${user.id}: ${err instanceof Error ? err.message : err}`);
+    }
+
+    return GENERIC_RESET_MESSAGE;
+  }
+
+  async resetPassword(input: ResetPasswordInput): Promise<{ message: string }> {
+    const invalidCode = () => new BadRequestException('Invalid or expired code');
+    const user = await this.findUserByIdentifier(input.identifier);
+    if (!user) throw invalidCode();
+
+    const token = await this.prisma.passwordResetToken.findFirst({
+      where: { userId: user.id, consumedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!token || token.attempts >= RESET_CODE_MAX_ATTEMPTS) {
+      if (token) await this.prisma.passwordResetToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } });
+      throw invalidCode();
+    }
+
+    const isMatch = await bcrypt.compare(input.code.trim(), token.codeHash);
+    if (!isMatch) {
+      await this.prisma.passwordResetToken.update({ where: { id: token.id }, data: { attempts: { increment: 1 } } });
+      throw invalidCode();
+    }
+
+    const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_ROUNDS);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+      this.prisma.passwordResetToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
+    ]);
+
+    return { message: 'Password updated — you can now log in.' };
   }
 
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<IdentityUser> {

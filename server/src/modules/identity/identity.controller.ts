@@ -7,6 +7,8 @@ import { LoginDto } from './dto/login.dto';
 import { CompleteRoleProfileDto } from './dto/complete-role-profile.dto';
 import { PayoutDestinationDto } from './dto/payout-destination.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 /**
  * The only thing in the Identity module that touches HTTP/Express — every
@@ -26,6 +28,16 @@ export class IdentityController {
   @Post('auth/login')
   login(@Body() dto: LoginDto) {
     return this.identity.login(dto);
+  }
+
+  @Post('auth/forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.identity.requestPasswordReset(dto);
+  }
+
+  @Post('auth/reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.identity.resetPassword(dto);
   }
 
   @UseGuards(JwtAuthGuard)

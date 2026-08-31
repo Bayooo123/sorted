@@ -98,6 +98,17 @@ export interface UpdateProfileInput {
   state?: string;
 }
 
+/** identifier is an email or a phone number — same lookup as LoginInput. See PLAN.md "Forgot password". */
+export interface ForgotPasswordInput {
+  identifier: string;
+}
+
+export interface ResetPasswordInput {
+  identifier: string;
+  code: string;
+  newPassword: string;
+}
+
 /** The only surface other modules may call into Identity through. */
 export interface IdentityPort {
   getUser(userId: string): Promise<IdentityUser>;

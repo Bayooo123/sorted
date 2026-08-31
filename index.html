@@ -764,6 +764,63 @@
 
   .field-row input:disabled { color: var(--text-muted); background: var(--border); }
 
+  .field-row-password { display: flex; gap: 8px; margin-bottom: 4px; }
+
+  .field-row-password input {
+    flex: 1;
+    min-width: 0;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .field-row-password input:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  .field-toggle {
+    flex: 0 0 auto;
+    padding: 0 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .field-toggle:hover { color: var(--text-primary); }
+
+  .modal-link {
+    font-size: 13px;
+    color: var(--green-deep);
+    text-align: right;
+    cursor: pointer;
+    margin: -2px 0 14px;
+    font-weight: 600;
+  }
+
+  .modal-link:hover { text-decoration: underline; }
+
+  .modal-link-center { text-align: center; margin: 14px 0 0; }
+
+  .modal-success {
+    font-size: 13px;
+    color: var(--green-primary);
+    font-weight: 600;
+    margin: -8px 0 14px;
+    min-height: 0;
+  }
+
+  .modal-success:empty { display: none; }
+
   .auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--bg-app); border-radius: 12px; padding: 4px; }
 
   .auth-tab {
@@ -1172,9 +1229,11 @@
         <div class="field-row">
           <input type="text" id="auth-login-identifier" placeholder="Email or phone number" aria-label="Email or phone number" autocomplete="username" />
         </div>
-        <div class="field-row">
+        <div class="field-row-password">
           <input type="password" id="auth-login-password" placeholder="Password" aria-label="Password" autocomplete="current-password" />
+          <button class="field-toggle" type="button" data-target="auth-login-password" aria-label="Show password">Show</button>
         </div>
+        <p class="modal-link" id="open-forgot-password">Forgot password?</p>
       </div>
 
       <div id="auth-signup-fields" hidden>
@@ -1195,13 +1254,41 @@
             <option value="">Select your state</option>
           </select>
         </div>
-        <div class="field-row">
+        <div class="field-row-password">
           <input type="password" id="auth-signup-password" placeholder="Password (min. 8 characters)" aria-label="Password" autocomplete="new-password" />
+          <button class="field-toggle" type="button" data-target="auth-signup-password" aria-label="Show password">Show</button>
         </div>
       </div>
 
+      <p class="modal-success" id="auth-form-success"></p>
       <p class="modal-error" id="auth-form-error"></p>
       <button class="btn btn-block" id="auth-form-submit" type="button">Log in</button>
+    </div>
+
+    <div class="auth-step" data-step="forgot" hidden>
+      <h3>Reset your password</h3>
+      <p class="modal-sub">Enter the email or phone number on your account and we'll send a 6-digit code.</p>
+      <div class="field-row">
+        <input type="text" id="forgot-identifier" placeholder="Email or phone number" aria-label="Email or phone number" autocomplete="username" />
+      </div>
+      <p class="modal-error" id="forgot-error"></p>
+      <button class="btn btn-block" id="forgot-submit" type="button">Send code</button>
+      <p class="modal-link modal-link-center" id="back-to-login-from-forgot">Back to log in</p>
+    </div>
+
+    <div class="auth-step" data-step="reset" hidden>
+      <h3>Enter your code</h3>
+      <p class="modal-sub">We sent a 6-digit code to your email — it expires in 15 minutes. Enter it below with your new password.</p>
+      <div class="field-row">
+        <input type="text" id="reset-code" placeholder="6-digit code" inputmode="numeric" maxlength="6" aria-label="Reset code" autocomplete="one-time-code" />
+      </div>
+      <div class="field-row-password">
+        <input type="password" id="reset-new-password" placeholder="New password (min. 8 characters)" aria-label="New password" autocomplete="new-password" />
+        <button class="field-toggle" type="button" data-target="reset-new-password" aria-label="Show password">Show</button>
+      </div>
+      <p class="modal-error" id="reset-error"></p>
+      <button class="btn btn-block" id="reset-submit" type="button">Reset password</button>
+      <p class="modal-link modal-link-center" id="back-to-login-from-reset">Back to log in</p>
     </div>
 
     <div class="auth-step" data-step="account-type" hidden>
@@ -1503,6 +1590,16 @@
       if (e.target === modal) closeModal();
     });
 
+    Array.prototype.forEach.call(modal.querySelectorAll('.field-toggle'), function (btn) {
+      btn.addEventListener('click', function () {
+        var input = document.getElementById(btn.getAttribute('data-target'));
+        var showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        btn.textContent = showing ? 'Show' : 'Hide';
+        btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+      });
+    });
+
     function api(path, opts) {
       opts = opts || {};
       var headers = { 'Content-Type': 'application/json' };
@@ -1529,6 +1626,7 @@
     var loginFields = document.getElementById('auth-login-fields');
     var signupFields = document.getElementById('auth-signup-fields');
     var formError = document.getElementById('auth-form-error');
+    var formSuccess = document.getElementById('auth-form-success');
     var formSubmit = document.getElementById('auth-form-submit');
     var stateSelect = document.getElementById('auth-signup-state');
 
@@ -1548,6 +1646,7 @@
       signupFields.hidden = mode !== 'signup';
       formSubmit.textContent = mode === 'login' ? 'Log in' : 'Sign up';
       formError.textContent = '';
+      formSuccess.textContent = '';
     }
 
     Array.prototype.forEach.call(authTabs.children, function (tab) {
@@ -1576,6 +1675,7 @@
         return;
       }
       formError.textContent = '';
+      formSuccess.textContent = '';
       formSubmit.disabled = true;
       formSubmit.textContent = 'Logging in…';
 
@@ -1604,6 +1704,7 @@
       if (password.length < 8) { formError.textContent = 'Password must be at least 8 characters.'; return; }
 
       formError.textContent = '';
+      formSuccess.textContent = '';
       formSubmit.disabled = true;
       formSubmit.textContent = 'Signing up…';
 
@@ -1621,6 +1722,76 @@
     formSubmit.addEventListener('click', function () {
       if (state.mode === 'login') submitLogin();
       else submitSignup();
+    });
+
+    // ---- step: forgot password / reset password ----
+    var forgotIdentifier = document.getElementById('forgot-identifier');
+    var forgotError = document.getElementById('forgot-error');
+    var forgotSubmit = document.getElementById('forgot-submit');
+    var resetCode = document.getElementById('reset-code');
+    var resetNewPassword = document.getElementById('reset-new-password');
+    var resetError = document.getElementById('reset-error');
+    var resetSubmit = document.getElementById('reset-submit');
+    var resetIdentifier = ''; // carried over from the forgot step
+
+    document.getElementById('open-forgot-password').addEventListener('click', function () {
+      forgotIdentifier.value = document.getElementById('auth-login-identifier').value.trim();
+      forgotError.textContent = '';
+      showStep('forgot');
+    });
+    document.getElementById('back-to-login-from-forgot').addEventListener('click', function () { showStep('auth'); });
+    document.getElementById('back-to-login-from-reset').addEventListener('click', function () { showStep('auth'); });
+
+    forgotSubmit.addEventListener('click', function () {
+      var identifier = forgotIdentifier.value.trim();
+      if (!identifier) { forgotError.textContent = 'Enter your email or phone number.'; return; }
+
+      forgotError.textContent = '';
+      forgotSubmit.disabled = true;
+      forgotSubmit.textContent = 'Sending…';
+
+      api('/auth/forgot-password', { method: 'POST', body: { identifier: identifier } })
+        .then(function () {
+          resetIdentifier = identifier;
+          resetCode.value = '';
+          resetNewPassword.value = '';
+          resetError.textContent = '';
+          showStep('reset');
+        })
+        .catch(function (err) {
+          forgotError.textContent = err.message;
+        })
+        .finally(function () {
+          forgotSubmit.disabled = false;
+          forgotSubmit.textContent = 'Send code';
+        });
+    });
+
+    resetSubmit.addEventListener('click', function () {
+      var code = resetCode.value.trim();
+      var newPassword = resetNewPassword.value;
+      if (!/^\d{6}$/.test(code)) { resetError.textContent = 'Enter the 6-digit code from your email.'; return; }
+      if (newPassword.length < 8) { resetError.textContent = 'Password must be at least 8 characters.'; return; }
+
+      resetError.textContent = '';
+      resetSubmit.disabled = true;
+      resetSubmit.textContent = 'Resetting…';
+
+      api('/auth/reset-password', { method: 'POST', body: { identifier: resetIdentifier, code: code, newPassword: newPassword } })
+        .then(function () {
+          showStep('auth');
+          setMode('login');
+          document.getElementById('auth-login-identifier').value = resetIdentifier;
+          document.getElementById('auth-login-password').value = '';
+          formSuccess.textContent = 'Password updated — log in with your new password.';
+        })
+        .catch(function (err) {
+          resetError.textContent = err.message;
+        })
+        .finally(function () {
+          resetSubmit.disabled = false;
+          resetSubmit.textContent = 'Reset password';
+        });
     });
 
     // ---- step: account-type ----

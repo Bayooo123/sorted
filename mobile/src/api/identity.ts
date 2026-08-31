@@ -26,6 +26,18 @@ export function login(identifier: string, password: string) {
   return api.post<AuthResult>('auth/login', { identifier, password }, false);
 }
 
+/**
+ * Always resolves — the server returns the same generic message whether
+ * or not the identifier matched an account (account-enumeration defense).
+ */
+export function forgotPassword(identifier: string) {
+  return api.post<{ message: string }>('auth/forgot-password', { identifier }, false);
+}
+
+export function resetPassword(identifier: string, code: string, newPassword: string) {
+  return api.post<{ message: string }>('auth/reset-password', { identifier, code, newPassword }, false);
+}
+
 export function getMe() {
   return api.get<IdentityUser>('me');
 }

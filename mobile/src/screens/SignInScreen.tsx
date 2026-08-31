@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Banner, Button, Heading, Screen, Subtext, TextField } from '../components/ui';
-import { login, signup } from '../api/identity';
+import { Banner, Body, Button, Heading, Screen, Subtext, TextField } from '../components/ui';
+import { login, signup, forgotPassword, resetPassword } from '../api/identity';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { AuthStackParamList } from '../navigation/types';
@@ -19,12 +19,36 @@ const NIGERIAN_STATES = [
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type Mode = 'login' | 'signup';
+type Mode = 'login' | 'signup' | 'forgot' | 'reset';
+
+/** A TextField with a Show/Hide toggle beside it — used for every password field on this screen. */
+function PasswordField({
+  value,
+  onChangeText,
+  placeholder,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <View style={styles.passwordRow}>
+      <View style={{ flex: 1 }}>
+        <TextField placeholder={placeholder} secureTextEntry={!visible} value={value} onChangeText={onChangeText} />
+      </View>
+      <Pressable onPress={() => setVisible((v) => !v)} style={styles.passwordToggle}>
+        <Text style={styles.passwordToggleText}>{visible ? 'Hide' : 'Show'}</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 /**
  * Screen 01 — Sign in. Entry point, both roles (handoff §01). Replaces
  * the earlier phone+OTP flow (PhoneSignInScreen/OtpVerifyScreen) — auth
  * moved to email/phone + password, see PLAN.md "Password-based auth".
+ * forgot/reset modes added later, see PLAN.md "Forgot password".
  */
 export default function SignInScreen(_props: NativeStackScreenProps<AuthStackParamList, 'SignIn'>) {
   const [mode, setMode] = useState<Mode>('login');
@@ -39,12 +63,24 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
   const [state, setState] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
 
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   function switchMode(next: Mode) {
     setMode(next);
     setError(null);
+    setSuccessMessage(null);
+  }
+
+  function openForgot() {
+    setForgotIdentifier(identifier);
+    switchMode('forgot');
   }
 
   async function handleLogin() {
@@ -53,6 +89,7 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
       return;
     }
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
     try {
       const { accessToken, user } = await login(identifier.trim(), loginPassword);
@@ -89,6 +126,7 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
       return;
     }
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
     try {
       const { accessToken, user } = await signup({
@@ -106,20 +144,71 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
     }
   }
 
+  async function handleForgotSubmit() {
+    if (!forgotIdentifier.trim()) {
+      setError('Enter your email or phone number.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      await forgotPassword(forgotIdentifier.trim());
+      setResetIdentifier(forgotIdentifier.trim());
+      setResetCode('');
+      setResetNewPassword('');
+      setMode('reset');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong — try again');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResetSubmit() {
+    if (!/^\d{6}$/.test(resetCode.trim())) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+    if (resetNewPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      await resetPassword(resetIdentifier, resetCode.trim(), resetNewPassword);
+      switchMode('login');
+      setIdentifier(resetIdentifier);
+      setLoginPassword('');
+      setSuccessMessage('Password updated — log in with your new password.');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong — try again');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const submitTitle =
+    mode === 'login' ? 'Log in' : mode === 'signup' ? 'Sign up' : mode === 'forgot' ? 'Send code' : 'Reset password';
+  const submitHandler =
+    mode === 'login' ? handleLogin : mode === 'signup' ? handleSignup : mode === 'forgot' ? handleForgotSubmit : handleResetSubmit;
+
   return (
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Heading>Consider it sorted.</Heading>
         <Subtext>Log in or create an account to get started.</Subtext>
 
-        <View style={styles.tabRow}>
-          <Pressable style={[styles.tab, mode === 'login' && styles.tabActive]} onPress={() => switchMode('login')}>
-            <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>Log in</Text>
-          </Pressable>
-          <Pressable style={[styles.tab, mode === 'signup' && styles.tabActive]} onPress={() => switchMode('signup')}>
-            <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>Sign up</Text>
-          </Pressable>
-        </View>
+        {mode === 'login' || mode === 'signup' ? (
+          <View style={styles.tabRow}>
+            <Pressable style={[styles.tab, mode === 'login' && styles.tabActive]} onPress={() => switchMode('login')}>
+              <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>Log in</Text>
+            </Pressable>
+            <Pressable style={[styles.tab, mode === 'signup' && styles.tabActive]} onPress={() => switchMode('signup')}>
+              <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>Sign up</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {mode === 'login' ? (
           <>
@@ -131,14 +220,14 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
               onChangeText={setIdentifier}
               autoFocus
             />
-            <TextField
-              placeholder="Password"
-              secureTextEntry
-              value={loginPassword}
-              onChangeText={setLoginPassword}
-            />
+            <PasswordField value={loginPassword} onChangeText={setLoginPassword} placeholder="Password" />
+            <Body onPress={openForgot} style={styles.linkRight}>
+              Forgot password?
+            </Body>
           </>
-        ) : (
+        ) : null}
+
+        {mode === 'signup' ? (
           <>
             <TextField placeholder="Full name" value={name} onChangeText={setName} autoFocus />
             <TextField
@@ -162,22 +251,59 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
                 );
               })}
             </View>
-            <TextField
-              placeholder="Password (min. 8 characters)"
-              secureTextEntry
+            <PasswordField
               value={signupPassword}
               onChangeText={setSignupPassword}
+              placeholder="Password (min. 8 characters)"
             />
           </>
-        )}
+        ) : null}
 
+        {mode === 'forgot' ? (
+          <>
+            <Subtext>Enter the email or phone number on your account and we'll send a 6-digit code.</Subtext>
+            <TextField
+              placeholder="Email or phone number"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={forgotIdentifier}
+              onChangeText={setForgotIdentifier}
+              autoFocus
+            />
+          </>
+        ) : null}
+
+        {mode === 'reset' ? (
+          <>
+            <Subtext>
+              We sent a 6-digit code to your email — it expires in 15 minutes. Enter it below with your new password.
+            </Subtext>
+            <TextField
+              placeholder="6-digit code"
+              keyboardType="number-pad"
+              maxLength={6}
+              value={resetCode}
+              onChangeText={setResetCode}
+              autoFocus
+            />
+            <PasswordField
+              value={resetNewPassword}
+              onChangeText={setResetNewPassword}
+              placeholder="New password (min. 8 characters)"
+            />
+          </>
+        ) : null}
+
+        {successMessage ? <Banner>{successMessage}</Banner> : null}
         {error ? <Banner tone="warning">{error}</Banner> : null}
 
-        <Button
-          title={mode === 'login' ? 'Log in' : 'Sign up'}
-          onPress={mode === 'login' ? handleLogin : handleSignup}
-          loading={loading}
-        />
+        <Button title={submitTitle} onPress={submitHandler} loading={loading} />
+
+        {mode === 'forgot' || mode === 'reset' ? (
+          <Body onPress={() => switchMode('login')} style={styles.linkCenter}>
+            Back to log in
+          </Body>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -214,4 +340,17 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
   chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
   chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
+  passwordRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  passwordToggle: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.input,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+  },
+  passwordToggleText: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.sm, color: colors.textMuted },
+  linkRight: { textAlign: 'right', color: colors.greenPrimary, marginBottom: spacing.lg },
+  linkCenter: { textAlign: 'center', color: colors.greenPrimary, marginTop: spacing.md },
 });

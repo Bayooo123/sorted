@@ -68,6 +68,26 @@ model User {
   // IdentityService.completeRoleProfile, not by the schema.
   serviceOfferings  ProfessionalServiceOffering[] // required when roleFlags includes "professional"
   seekingCategories ClientSeekingCategory[]  // required when roleFlags includes "client"
+
+  passwordResetTokens PasswordResetToken[]
+}
+
+// Emailed 6-digit password-reset codes — see PLAN.md "Forgot password".
+// Same discipline as the old OtpRequest table (codeHash, attempts cap,
+// consumedAt, expiresAt) but scoped to a userId: unlike OTP sign-in, a
+// reset always targets one already-existing account, never a not-yet-
+// created one, so there's no phone/email ambiguity to carry.
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  codeHash   String
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // Short-lived OTP codes for phone auth. Deliberately its own table, not
