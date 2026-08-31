@@ -6,6 +6,7 @@ import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { CompleteRoleProfileDto } from './dto/complete-role-profile.dto';
 import { PayoutDestinationDto } from './dto/payout-destination.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 /**
  * The only thing in the Identity module that touches HTTP/Express — every
@@ -31,6 +32,12 @@ export class IdentityController {
   @Get('me')
   getMe(@CurrentUser() user: AuthenticatedUser) {
     return this.identity.getUser(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/profile')
+  updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
+    return this.identity.updateProfile(user.userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1290,7 +1290,29 @@
     </div>
 
     <div class="shell-panel" data-panel="profile" hidden>
-      <div id="shell-profile-rows"></div>
+      <p class="profile-row"><span class="profile-row-label">Email</span><span class="profile-row-value" id="profile-email"></span></p>
+
+      <p class="field-label">Name</p>
+      <div class="field-row">
+        <input type="text" id="profile-name" />
+      </div>
+
+      <p class="field-label">Phone</p>
+      <div class="field-row">
+        <input type="tel" id="profile-phone" placeholder="0803 123 4567" />
+      </div>
+
+      <p class="field-label">State</p>
+      <div class="field-row">
+        <select id="profile-state">
+          <option value="">Select your state</option>
+        </select>
+      </div>
+
+      <p class="profile-row"><span class="profile-row-label">Roles</span><span class="profile-row-value" id="profile-roles"></span></p>
+
+      <p class="modal-error" id="shell-profile-error"></p>
+      <button class="btn btn-block" id="shell-profile-save" type="button">Save</button>
     </div>
   </div>
 </div>
@@ -1856,26 +1878,61 @@
         });
     }
 
+    var profileStateSelect = document.getElementById('profile-state');
+    var profileStateOptionsBuilt = false;
+    var profileError = document.getElementById('shell-profile-error');
+    var profileSave = document.getElementById('shell-profile-save');
+
     function renderProfile() {
-      var container = document.getElementById('shell-profile-rows');
+      if (!profileStateOptionsBuilt) {
+        NIGERIAN_STATES.forEach(function (name) {
+          var opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          profileStateSelect.appendChild(opt);
+        });
+        profileStateOptionsBuilt = true;
+      }
       var user = shellState.user;
-      var rows = [
-        ['Name', user.name || '—'],
-        ['Email', user.email || '—'],
-        ['Phone', user.phone || '—'],
-        ['State', user.state || '—'],
-        ['Roles', (user.roles || []).join(', ') || '—'],
-      ];
-      container.innerHTML = '';
-      rows.forEach(function (pair) {
-        var row = document.createElement('div');
-        row.className = 'profile-row';
-        row.innerHTML = '<span class="profile-row-label"></span><span class="profile-row-value"></span>';
-        row.querySelector('.profile-row-label').textContent = pair[0];
-        row.querySelector('.profile-row-value').textContent = pair[1];
-        container.appendChild(row);
-      });
+      document.getElementById('profile-email').textContent = user.email || '—';
+      document.getElementById('profile-name').value = user.name || '';
+      document.getElementById('profile-phone').value = user.phone || '';
+      profileStateSelect.value = user.state || '';
+      document.getElementById('profile-roles').textContent = (user.roles || []).join(', ') || '—';
+      profileError.textContent = '';
     }
+
+    profileSave.addEventListener('click', function () {
+      var name = document.getElementById('profile-name').value.trim();
+      var phone = document.getElementById('profile-phone').value.trim();
+      var stateName = profileStateSelect.value;
+
+      profileError.textContent = '';
+      profileSave.disabled = true;
+      profileSave.textContent = 'Saving…';
+
+      api('/me/profile', {
+        method: 'PATCH',
+        auth: true,
+        body: {
+          name: name || undefined,
+          phone: phone || undefined,
+          state: stateName || undefined,
+        },
+      })
+        .then(function (updatedUser) {
+          shellState.user = updatedUser;
+          shellGreeting.textContent = 'Hi, ' + (updatedUser.name || updatedUser.email || updatedUser.phone || 'there');
+          renderProfile();
+        })
+        .catch(function (err) {
+          profileError.textContent = err.message;
+        })
+        .finally(function () {
+          profileSave.disabled = false;
+          profileSave.textContent = 'Save';
+        });
+    });
 
     // ---- post-a-gig form ----
     var postDomainChips = document.getElementById('post-domain-chips');

@@ -85,6 +85,19 @@ export interface AuthResult {
   user: IdentityUser;
 }
 
+/**
+ * Backfills name/phone/state on accounts created before those were
+ * required at signup (every account from the phone/email+OTP era — see
+ * PLAN.md "Password-based auth"). All optional; only the fields present
+ * are changed. phone is normalized (leading-zero Nigerian local format
+ * accepted, not just E.164) before the uniqueness check.
+ */
+export interface UpdateProfileInput {
+  name?: string;
+  phone?: string;
+  state?: string;
+}
+
 /** The only surface other modules may call into Identity through. */
 export interface IdentityPort {
   getUser(userId: string): Promise<IdentityUser>;

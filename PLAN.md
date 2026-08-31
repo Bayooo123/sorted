@@ -452,6 +452,36 @@ click-through); no edit-after-post; no pagination (`listGigs` caps at
 
 ---
 
+### PATCH /me/profile — edit name/phone/state — IMPLEMENTED
+
+Needed the moment the web Profile tab shipped: every account created
+during this session's phone/email+OTP testing has `name`/`phone`/`state`
+all null (that era never collected them), and there was no way to fill
+them in — the account is real, the fields are just genuinely empty, not
+a bug. `IdentityService.updateProfile(userId, input)` backfills whichever
+of `name`/`phone`/`state` are given; unset fields are left alone (not
+cleared).
+
+**phone normalization**, added here since a raw profile-edit text field
+is exactly where someone types a number the way they'd say it out loud,
+not in E.164: `normalizeNigerianPhone` accepts a 0-prefixed Nigerian
+local number (`09031812675` -> `+2349031812675`) as well as already-E.164
+input. Applied to `login`'s phone lookup too, in the same pass — it
+previously only matched an identifier stored exactly as typed, which
+would have silently failed to match an E.164-stored phone against a
+local-format login attempt.
+
+**Endpoint:** `PATCH /me/profile` (auth'd) `{ name?, phone?, state? }` ->
+`IdentityUser`. Phone uniqueness is checked against the normalized form
+before saving (409 on collision, same as signup).
+
+**Web app:** Profile tab is now an edit form (name/phone/state inputs,
+pre-filled from the current user, a Save button), not static read-only
+rows. **Mobile app's `ProfileScreen` was not given equivalent edit UI in
+this pass** — it still only displays phone/email/state read-only; add a
+save flow there too before relying on this for mobile users needing the
+same backfill.
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to

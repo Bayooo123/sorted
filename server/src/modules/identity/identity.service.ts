@@ -24,9 +24,26 @@ import {
   PayoutDestination,
   Role,
   SignupInput,
+  UpdateProfileInput,
 } from './identity.interface';
 
 const BCRYPT_ROUNDS = 12;
+
+/**
+ * Accepts Nigerian local format (0-prefixed, e.g. "09031812675") as well
+ * as E.164 — SignupDto's own phone field requires strict E.164 already
+ * (a picker/mask can enforce that at signup time), but a raw profile-edit
+ * text field is exactly where someone types the number the way they'd say
+ * it out loud. Same normalization the mobile app's phone sign-in used to
+ * do client-side (deleted with the OTP flow) — done server-side here so
+ * every caller gets it, not just one screen.
+ */
+function normalizeNigerianPhone(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.startsWith('+')) return trimmed;
+  if (trimmed.startsWith('0')) return `+234${trimmed.slice(1)}`;
+  return `+${trimmed}`;
+}
 
 @Injectable()
 export class IdentityService implements IdentityPort {
@@ -78,8 +95,12 @@ export class IdentityService implements IdentityPort {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const identifier = input.identifier.trim().toLowerCase();
+    // Accept a phone typed either in local (0-prefixed) or E.164 form —
+    // same reasoning as updateProfile's normalization, since login is the
+    // same kind of raw text field.
+    const normalizedPhone = normalizeNigerianPhone(input.identifier);
     const user = await this.prisma.user.findFirst({
-      where: { OR: [{ email: identifier }, { phone: input.identifier.trim() }] },
+      where: { OR: [{ email: identifier }, { phone: input.identifier.trim() }, { phone: normalizedPhone }] },
     });
     if (!user || !user.passwordHash) throw new UnauthorizedException('Incorrect email/phone or password');
 
@@ -88,6 +109,41 @@ export class IdentityService implements IdentityPort {
 
     const accessToken = await this.jwt.signAsync({ sub: user.id });
     return { accessToken, user: await this.getUser(user.id) };
+  }
+
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<IdentityUser> {
+    const data: { name?: string; phone?: string; state?: string } = {};
+
+    if (input.name !== undefined) {
+      const name = input.name.trim();
+      if (!name) throw new BadRequestException('name cannot be empty');
+      data.name = name;
+    }
+
+    if (input.state !== undefined) {
+      const state = input.state.trim();
+      if (!(NIGERIAN_STATES as readonly string[]).includes(state)) {
+        throw new BadRequestException(`Unknown state "${state}"`);
+      }
+      data.state = state;
+    }
+
+    if (input.phone !== undefined) {
+      const phone = normalizeNigerianPhone(input.phone);
+      if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+        throw new BadRequestException('phone must be a valid Nigerian or E.164-style number');
+      }
+      const existing = await this.prisma.user.findUnique({ where: { phone } });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('An account with this phone number already exists');
+      }
+      data.phone = phone;
+    }
+
+    if (Object.keys(data).length === 0) return this.getUser(userId);
+
+    await this.prisma.user.update({ where: { id: userId }, data });
+    return this.getUser(userId);
   }
 
   // ---------------------------------------------------------------------
