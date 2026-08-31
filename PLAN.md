@@ -535,6 +535,35 @@ cost of 12 on every hash operation and the 5-attempt cap on guessing a
 
 ---
 
+### Web funding flow — IMPLEMENTED
+
+"My gigs" said "Fund this gig from the Sorted mobile app" for every
+`escrow_pending` gig — a dead end for anyone posting from the web, same
+shape of gap the whole app-shell slice existed to close. Ports
+`FundEscrowScreen`'s manual-pilot flow to the web: an `escrow_pending`
+card now renders its own "Get transfer details" button in place of the
+static note. Clicking it calls `POST /gigs/:id/fund` (unchanged — same
+endpoint mobile already used) and swaps in the bounty/fee breakdown plus
+the transfer account, with the same manual-pilot disclosure copy
+(`FundEscrowScreen`'s warning banner text, condensed to fit a card). It
+then polls `GET /gigs/:id/escrow` every 4s until state leaves
+`awaiting_funding`, at which point the whole "My gigs" list is
+reloaded so the card picks up its new status pill.
+
+**Not ported:** `POST /gigs/:id/confirm-funding` stays exactly as it
+was — an admin-only action (`AdminGuard`/`ADMIN_API_KEY`) the founder
+calls by hand after seeing the bank alert land, same as before this
+change. There is no web UI for it and there shouldn't be one; putting
+an admin-key field in the client-facing app would be a real credential-
+exposure risk for a feature only one person ever calls.
+
+**Poll cleanup:** each open funding card's `setInterval` handle is
+tracked in `activeFundingPolls` and cleared on tab switch, sign-out, and
+before every re-render of "My gigs" — otherwise navigating away mid-poll
+would leak an interval per visit to an unfunded gig's card.
+
+---
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to
