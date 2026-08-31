@@ -6,7 +6,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts as useInterFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useFonts as useLoraFonts, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
 import { AuthProvider } from './src/auth/AuthContext';
-import { GigsCacheProvider } from './src/state/GigsCacheContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/theme/tokens';
 
@@ -26,10 +25,8 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <GigsCacheProvider>
-            <RootNavigator />
-            <StatusBar style="dark" />
-          </GigsCacheProvider>
+          <RootNavigator />
+          <StatusBar style="dark" />
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

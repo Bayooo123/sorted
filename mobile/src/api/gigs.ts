@@ -1,5 +1,5 @@
 import { api } from './client';
-import { CreateGigInput, GigRecord } from './types';
+import { CreateGigInput, GigListFilter, GigRecord } from './types';
 
 export function createGig(input: CreateGigInput) {
   return api.post<GigRecord>('gigs', input);
@@ -13,11 +13,23 @@ export function getGig(gigId: string) {
   return api.get<GigRecord>(`gigs/${gigId}`);
 }
 
-/**
- * GigsService.listGigs is still a NotImplementedException stub server-side
- * (PLAN.md, slice 5 — market/browse). There is no "my gigs" endpoint
- * either. Until slice 5 ships, the Home feed (screen 4) and Browse feed
- * (screen 10) cannot read a real list from the server — see
- * HomeFeedScreen's local-session-cache comment for how this app works
- * around that honestly instead of pretending it's wired up.
- */
+function toQuery(filter?: GigListFilter): string {
+  if (!filter) return '';
+  const params = new URLSearchParams();
+  if (filter.domain) params.set('domain', filter.domain);
+  if (filter.submarket) params.set('submarket', filter.submarket);
+  if (filter.clientType) params.set('clientType', filter.clientType);
+  if (filter.status) params.set('status', filter.status);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+/** Public browse — server always excludes draft gigs here, regardless of `status`. */
+export function listGigs(filter?: GigListFilter) {
+  return api.get<GigRecord[]>(`gigs${toQuery(filter)}`, false);
+}
+
+/** The signed-in user's own gigs, any status (including draft). */
+export function listMyGigs(filter?: GigListFilter) {
+  return api.get<GigRecord[]>(`gigs/mine${toQuery(filter)}`);
+}

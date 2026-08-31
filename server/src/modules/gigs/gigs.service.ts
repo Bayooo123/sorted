@@ -1,5 +1,5 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, NotImplementedException } from '@nestjs/common';
-import { Gig } from '@prisma/client';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interface';
@@ -33,6 +33,14 @@ const ALLOWED_TRANSITIONS: Record<GigStatus, GigStatus[]> = {
   refunded: [],
   cancelled: [],
 };
+
+const GIG_INCLUDE = {
+  domain: true,
+  submarket: true,
+  criteria: { orderBy: { orderIndex: 'asc' as const } },
+} satisfies Prisma.GigInclude;
+
+type GigWithRelations = Prisma.GigGetPayload<{ include: typeof GIG_INCLUDE }>;
 
 @Injectable()
 export class GigsService implements GigsPort {
@@ -93,6 +101,7 @@ export class GigsService implements GigsPort {
           create: input.criteria.map((text, orderIndex) => ({ orderIndex, text, locked: false })),
         },
       },
+      include: GIG_INCLUDE,
     });
 
     return this.toGigRecord(gig);
@@ -112,6 +121,7 @@ export class GigsService implements GigsPort {
       return tx.gig.update({
         where: { id: gigId },
         data: { status: 'escrow_pending', publishedAt: new Date() },
+        include: GIG_INCLUDE,
       });
     });
 
@@ -119,7 +129,7 @@ export class GigsService implements GigsPort {
   }
 
   async getGig(gigId: string): Promise<GigRecord> {
-    const gig = await this.prisma.gig.findUnique({ where: { id: gigId } });
+    const gig = await this.prisma.gig.findUnique({ where: { id: gigId }, include: GIG_INCLUDE });
     if (!gig) throw new NotFoundException('Gig not found');
     return this.toGigRecord(gig);
   }
@@ -130,12 +140,51 @@ export class GigsService implements GigsPort {
     if (!gig) throw new NotFoundException('Gig not found');
     this.assertTransitionAllowed(gig.status as GigStatus, to);
 
-    const updated = await client.gig.update({ where: { id: gigId }, data: { status: to } });
+    const updated = await client.gig.update({ where: { id: gigId }, data: { status: to }, include: GIG_INCLUDE });
     return this.toGigRecord(updated);
   }
 
-  listGigs(_filter: GigListFilter): Promise<GigRecord[]> {
-    throw new NotImplementedException('GigsService.listGigs — slice 5 (market/browse)');
+  /**
+   * clientId set -> that client's own gigs, any status ("my gigs" — the
+   * caller, GigsController, sources clientId from the verified JWT, never
+   * a query param, so this can't be used to snoop someone else's drafts).
+   * clientId unset -> public browse: draft is always excluded, regardless
+   * of what `filter.status` asks for — an unpublished gig's title/
+   * description/bounty isn't meant to be visible to anyone but its owner.
+   */
+  async listGigs(filter: GigListFilter): Promise<GigRecord[]> {
+    const where: Prisma.GigWhereInput = {};
+
+    if (filter.clientId) {
+      where.clientId = filter.clientId;
+      if (filter.status) where.status = filter.status;
+    } else {
+      where.status = filter.status && filter.status !== 'draft' ? filter.status : { not: 'draft' };
+    }
+
+    if (filter.domain) {
+      const domain = await this.prisma.domain.findUnique({ where: { key: filter.domain } });
+      if (!domain) return [];
+      where.domainId = domain.id;
+    }
+    if (filter.submarket) {
+      const submarket = await this.prisma.submarket.findUnique({ where: { key: filter.submarket } });
+      if (!submarket) return [];
+      where.submarketId = submarket.id;
+    }
+    if (filter.clientType) {
+      const clientType = await this.prisma.clientTypeRef.findUnique({ where: { key: filter.clientType } });
+      if (!clientType) return [];
+      where.clientTypeId = clientType.id;
+    }
+
+    const gigs = await this.prisma.gig.findMany({
+      where,
+      include: GIG_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return gigs.map((g) => this.toGigRecord(g));
   }
 
   private assertTransitionAllowed(from: GigStatus, to: GigStatus): void {
@@ -144,15 +193,24 @@ export class GigsService implements GigsPort {
     }
   }
 
-  private toGigRecord(gig: Gig): GigRecord {
+  private toGigRecord(gig: GigWithRelations): GigRecord {
     return {
       id: gig.id,
       clientId: gig.clientId,
       source: gig.source as GigRecord['source'],
       templateId: gig.templateId,
+      title: gig.title,
+      description: gig.description,
+      domain: gig.domain.key,
+      submarket: gig.submarket.key,
+      locationText: gig.locationText,
+      materialsMode: gig.materialsMode as GigRecord['materialsMode'],
       status: gig.status as GigStatus,
       bountyKobo: kobo(Number(gig.bountyKobo)),
       matchingStrategy: gig.matchingStrategy,
+      criteria: gig.criteria.map((c) => ({ text: c.text, locked: c.locked })),
+      createdAt: gig.createdAt,
+      publishedAt: gig.publishedAt,
     };
   }
 }

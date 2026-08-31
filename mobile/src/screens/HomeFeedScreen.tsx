@@ -1,8 +1,10 @@
-import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext } from '../components/ui';
-import { useGigsCache } from '../state/GigsCacheContext';
+import { listMyGigs } from '../api/gigs';
+import { ApiError } from '../api/client';
 import { GigStackParamList } from '../navigation/types';
 import { GigRecord } from '../api/types';
 import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
@@ -21,25 +23,41 @@ const STATUS_LABEL: Record<GigRecord['status'], string> = {
   cancelled: 'Cancelled',
 };
 
-/** Screen 04 — Home / gig feed. Client view (handoff §04). */
+/** Screen 04 — Home / gig feed. Client view (handoff §04). Backed by the real GET /gigs/mine now (PLAN.md slice 5). */
 export default function HomeFeedScreen({
   navigation,
 }: NativeStackScreenProps<GigStackParamList, 'HomeFeed'>) {
-  const { gigs } = useGigsCache();
+  const [gigs, setGigs] = useState<GigRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    listMyGigs()
+      .then(setGigs)
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load your gigs — try again'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Refetch every time this screen gains focus — e.g. right after posting
+  // a gig on PostGigScreen, or coming back from FundEscrow/ReviewSignOff
+  // having changed a gig's status.
+  useFocusEffect(load);
 
   return (
     <Screen>
       <Heading>Your gigs</Heading>
-      <Subtext>Posted by you, this session</Subtext>
+      <Subtext>Everything you've posted</Subtext>
 
-      <Banner>
-        There's no "list my gigs" endpoint yet (GigsService.listGigs is
-        still a stub — PLAN.md slice 5). This shows gigs you've posted in
-        this app session only; nothing is fetched from the server here.
-      </Banner>
+      {error ? <Banner tone="warning">{error}</Banner> : null}
 
-      {gigs.length === 0 ? (
-        <View style={styles.empty}>
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.greenPrimary} />
+        </View>
+      ) : gigs.length === 0 ? (
+        <View style={styles.center}>
           <Body style={{ textAlign: 'center', marginBottom: spacing.lg }}>
             No gigs posted yet. Tap below to post your first one.
           </Body>
@@ -52,7 +70,7 @@ export default function HomeFeedScreen({
           renderItem={({ item }) => (
             <Card>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-                <Text style={styles.gigTitle}>Gig {item.id.slice(0, 8)}</Text>
+                <Text style={styles.gigTitle} numberOfLines={1}>{item.title}</Text>
                 <Pill label={STATUS_LABEL[item.status]} tone={item.status === 'open' ? 'active' : 'neutral'} />
               </View>
               <Text style={styles.gigBounty}>{(item.bountyKobo / 100).toLocaleString('en-NG', {
@@ -83,8 +101,8 @@ export default function HomeFeedScreen({
 }
 
 const styles = StyleSheet.create({
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  gigTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  gigTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
   gigBounty: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg, color: colors.textPrimary, marginBottom: spacing.xs },
   link: { fontFamily: fonts.sansMedium, fontSize: fontSizes.sm, color: colors.greenPrimary, marginTop: spacing.xs },
 });

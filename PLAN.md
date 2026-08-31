@@ -371,6 +371,87 @@ no separate mobile-side change needed.
 
 ---
 
+### GET /gigs — real listing (replaces the slice-5 stub) — IMPLEMENTED
+
+Prompted by building the web app pages below: "browse jobs" needs a real
+list from somewhere, and the mobile app's own Browse/Home screens were
+already faking it with a session-local cache for exactly this reason
+(`GigsCacheContext`, now deleted). Fixed once, for both platforms,
+instead of adding a second fake version on web.
+
+**GigsPort.listGigs(filter)** is real now. `filter.clientId` set -> that
+client's own gigs, any status including draft ("my gigs" — Escrow/
+Payments-adjacent, so only ever set from the verified JWT, never a query
+param). `filter.clientId` unset -> public browse: `draft` is always
+excluded server-side regardless of what `status` is requested — an
+unpublished gig's title/description/bounty isn't meant to be visible to
+anyone but its owner. `domain`/`submarket`/`clientType` filter by
+taxonomy key, same as `createGig`.
+
+**GigRecord grew real fields** it never had: `title`, `description`,
+`domain`, `submarket`, `locationText`, `materialsMode`, `criteria`,
+`createdAt`, `publishedAt` — previously just id/status/bounty/etc., which
+is why the mobile app rendered "Gig a1b2c3d4" instead of a real title
+everywhere. Fixed at the type level so this can't regress: `toGigRecord`
+now takes the Prisma-included shape (`domain`/`submarket`/`criteria`
+relations), not the bare row.
+
+**Endpoints (`GigsController`):**
+```
+GET /gigs                (public)          ?domain&submarket&clientType&status -> GigRecord[] (draft always excluded)
+GET /gigs/mine           (auth'd)          ?domain&submarket&clientType&status -> GigRecord[] (own gigs, any status)
+```
+`mine` is registered ahead of `:id` so it isn't parsed as a gig id.
+
+**Mobile app:** `GigsCacheContext` deleted entirely — it was also never
+actually broken (correction to an earlier claim in this same work: it
+*was* mounted in `App.tsx`, contrary to what I first assumed from an
+incomplete grep). `HomeFeedScreen`/`BrowseMarketScreen` now call
+`listMyGigs()`/`listGigs({status:'open'})` for real, refetching on every
+focus (`useFocusEffect`) so posting a gig or changing its status
+elsewhere shows up without a manual reload. `FundEscrowScreen`/
+`ClaimWorkScreen`/`ReviewSignOffScreen` switched from a cache lookup to
+`getGig(gigId)`, and `ClaimWorkScreen`/`ReviewSignOffScreen` now show the
+real title instead of a truncated id.
+
+---
+
+### Web app pages (post-login) — IMPLEMENTED
+
+The landing page's login/signup modal used to end at "the Sorted mobile
+app is where you post and claim gigs" — a dead end for anyone who'd just
+signed up on the web and had no reason yet to install anything else.
+Replaced with real post-login pages on `sorted.com.ng` itself: My gigs,
+Browse, Post a gig, Profile — a `#app-shell` full-viewport view (same
+overlay pattern as the auth modal) that replaces the "done" step
+entirely; signup/login/finish-account-setup all land here now instead of
+showing a closing confirmation.
+
+**What's real:** My gigs (`GET /gigs/mine`) and Browse (`GET /gigs?
+status=open`) both read the real listing above. Post a gig
+(`POST /gigs` + `POST /gigs/:id/publish`) is the same real flow the
+mobile app's `PostGigScreen` uses — same validation (₦3,000 bounty floor,
+domain/category/posting-as pickers off live taxonomy, at least one
+criterion), same two-call publish sequence. Profile shows the real
+`IdentityUser` fields. A session persists across a page reload (checks
+`localStorage` for a token and calls `GET /me` on load, same as the
+mobile app's `AuthContext`).
+
+**What's explicitly not built here, said so in the UI itself rather than
+faked:** funding a gig (escrow) and reviewing/signing off both stay
+mobile-only — a gig sitting at `escrow_pending` or `submitted` in "My
+gigs" shows a plain note ("Fund this gig from the Sorted mobile app...")
+instead of a dead button or a fake action. Claiming a gig from Browse
+isn't wired on *either* platform yet (`MatchingStrategy.assignProfessional`
+doesn't exist server-side) — Browse cards say "Claiming isn't available
+yet" rather than linking somewhere that does nothing.
+
+**Not done:** no gig detail page (the list cards are the only view — no
+click-through); no edit-after-post; no pagination (`listGigs` caps at
+100, matching the server-side `take: 100`).
+
+---
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to

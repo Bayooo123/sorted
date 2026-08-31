@@ -82,14 +82,35 @@ export interface CreateGigInput {
   templateId?: string;
 }
 
+export interface GigCriterionView {
+  text: string;
+  locked: boolean;
+}
+
 export interface GigRecord {
   id: string;
   clientId: string;
   source: 'self_posted';
   templateId: string | null;
+  title: string;
+  description: string;
+  domain: string;
+  submarket: string;
+  locationText: string;
+  materialsMode: MaterialsMode;
   status: GigStatus;
   bountyKobo: number;
   matchingStrategy: string;
+  criteria: GigCriterionView[];
+  createdAt: string;
+  publishedAt: string | null;
+}
+
+export interface GigListFilter {
+  domain?: string;
+  submarket?: string;
+  clientType?: string;
+  status?: GigStatus;
 }
 
 export type EscrowState =

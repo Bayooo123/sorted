@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Card, Heading, Screen, Subtext } from '../components/ui';
-import { useGigsCache } from '../state/GigsCacheContext';
+import { getGig } from '../api/gigs';
 import { BrowseStackParamList } from '../navigation/types';
+import { GigRecord } from '../api/types';
 import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
 
 /** Illustrative — real stake is EscrowRecord.stakeKobo, config per gig
@@ -22,9 +23,12 @@ export default function ClaimWorkScreen({
   route,
 }: NativeStackScreenProps<BrowseStackParamList, 'ClaimWork'>) {
   const { gigId } = route.params;
-  const { gigs } = useGigsCache();
-  const gig = gigs.find((g) => g.id === gigId);
+  const [gig, setGig] = useState<GigRecord | null>(null);
   const [proofUri, setProofUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    getGig(gigId).then(setGig).catch(() => {});
+  }, [gigId]);
 
   const stakeKobo = Math.round(((gig?.bountyKobo ?? 0) * ILLUSTRATIVE_STAKE_BPS) / 10_000);
 
@@ -37,7 +41,7 @@ export default function ClaimWorkScreen({
 
   return (
     <Screen>
-      <Heading>Gig {gig ? gig.id.slice(0, 8) : gigId.slice(0, 8)}</Heading>
+      <Heading>{gig ? gig.title : `Gig ${gigId.slice(0, 8)}`}</Heading>
       <Subtext>Claimed — stake held</Subtext>
 
       <Banner tone="warning">

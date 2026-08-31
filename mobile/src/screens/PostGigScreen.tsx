@@ -5,7 +5,6 @@ import { Banner, Body, Button, Heading, Screen, Subtext, TextField } from '../co
 import { listClientTypes, listDomains, listSubmarkets } from '../api/identity';
 import { createGig, publishGig } from '../api/gigs';
 import { ApiError } from '../api/client';
-import { useGigsCache } from '../state/GigsCacheContext';
 import { GigStackParamList } from '../navigation/types';
 import { ClientTypeRef, Domain, MaterialsMode, Submarket } from '../api/types';
 import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
@@ -38,7 +37,6 @@ export default function PostGigScreen({
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { upsert } = useGigsCache();
 
   useEffect(() => {
     Promise.all([listDomains(), listSubmarkets(), listClientTypes()])
@@ -100,13 +98,11 @@ export default function PostGigScreen({
         bountyKobo,
         criteria: validCriteria,
       });
-      upsert(draft);
       // publishGig locks criteria (server-enforced, immutable thereafter)
       // and moves draft -> escrow_pending in one call, per HANDOFF.md §5
       // PUBLISH. There's no separate "review" round-trip to the server —
       // the review step below is purely client-side before that call.
       const published = await publishGig(draft.id);
-      upsert(published);
       navigation.replace('FundEscrow', { gigId: published.id });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not post this gig — try again');
@@ -119,7 +115,7 @@ export default function PostGigScreen({
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Heading>Post a gig</Heading>
-        <Subtext>Criteria lock once you publish — payers can't edit them after.</Subtext>
+        <Subtext>Criteria lock once you publish — you can't edit them after.</Subtext>
 
         <TextField label="Title" value={title} onChangeText={setTitle} placeholder="Fix leaking kitchen pipe" />
         <TextField

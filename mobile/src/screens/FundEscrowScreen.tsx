@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext } from '../components/ui';
-import { useGigsCache } from '../state/GigsCacheContext';
+import { getGig } from '../api/gigs';
 import { GigStackParamList } from '../navigation/types';
 import { fundGig, getEscrow } from '../api/escrow';
 import { ApiError } from '../api/client';
-import { EscrowRecordView, FundGigResult } from '../api/types';
+import { EscrowRecordView, FundGigResult, GigRecord } from '../api/types';
 import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
 
 const POLL_INTERVAL_MS = 4000;
@@ -30,9 +30,17 @@ export default function FundEscrowScreen({
   route,
 }: NativeStackScreenProps<GigStackParamList, 'FundEscrow'>) {
   const { gigId } = route.params;
-  const { gigs } = useGigsCache();
-  const gig = gigs.find((g) => g.id === gigId);
+  const [gig, setGig] = useState<GigRecord | null>(null);
   const bountyKobo = gig?.bountyKobo ?? 0;
+
+  useEffect(() => {
+    getGig(gigId)
+      .then(setGig)
+      .catch(() => {
+        // Non-fatal here — the fee-math card just shows ₦0 until this
+        // resolves; the actual funding flow below doesn't depend on it.
+      });
+  }, [gigId]);
 
   const [result, setResult] = useState<FundGigResult | null>(null);
   const [escrow, setEscrow] = useState<EscrowRecordView | null>(null);

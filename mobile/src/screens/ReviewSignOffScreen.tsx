@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Card, Heading, Screen, Subtext } from '../components/ui';
-import { useGigsCache } from '../state/GigsCacheContext';
+import { getGig } from '../api/gigs';
 import { GigStackParamList } from '../navigation/types';
+import { GigRecord } from '../api/types';
 import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
 
 /** Screen 07 — Review & sign off ★. Client view, money slice (handoff §07). */
@@ -11,14 +12,17 @@ export default function ReviewSignOffScreen({
   route,
 }: NativeStackScreenProps<GigStackParamList, 'ReviewSignOff'>) {
   const { gigId } = route.params;
-  const { gigs } = useGigsCache();
-  const gig = gigs.find((g) => g.id === gigId);
+  const [gig, setGig] = useState<GigRecord | null>(null);
   const [inspectionRequested, setInspectionRequested] = useState(false);
+
+  useEffect(() => {
+    getGig(gigId).then(setGig).catch(() => {});
+  }, [gigId]);
 
   return (
     <Screen>
       <Heading>Review & sign off</Heading>
-      <Subtext>Gig {gig ? gig.id.slice(0, 8) : gigId.slice(0, 8)}</Subtext>
+      <Subtext>{gig ? gig.title : `Gig ${gigId.slice(0, 8)}`}</Subtext>
 
       <Banner tone="warning">
         ★ Money slice — not wired to the server yet. "Approve" must call

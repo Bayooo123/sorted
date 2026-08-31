@@ -864,6 +864,120 @@
     justify-content: center;
     margin: 0 0 16px;
   }
+
+  /* ---------- app shell (post-login) ---------- */
+
+  #app-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: var(--bg-app);
+    overflow-y: auto;
+  }
+
+  #app-shell[hidden] { display: none; }
+
+  .shell-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .shell-greeting {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    color: var(--text-primary);
+  }
+
+  .shell-signout {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .shell-wrap { max-width: 640px; margin: 0 auto; padding: 20px; }
+
+  .shell-tabs { margin-bottom: 20px; }
+
+  .shell-panel[hidden] { display: none; }
+
+  .gig-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+
+  .gig-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+
+  .gig-card-title { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 16px; color: var(--text-primary); }
+
+  .gig-card-meta { font-size: 12.5px; color: var(--text-muted); margin: 0 0 8px; }
+
+  .gig-card-bounty { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+
+  .gig-card-note { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+  .status-pill {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--bg-app);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .status-pill[data-tone="active"] { background: var(--green-mint-bg); color: var(--green-deep); border-color: var(--green-bright); }
+
+  .shell-empty { text-align: center; color: var(--text-muted); font-size: 14px; padding: 40px 20px; }
+
+  .profile-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .profile-row:last-child { border-bottom: none; }
+  .profile-row-label { color: var(--text-muted); }
+  .profile-row-value { color: var(--text-primary); font-weight: 600; text-align: right; }
+
+  .field-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
+
+  textarea.field-row-textarea {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+    font-family: inherit;
+    min-height: 80px;
+    resize: vertical;
+    margin-bottom: 4px;
+  }
+
+  .criterion-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .criterion-remove { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 4px 8px; }
+  .add-criterion-link { font-size: 13.5px; font-weight: 600; color: var(--green-primary); cursor: pointer; background: none; border: none; padding: 0; margin-bottom: 18px; font-family: inherit; }
 </style>
 </head>
 <body>
@@ -1111,14 +1225,72 @@
       <p class="modal-error" id="auth-type-error"></p>
       <button class="btn btn-block" id="auth-type-submit" type="button">Finish setup</button>
     </div>
+  </div>
+</div>
 
-    <div class="auth-step" data-step="done" hidden>
-      <div class="done-check">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+<div id="app-shell" hidden>
+  <div class="shell-header">
+    <span class="shell-greeting" id="shell-greeting"></span>
+    <button class="shell-signout" id="shell-signout" type="button">Sign out</button>
+  </div>
+  <div class="shell-wrap">
+    <div class="auth-tabs shell-tabs" id="shell-tabs">
+      <button class="auth-tab auth-tab-active" data-tab="mine" type="button">My gigs</button>
+      <button class="auth-tab" data-tab="browse" type="button">Browse</button>
+      <button class="auth-tab" data-tab="post" type="button">Post a gig</button>
+      <button class="auth-tab" data-tab="profile" type="button">Profile</button>
+    </div>
+
+    <div class="shell-panel" data-panel="mine">
+      <div id="shell-mine-list"></div>
+    </div>
+
+    <div class="shell-panel" data-panel="browse" hidden>
+      <div id="shell-browse-list"></div>
+    </div>
+
+    <div class="shell-panel" data-panel="post" hidden>
+      <p class="modal-error" id="shell-post-error"></p>
+
+      <p class="field-label">Title</p>
+      <div class="field-row">
+        <input type="text" id="post-title" placeholder="Fix leaking kitchen pipe" />
       </div>
-      <h3>You&rsquo;re in.</h3>
-      <p class="modal-sub" id="auth-done-message"></p>
-      <button class="btn btn-block" id="auth-done-close" type="button">Close</button>
+
+      <p class="field-label">Description</p>
+      <textarea id="post-description" class="field-row-textarea" placeholder="What needs doing, and any context a professional should know"></textarea>
+
+      <p class="field-label">Domain</p>
+      <div class="chip-wrap" id="post-domain-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Category</p>
+      <div class="chip-wrap" id="post-submarket-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Posting as</p>
+      <div class="chip-wrap" id="post-clienttype-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Location</p>
+      <div class="field-row">
+        <input type="text" id="post-location" placeholder="Lekki Phase 1, Lagos" />
+      </div>
+
+      <p class="field-label">Who supplies materials?</p>
+      <div class="chip-wrap" id="post-materials-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Definition of done</p>
+      <div id="post-criteria-rows"></div>
+      <button class="add-criterion-link" id="post-add-criterion" type="button">+ Add another criterion</button>
+
+      <p class="field-label">Budget (&#8358;)</p>
+      <div class="field-row">
+        <input type="text" inputmode="decimal" id="post-bounty" placeholder="3000" />
+      </div>
+
+      <button class="btn btn-block" id="shell-post-submit" type="button">Review & publish</button>
+    </div>
+
+    <div class="shell-panel" data-panel="profile" hidden>
+      <div id="shell-profile-rows"></div>
     </div>
   </div>
 </div>
@@ -1369,9 +1541,8 @@
       if (!res.user.roles || res.user.roles.length === 0) {
         loadSubmarketsAndShowAccountType();
       } else {
-        document.getElementById('auth-done-message').textContent =
-          'Welcome back — the Sorted mobile app is where you post and claim gigs; this account is ready to go there.';
-        showStep('done');
+        closeModal();
+        openAppShell(res.user);
       }
     }
 
@@ -1526,10 +1697,9 @@
           seekingCategorySubmarketIds: seekingIds,
         },
       })
-        .then(function () {
-          document.getElementById('auth-done-message').textContent =
-            "You're set up — the Sorted mobile app is where you post and claim gigs; this account is ready to go there.";
-          showStep('done');
+        .then(function (updatedUser) {
+          closeModal();
+          openAppShell(updatedUser);
         })
         .catch(function (err) {
           typeError.textContent = err.message;
@@ -1540,8 +1710,353 @@
         });
     });
 
-    // ---- step: done ----
-    document.getElementById('auth-done-close').addEventListener('click', closeModal);
+    // ---- app shell (post-login: my gigs / browse / post a gig / profile) ----
+    var MIN_BOUNTY_NAIRA = 3000; // matches server's platform-fee floor, see mobile's PostGigScreen
+    var STATUS_LABEL = {
+      draft: 'Draft',
+      escrow_pending: 'Awaiting funding',
+      open: 'Open — matching',
+      claimed: 'Claimed',
+      in_progress: 'In progress',
+      submitted: 'Awaiting sign-off',
+      signed_off: 'Signed off',
+      disputed: 'Disputed',
+      released: 'Complete',
+      refunded: 'Refunded',
+      cancelled: 'Cancelled',
+    };
+
+    var shell = document.getElementById('app-shell');
+    var shellGreeting = document.getElementById('shell-greeting');
+    var shellSignout = document.getElementById('shell-signout');
+    var shellTabs = document.getElementById('shell-tabs');
+    var shellPanels = shell.querySelectorAll('.shell-panel');
+    var shellState = {
+      user: null,
+      taxonomyLoaded: false,
+      domains: [],
+      submarkets: [],
+      clientTypes: [],
+      postDomain: null,
+      postSubmarket: null,
+      postClientType: null,
+      postMaterials: 'bounty_covers',
+      postCriteria: [''],
+    };
+
+    function formatNaira(kobo) {
+      return (kobo / 100).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 });
+    }
+
+    function openAppShell(user) {
+      shellState.user = user;
+      shellGreeting.textContent = 'Hi, ' + (user.name || user.email || user.phone || 'there');
+      shell.hidden = false;
+      showShellTab('mine');
+    }
+
+    function closeAppShell() {
+      shell.hidden = true;
+    }
+
+    function signOut() {
+      state.accessToken = null;
+      shellState.user = null;
+      try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+      closeAppShell();
+    }
+    shellSignout.addEventListener('click', signOut);
+
+    function showShellTab(name) {
+      Array.prototype.forEach.call(shellTabs.children, function (tab) {
+        tab.classList.toggle('auth-tab-active', tab.getAttribute('data-tab') === name);
+      });
+      shellPanels.forEach(function (panel) {
+        panel.hidden = panel.getAttribute('data-panel') !== name;
+      });
+      if (name === 'mine') loadMineList();
+      else if (name === 'browse') loadBrowseList();
+      else if (name === 'post') loadPostForm();
+      else if (name === 'profile') renderProfile();
+    }
+
+    Array.prototype.forEach.call(shellTabs.children, function (tab) {
+      tab.addEventListener('click', function () {
+        showShellTab(tab.getAttribute('data-tab'));
+      });
+    });
+
+    function gigCard(gig, note) {
+      var card = document.createElement('div');
+      card.className = 'gig-card';
+      var tone = gig.status === 'open' ? 'active' : 'neutral';
+      card.innerHTML =
+        '<div class="gig-card-head">' +
+          '<span class="gig-card-title"></span>' +
+          '<span class="status-pill" data-tone="' + tone + '"></span>' +
+        '</div>' +
+        '<p class="gig-card-meta"></p>' +
+        '<div class="gig-card-bounty"></div>';
+      card.querySelector('.gig-card-title').textContent = gig.title;
+      card.querySelector('.status-pill').textContent = STATUS_LABEL[gig.status] || gig.status;
+      card.querySelector('.gig-card-meta').textContent = gig.locationText;
+      card.querySelector('.gig-card-bounty').textContent = formatNaira(gig.bountyKobo);
+      if (note) {
+        var noteEl = document.createElement('p');
+        noteEl.className = 'gig-card-note';
+        noteEl.textContent = note;
+        card.appendChild(noteEl);
+      }
+      return card;
+    }
+
+    function loadMineList() {
+      var container = document.getElementById('shell-mine-list');
+      container.innerHTML = '<p class="shell-empty">Loading…</p>';
+      api('/gigs/mine', { auth: true })
+        .then(function (gigs) {
+          container.innerHTML = '';
+          if (gigs.length === 0) {
+            container.innerHTML = '<p class="shell-empty">No gigs posted yet — try the "Post a gig" tab.</p>';
+            return;
+          }
+          gigs.forEach(function (gig) {
+            var note = null;
+            // Funding and sign-off aren't built on the web yet (only on
+            // the mobile app) — say so plainly rather than showing a
+            // dead button.
+            if (gig.status === 'escrow_pending') note = 'Fund this gig from the Sorted mobile app to make it live for professionals.';
+            else if (gig.status === 'submitted') note = 'Review and sign off from the Sorted mobile app.';
+            container.appendChild(gigCard(gig, note));
+          });
+        })
+        .catch(function (err) {
+          container.innerHTML = '';
+          container.appendChild(Object.assign(document.createElement('p'), { className: 'modal-error', textContent: err.message }));
+        });
+    }
+
+    function loadBrowseList() {
+      var container = document.getElementById('shell-browse-list');
+      container.innerHTML = '<p class="shell-empty">Loading…</p>';
+      api('/gigs?status=open')
+        .then(function (gigs) {
+          container.innerHTML = '';
+          if (gigs.length === 0) {
+            container.innerHTML = '<p class="shell-empty">No open gigs right now.</p>';
+            return;
+          }
+          gigs.forEach(function (gig) {
+            container.appendChild(gigCard(gig, 'Claiming isn’t available yet — coming soon.'));
+          });
+        })
+        .catch(function (err) {
+          container.innerHTML = '';
+          container.appendChild(Object.assign(document.createElement('p'), { className: 'modal-error', textContent: err.message }));
+        });
+    }
+
+    function renderProfile() {
+      var container = document.getElementById('shell-profile-rows');
+      var user = shellState.user;
+      var rows = [
+        ['Name', user.name || '—'],
+        ['Email', user.email || '—'],
+        ['Phone', user.phone || '—'],
+        ['State', user.state || '—'],
+        ['Roles', (user.roles || []).join(', ') || '—'],
+      ];
+      container.innerHTML = '';
+      rows.forEach(function (pair) {
+        var row = document.createElement('div');
+        row.className = 'profile-row';
+        row.innerHTML = '<span class="profile-row-label"></span><span class="profile-row-value"></span>';
+        row.querySelector('.profile-row-label').textContent = pair[0];
+        row.querySelector('.profile-row-value').textContent = pair[1];
+        container.appendChild(row);
+      });
+    }
+
+    // ---- post-a-gig form ----
+    var postDomainChips = document.getElementById('post-domain-chips');
+    var postSubmarketChips = document.getElementById('post-submarket-chips');
+    var postClientTypeChips = document.getElementById('post-clienttype-chips');
+    var postMaterialsChips = document.getElementById('post-materials-chips');
+    var postCriteriaRows = document.getElementById('post-criteria-rows');
+    var postError = document.getElementById('shell-post-error');
+    var postSubmit = document.getElementById('shell-post-submit');
+
+    function loadPostForm() {
+      if (shellState.taxonomyLoaded) return;
+      Promise.all([api('/taxonomy/domains'), api('/taxonomy/submarkets'), api('/taxonomy/client-types')])
+        .then(function (results) {
+          shellState.domains = results[0];
+          shellState.submarkets = results[1];
+          shellState.clientTypes = results[2];
+          shellState.taxonomyLoaded = true;
+          if (results[0][0]) shellState.postDomain = results[0][0].key;
+          if (results[2][0]) shellState.postClientType = results[2][0].key;
+          renderPostChips();
+          renderCriteriaRows();
+        })
+        .catch(function (err) {
+          postError.textContent = err.message;
+        });
+    }
+
+    function singleSelectChips(container, items, selectedKey, onSelect) {
+      container.innerHTML = '';
+      items.forEach(function (item) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.textContent = item.label;
+        if (item.key === selectedKey) chip.classList.add('chip-active');
+        chip.addEventListener('click', function () { onSelect(item.key); });
+        container.appendChild(chip);
+      });
+    }
+
+    function renderPostChips() {
+      singleSelectChips(postDomainChips, shellState.domains, shellState.postDomain, function (key) {
+        shellState.postDomain = key;
+        shellState.postSubmarket = null;
+        renderPostChips();
+      });
+      var visibleSubmarkets = shellState.submarkets.filter(function (s) {
+        return !shellState.postDomain || (s.domain && s.domain.key === shellState.postDomain);
+      });
+      singleSelectChips(postSubmarketChips, visibleSubmarkets, shellState.postSubmarket, function (key) {
+        shellState.postSubmarket = key;
+        renderPostChips();
+      });
+      singleSelectChips(postClientTypeChips, shellState.clientTypes, shellState.postClientType, function (key) {
+        shellState.postClientType = key;
+        renderPostChips();
+      });
+      singleSelectChips(
+        postMaterialsChips,
+        [
+          { key: 'bounty_covers', label: 'Bounty covers materials' },
+          { key: 'professional_supplies', label: 'Professional supplies' },
+        ],
+        shellState.postMaterials,
+        function (key) {
+          shellState.postMaterials = key;
+          renderPostChips();
+        },
+      );
+    }
+
+    function renderCriteriaRows() {
+      postCriteriaRows.innerHTML = '';
+      shellState.postCriteria.forEach(function (text, i) {
+        var row = document.createElement('div');
+        row.className = 'criterion-row';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Criterion ' + (i + 1);
+        input.value = text;
+        input.style.cssText = 'flex:1;padding:13px 14px;border-radius:11px;border:1px solid var(--border);background:var(--bg-app);font-size:15px;color:var(--text-primary);';
+        input.addEventListener('input', function () {
+          shellState.postCriteria[i] = input.value;
+        });
+        row.appendChild(input);
+        if (shellState.postCriteria.length > 1) {
+          var removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'criterion-remove';
+          removeBtn.textContent = '✕';
+          removeBtn.addEventListener('click', function () {
+            shellState.postCriteria.splice(i, 1);
+            renderCriteriaRows();
+          });
+          row.appendChild(removeBtn);
+        }
+        postCriteriaRows.appendChild(row);
+      });
+    }
+
+    document.getElementById('post-add-criterion').addEventListener('click', function () {
+      shellState.postCriteria.push('');
+      renderCriteriaRows();
+    });
+
+    postSubmit.addEventListener('click', function () {
+      var title = document.getElementById('post-title').value.trim();
+      var description = document.getElementById('post-description').value.trim();
+      var locationText = document.getElementById('post-location').value.trim();
+      var bountyNaira = parseFloat(document.getElementById('post-bounty').value || '0');
+      var bountyKobo = Math.round(bountyNaira * 100);
+      var criteria = shellState.postCriteria.map(function (c) { return c.trim(); }).filter(Boolean);
+
+      if (title.length < 3) { postError.textContent = 'Enter a title (at least 3 characters).'; return; }
+      if (!description) { postError.textContent = 'Enter a description.'; return; }
+      if (!locationText) { postError.textContent = 'Enter a location.'; return; }
+      if (!shellState.postDomain || !shellState.postSubmarket || !shellState.postClientType) {
+        postError.textContent = 'Pick a domain, category, and posting-as type.';
+        return;
+      }
+      if (criteria.length === 0) { postError.textContent = 'Add at least one criterion.'; return; }
+      if (bountyKobo < MIN_BOUNTY_NAIRA * 100) {
+        postError.textContent = 'Minimum budget is ₦' + MIN_BOUNTY_NAIRA.toLocaleString() + ' (platform fee floor).';
+        return;
+      }
+
+      postError.textContent = '';
+      postSubmit.disabled = true;
+      postSubmit.textContent = 'Publishing…';
+
+      api('/gigs', {
+        method: 'POST',
+        auth: true,
+        body: {
+          title: title,
+          description: description,
+          domain: shellState.postDomain,
+          submarket: shellState.postSubmarket,
+          clientType: shellState.postClientType,
+          locationText: locationText,
+          materialsMode: shellState.postMaterials,
+          bountyKobo: bountyKobo,
+          criteria: criteria,
+        },
+      })
+        .then(function (draft) {
+          return api('/gigs/' + draft.id + '/publish', { method: 'POST', auth: true });
+        })
+        .then(function () {
+          // Reset the form for next time.
+          document.getElementById('post-title').value = '';
+          document.getElementById('post-description').value = '';
+          document.getElementById('post-location').value = '';
+          document.getElementById('post-bounty').value = '';
+          shellState.postCriteria = [''];
+          renderCriteriaRows();
+          showShellTab('mine');
+        })
+        .catch(function (err) {
+          postError.textContent = err.message;
+        })
+        .finally(function () {
+          postSubmit.disabled = false;
+          postSubmit.textContent = 'Review & publish';
+        });
+    });
+
+    // ---- restore a session on page load ----
+    (function restoreSession() {
+      var token;
+      try { token = localStorage.getItem(TOKEN_KEY); } catch (e) { token = null; }
+      if (!token) return;
+      state.accessToken = token;
+      api('/me', { auth: true })
+        .then(openAppShell)
+        .catch(function () {
+          state.accessToken = null;
+          try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+        });
+    })();
   })();
 </script>
 

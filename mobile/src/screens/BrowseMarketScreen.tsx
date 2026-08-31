@@ -1,72 +1,66 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Banner, Body, Card, Heading, Pill, Screen, Subtext } from '../components/ui';
-import { useGigsCache } from '../state/GigsCacheContext';
+import { listGigs } from '../api/gigs';
+import { ApiError } from '../api/client';
 import { BrowseStackParamList } from '../navigation/types';
+import { GigRecord } from '../api/types';
 import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
-
-type DevPreviewState = 'loaded' | 'empty' | 'loading';
 
 /**
  * Screen 10 — Browse / market feed. Professional view, Matching module
- * (handoff §10). The handoff's reference build has loaded/empty/loading
- * toggle buttons "for review; remove those toggles in the shipped
- * build" — kept here gated behind __DEV__ for the same reason, off in a
- * production build.
+ * (handoff §10). Backed by the real public GET /gigs?status=open now
+ * (PLAN.md slice 5) — the server already excludes draft gigs regardless
+ * of what status is requested, so this never needs to filter that itself.
  */
 export default function BrowseMarketScreen({
   navigation,
 }: NativeStackScreenProps<BrowseStackParamList, 'BrowseMarket'>) {
-  const { gigs } = useGigsCache();
-  const [devState, setDevState] = useState<DevPreviewState>('loaded');
-  const openGigs = gigs.filter((g) => g.status === 'open');
+  const [gigs, setGigs] = useState<GigRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const effectiveState: DevPreviewState = __DEV__ ? devState : openGigs.length === 0 ? 'empty' : 'loaded';
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    listGigs({ status: 'open' })
+      .then(setGigs)
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load open gigs — try again'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useFocusEffect(load);
 
   return (
     <Screen>
       <Heading>Open gigs</Heading>
       <Subtext>FixedPriceAccept — first credible claim wins</Subtext>
 
-      <Banner>
-        GigsService.listGigs is still a stub (PLAN.md slice 5), so this
-        reads from gigs published in this app session instead of a real
-        server-side open-gigs list. Claiming isn't wired either — Matching/
-        Escrow have no HTTP route (assignProfessional, holdStake are
-        stubs).
-      </Banner>
+      {error ? <Banner tone="warning">{error}</Banner> : null}
 
-      {__DEV__ ? (
-        <View style={styles.devToggleRow}>
-          {(['loaded', 'empty', 'loading'] as DevPreviewState[]).map((s) => (
-            <Pressable key={s} onPress={() => setDevState(s)} style={[styles.devToggle, devState === s && styles.devToggleActive]}>
-              <Text style={styles.devToggleText}>{s}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      {effectiveState === 'loading' ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      {loading ? (
+        <View style={styles.center}>
           <ActivityIndicator color={colors.greenPrimary} />
         </View>
-      ) : effectiveState === 'empty' ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      ) : gigs.length === 0 ? (
+        <View style={styles.center}>
           <Body style={{ textAlign: 'center' }}>No open gigs right now.</Body>
         </View>
       ) : (
         <FlatList
-          data={openGigs}
+          data={gigs}
           keyExtractor={(g) => g.id}
           contentContainerStyle={{ gap: spacing.md }}
           renderItem={({ item }) => (
             <Pressable onPress={() => navigation.navigate('ClaimWork', { gigId: item.id })}>
               <Card>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs }}>
-                  <Text style={styles.title}>Gig {item.id.slice(0, 8)}</Text>
+                  <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                   <Pill label={item.matchingStrategy} />
                 </View>
+                <Text style={styles.location} numberOfLines={1}>{item.locationText}</Text>
                 <Text style={styles.bounty}>
                   {(item.bountyKobo / 100).toLocaleString('en-NG', {
                     style: 'currency',
@@ -84,17 +78,8 @@ export default function BrowseMarketScreen({
 }
 
 const styles = StyleSheet.create({
-  devToggleRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  devToggle: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    backgroundColor: colors.surface,
-  },
-  devToggleActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
-  devToggleText: { fontFamily: fonts.sans, fontSize: fontSizes.xs, color: colors.textMuted },
-  title: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
+  location: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted, marginBottom: spacing.xs },
   bounty: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg, color: colors.textPrimary },
 });

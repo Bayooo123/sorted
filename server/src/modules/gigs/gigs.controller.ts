@@ -1,8 +1,9 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { GigsService } from './gigs.service';
 import { AuthenticatedUser, JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { CreateGigDto } from './dto/create-gig.dto';
+import { ListGigsDto } from './dto/list-gigs.dto';
 import { kobo } from '../../common/money';
 
 /**
@@ -42,6 +43,24 @@ export class GigsController {
       throw new ForbiddenException('Only the gig owner can publish it');
     }
     return this.gigs.publishGig(id);
+  }
+
+  /**
+   * Own gigs, any status (including draft) — registered ahead of `:id` so
+   * "mine" isn't parsed as a gig id. clientId always comes from the
+   * verified token, never a query param — see GigsService.listGigs's doc
+   * comment for why that matters (draft titles/descriptions aren't public).
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('mine')
+  listMine(@CurrentUser() user: AuthenticatedUser, @Query() query: ListGigsDto) {
+    return this.gigs.listGigs({ ...query, clientId: user.userId });
+  }
+
+  /** Public browse — draft is always excluded server-side regardless of `status`. */
+  @Get()
+  list(@Query() query: ListGigsDto) {
+    return this.gigs.listGigs(query);
   }
 
   @Get(':id')

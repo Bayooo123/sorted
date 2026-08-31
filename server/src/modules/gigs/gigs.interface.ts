@@ -48,21 +48,43 @@ export interface CreateGigInput {
   templateId?: string;
 }
 
+export interface GigCriterionView {
+  text: string;
+  locked: boolean;
+}
+
 export interface GigRecord {
   id: string;
   clientId: string;
   source: GigSource;
   templateId: string | null;
+  title: string;
+  description: string;
+  domain: string; // taxonomy key
+  submarket: string; // taxonomy key
+  locationText: string;
+  materialsMode: 'bounty_covers' | 'professional_supplies';
   status: GigStatus;
   bountyKobo: Kobo;
   matchingStrategy: string;
+  criteria: GigCriterionView[];
+  createdAt: Date;
+  publishedAt: Date | null;
 }
 
+/**
+ * clientId scopes to one client's own gigs (any status, including draft —
+ * "my gigs"). Without it, listGigs is a public browse: draft is always
+ * excluded regardless of `status`, since an unpublished gig's
+ * title/description/bounty isn't meant to be visible to anyone but its
+ * owner — see GigsService.listGigs's doc comment for the enforcement.
+ */
 export interface GigListFilter {
   domain?: string;
   submarket?: string;
   clientType?: string;
   status?: GigStatus;
+  clientId?: string;
 }
 
 /** The only surface other modules may call into Gigs through. */
