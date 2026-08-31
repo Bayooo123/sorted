@@ -477,10 +477,15 @@ before saving (409 on collision, same as signup).
 
 **Web app:** Profile tab is now an edit form (name/phone/state inputs,
 pre-filled from the current user, a Save button), not static read-only
-rows. **Mobile app's `ProfileScreen` was not given equivalent edit UI in
-this pass** — it still only displays phone/email/state read-only; add a
-save flow there too before relying on this for mobile users needing the
-same backfill.
+rows.
+
+**Mobile app** (added in a follow-up pass, same feature): `ProfileScreen`'s
+Account card gained an "Edit name, phone, state" link that swaps the
+read-only rows for the same inputs/chip state-picker as `SignInScreen`'s
+signup tab, with Save/Cancel. Save calls `updateProfile` then
+`AuthContext.refreshUser()` (a fresh `GET /me`) rather than trusting the
+PATCH response directly into local state — same pattern the rest of the
+app already uses after a mutation.
 
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 

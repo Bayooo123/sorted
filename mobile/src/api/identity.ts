@@ -30,6 +30,17 @@ export function getMe() {
   return api.get<IdentityUser>('me');
 }
 
+/** All optional — only fields present are changed. Mirrors server's UpdateProfileInput. */
+export interface UpdateProfileInput {
+  name?: string;
+  phone?: string;
+  state?: string;
+}
+
+export function updateProfile(input: UpdateProfileInput) {
+  return api.patch<IdentityUser>('me/profile', input);
+}
+
 export function setPayoutDestination(dest: PayoutDestination) {
   return api.patch<PayoutDestination>('me/payout-destination', dest);
 }
