@@ -16,10 +16,23 @@ export interface IdentityUser {
   email: string | null;
   name: string | null;
   state: string | null;
+  /** Data URI (e.g. "data:image/jpeg;base64,..."), any role. */
+  avatarBase64: string | null;
   roles: Role[];
   kycStatus: KycStatus;
   serviceOfferingSubmarketIds: string[];
   seekingCategorySubmarketIds: string[];
+}
+
+export type KycRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface KycRequestView {
+  id: string;
+  status: KycRequestStatus;
+  note: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
 }
 
 export interface PayoutDestination {

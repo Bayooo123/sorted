@@ -19,6 +19,8 @@ export interface IdentityUser {
   email: string | null;
   name: string | null;
   state: string | null;
+  /** Data URI (e.g. "data:image/jpeg;base64,..."), any role. See PLAN.md "Profile photo + KYC apply flow". */
+  avatarBase64: string | null;
   roles: Role[];
   kycStatus: KycStatus;
   /** Populated when roles includes 'professional'. Submarket IDs — see CompleteRoleProfileInput. */
@@ -107,6 +109,50 @@ export interface ResetPasswordInput {
   identifier: string;
   code: string;
   newPassword: string;
+}
+
+export interface UpdateAvatarInput {
+  /** Data URI — png/jpeg/webp, size-capped in IdentityService. */
+  avatarBase64: string;
+}
+
+/**
+ * Manual-pilot professional verification (product decision, not in
+ * HANDOFF.md — see PLAN.md "Profile photo + KYC apply flow"). NOT the
+ * same "Verification" as HANDOFF.md §3.6 (criterion proof/sign-off,
+ * modules/verification/) — this is KYC (User.kycStatus), owned by
+ * Identity §3.1. A professional applies with a photo/ID; the founder
+ * reviews by hand (AdminGuard) and approves/rejects, same disclosed-
+ * manual pattern as escrow funding.
+ */
+export type KycRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface KycRequestView {
+  id: string;
+  status: KycRequestStatus;
+  note: string | null;
+  reviewNote: string | null;
+  createdAt: Date;
+  reviewedAt: Date | null;
+}
+
+/** Only returned from the admin listing — includes the document image and applicant contact info the founder needs to actually review it. */
+export interface KycRequestAdminView extends KycRequestView {
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  userPhone: string | null;
+  documentBase64: string;
+}
+
+export interface ApplyForKycInput {
+  documentBase64: string;
+  note?: string;
+}
+
+export interface ReviewKycInput {
+  decision: 'approved' | 'rejected';
+  reviewNote?: string;
 }
 
 /** The only surface other modules may call into Identity through. */

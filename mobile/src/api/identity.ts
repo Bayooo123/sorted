@@ -4,6 +4,7 @@ import {
   ClientTypeRef,
   Domain,
   IdentityUser,
+  KycRequestView,
   PayoutDestination,
   Role,
   Submarket,
@@ -55,6 +56,21 @@ export function updateProfile(input: UpdateProfileInput) {
 
 export function setPayoutDestination(dest: PayoutDestination) {
   return api.patch<PayoutDestination>('me/payout-destination', dest);
+}
+
+/** avatarBase64 is a data URI (png/jpeg/webp) — see PLAN.md "Profile photo + KYC apply flow". */
+export function updateAvatar(avatarBase64: string) {
+  return api.patch<IdentityUser>('me/avatar', { avatarBase64 });
+}
+
+/** Professional-only — server 403s otherwise. documentBase64 is a data URI. */
+export function applyForKyc(documentBase64: string, note?: string) {
+  return api.post<KycRequestView>('me/kyc/apply', { documentBase64, note });
+}
+
+/** null if never applied. */
+export function getMyKycRequest() {
+  return api.get<KycRequestView | null>('me/kyc');
 }
 
 export interface CompleteRoleProfileInput {

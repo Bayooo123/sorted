@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { ExpressAdapter } from '@nestjs/platform-express';
+import { ExpressAdapter, NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
@@ -26,9 +26,14 @@ const expressApp = express();
 let bootstrapped: Promise<void> | null = null;
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, new ExpressAdapter(expressApp));
   app.enableCors({ origin: corsOrigins() });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  // Default (100kb) is too small for a base64 profile photo / KYC document
+  // upload — see identity.service.ts's MAX_IMAGE_DATA_URI_LENGTH. Vercel's
+  // own serverless function request body ceiling is ~4.5MB regardless of
+  // this setting, so 4mb here stays under that with a little headroom.
+  app.useBodyParser('json', { limit: '4mb' });
   await app.init();
 }
 

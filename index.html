@@ -1029,6 +1029,34 @@
 
   .field-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
 
+  .avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+
+  .avatar-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    font-weight: 700;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+  .avatar-upload-label { display: inline-block; margin-bottom: 4px; cursor: pointer; }
+
+  .profile-kyc { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  .kyc-note { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 8px 0 0; }
+
+  .kyc-review-note { font-size: 13px; color: var(--text-body); background: var(--bg-app); border-radius: 10px; padding: 10px 12px; margin: 8px 0 0; }
+
   textarea.field-row-textarea {
     width: 100%;
     padding: 13px 14px;
@@ -1388,6 +1416,15 @@
     </div>
 
     <div class="shell-panel" data-panel="profile" hidden>
+      <div class="avatar-row">
+        <div class="avatar-preview" id="profile-avatar-preview"></div>
+        <div>
+          <label class="modal-link avatar-upload-label" for="profile-avatar-input">Change photo</label>
+          <input type="file" id="profile-avatar-input" accept="image/*" hidden />
+          <p class="modal-error" id="profile-avatar-error"></p>
+        </div>
+      </div>
+
       <p class="profile-row"><span class="profile-row-label">Email</span><span class="profile-row-value" id="profile-email"></span></p>
 
       <p class="field-label">Name</p>
@@ -1411,6 +1448,11 @@
 
       <p class="modal-error" id="shell-profile-error"></p>
       <button class="btn btn-block" id="shell-profile-save" type="button">Save</button>
+
+      <div class="profile-kyc" id="profile-kyc-section" hidden>
+        <p class="field-label">Verification</p>
+        <div id="profile-kyc-status"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1628,6 +1670,36 @@
           }
           return data;
         });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    /** Downscales/recompresses an image file client-side before it's sent as a base64 data URI — keeps avatar/KYC uploads well under the server's body-size cap. */
+    function resizeImageFileToDataUri(file, maxDim, quality) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function () { reject(new Error('Could not read that file.')); };
+        reader.onload = function () {
+          var img = new Image();
+          img.onerror = function () { reject(new Error('Could not read that image.')); };
+          img.onload = function () {
+            var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            var w = Math.max(1, Math.round(img.width * scale));
+            var h = Math.max(1, Math.round(img.height * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
       });
     }
 
@@ -2185,6 +2257,131 @@
       profileStateSelect.value = user.state || '';
       document.getElementById('profile-roles').textContent = (user.roles || []).join(', ') || '—';
       profileError.textContent = '';
+      renderAvatar(user);
+      renderKycSection();
+    }
+
+    // ---- profile photo (any role) ----
+    var avatarPreview = document.getElementById('profile-avatar-preview');
+    var avatarInput = document.getElementById('profile-avatar-input');
+    var avatarError = document.getElementById('profile-avatar-error');
+
+    function renderAvatar(user) {
+      if (user.avatarBase64) {
+        avatarPreview.innerHTML = '';
+        var img = document.createElement('img');
+        img.src = user.avatarBase64;
+        img.alt = '';
+        avatarPreview.appendChild(img);
+      } else {
+        var initial = (user.name || user.email || user.phone || '?').trim().charAt(0).toUpperCase();
+        avatarPreview.textContent = initial || '?';
+      }
+    }
+
+    avatarInput.addEventListener('change', function () {
+      var file = avatarInput.files && avatarInput.files[0];
+      if (!file) return;
+      avatarError.textContent = '';
+
+      resizeImageFileToDataUri(file, 480, 0.75)
+        .then(function (dataUri) {
+          return api('/me/avatar', { method: 'PATCH', auth: true, body: { avatarBase64: dataUri } });
+        })
+        .then(function (updatedUser) {
+          shellState.user = updatedUser;
+          renderAvatar(updatedUser);
+        })
+        .catch(function (err) {
+          avatarError.textContent = err.message;
+        })
+        .finally(function () {
+          avatarInput.value = '';
+        });
+    });
+
+    // ---- verification (KYC) — professional only, manual pilot; see PLAN.md "Profile photo + KYC apply flow" ----
+    function renderKycStatusUi(kycStatus, request) {
+      var el = document.getElementById('profile-kyc-status');
+
+      if (kycStatus === 'verified') {
+        el.innerHTML =
+          '<span class="status-pill" data-tone="active">Verified</span>' +
+          '<p class="kyc-note">Verified professionals are more likely to be picked for gigs.</p>';
+        return;
+      }
+
+      if (request && request.status === 'pending') {
+        el.innerHTML =
+          '<span class="status-pill" data-tone="neutral">Application under review</span>' +
+          '<p class="kyc-note">We’ll update this once it’s reviewed — usually within a few days.</p>';
+        return;
+      }
+
+      var rejectedNote = '';
+      if (request && request.status === 'rejected') {
+        rejectedNote =
+          '<p class="kyc-review-note">Not approved' +
+          (request.reviewNote ? ': ' + escapeHtml(request.reviewNote) : '.') +
+          ' You can apply again below.</p>';
+      }
+
+      el.innerHTML =
+        rejectedNote +
+        '<p class="kyc-note">Verified professionals are more likely to be picked for gigs. Upload a clear photo of a government ID or yourself for manual review.</p>' +
+        '<div class="field-row"><input type="file" id="kyc-document-input" accept="image/*" /></div>' +
+        '<div class="field-row"><input type="text" id="kyc-note-input" placeholder="Optional note" /></div>' +
+        '<p class="modal-error" id="kyc-apply-error"></p>' +
+        '<button class="btn btn-block" id="kyc-apply-submit" type="button">Apply for verification</button>';
+
+      document.getElementById('kyc-apply-submit').addEventListener('click', function () {
+        var fileInput = document.getElementById('kyc-document-input');
+        var noteInput = document.getElementById('kyc-note-input');
+        var err = document.getElementById('kyc-apply-error');
+        var btn = document.getElementById('kyc-apply-submit');
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) { err.textContent = 'Choose a photo to upload.'; return; }
+
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+
+        resizeImageFileToDataUri(file, 1000, 0.8)
+          .then(function (dataUri) {
+            return api('/me/kyc/apply', {
+              method: 'POST',
+              auth: true,
+              body: { documentBase64: dataUri, note: noteInput.value.trim() || undefined },
+            });
+          })
+          .then(function () {
+            shellState.user.kycStatus = 'pending';
+            renderKycSection();
+          })
+          .catch(function (e) {
+            err.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Apply for verification';
+          });
+      });
+    }
+
+    function renderKycSection() {
+      var section = document.getElementById('profile-kyc-section');
+      var user = shellState.user;
+      if (!user.roles || user.roles.indexOf('professional') === -1) {
+        section.hidden = true;
+        return;
+      }
+      section.hidden = false;
+      document.getElementById('profile-kyc-status').innerHTML = '<p class="kyc-note">Loading…</p>';
+      api('/me/kyc', { auth: true })
+        .then(function (request) {
+          renderKycStatusUi(user.kycStatus, request);
+        })
+        .catch(function () {
+          document.getElementById('profile-kyc-status').innerHTML = '<p class="modal-error">Could not load verification status.</p>';
+        });
     }
 
     profileSave.addEventListener('click', function () {

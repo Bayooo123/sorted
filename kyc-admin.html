@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sorted — KYC review</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root {
+    --green-primary:#027A61;
+    --green-deep:#007B5C;
+    --green-bright:#04C29C;
+    --green-mint-bg:#C8FFF6;
+    --bg-app:#F4FAF8;
+    --surface:#FFFFFF;
+    --border:#E0E6E4;
+    --text-primary:#0C1F1B;
+    --text-body:#3A4A47;
+    --text-muted:#7E8F8D;
+    --error:#B3261E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg-app);
+    color: var(--text-body);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 24px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+  p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 28px; }
+  .key-row input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+  }
+  button {
+    padding: 12px 18px;
+    border-radius: 11px;
+    border: none;
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary { background: var(--surface); color: var(--text-body); border: 1px solid var(--border); }
+  button.reject { background: var(--error); }
+  #status { font-size: 13px; color: var(--error); font-weight: 600; margin: -16px 0 20px; }
+  #status:empty { display: none; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h3 { margin: 0 0 4px; font-size: 16px; color: var(--text-primary); }
+  .card .meta { font-size: 12.5px; color: var(--text-muted); margin: 0 0 12px; }
+  .card img { width: 100%; max-height: 360px; object-fit: contain; border-radius: 10px; background: var(--bg-app); margin-bottom: 12px; display: block; }
+  .card .note { font-size: 13px; color: var(--text-body); background: var(--bg-app); border-radius: 8px; padding: 8px 10px; margin: 0 0 12px; }
+  .actions { display: flex; gap: 8px; }
+  .review-note-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  #empty { text-align: center; color: var(--text-muted); padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>KYC review</h1>
+  <p class="sub">Not linked from the main app. Bookmark this page — the admin key is never stored, you re-enter it each visit.</p>
+
+  <div class="key-row">
+    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
+    <button id="load-btn" type="button">Load pending</button>
+  </div>
+  <p id="status"></p>
+
+  <div id="list"></div>
+  <p id="empty" hidden>No pending applications.</p>
+</div>
+
+<script>
+  var API_BASE_URL = 'https://sorted-api.vercel.app';
+  var keyInput = document.getElementById('admin-key');
+  var loadBtn = document.getElementById('load-btn');
+  var statusEl = document.getElementById('status');
+  var listEl = document.getElementById('list');
+  var emptyEl = document.getElementById('empty');
+
+  function adminApi(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json', 'x-admin-key': keyInput.value };
+    return fetch(API_BASE_URL + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? JSON.parse(text) : undefined;
+        if (!res.ok) {
+          var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+          throw new Error(Array.isArray(message) ? message.join(', ') : message);
+        }
+        return data;
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function renderCard(req) {
+    var card = document.createElement('div');
+    card.className = 'card';
+
+    var name = req.userName || req.userEmail || req.userPhone || 'Unknown';
+    var meta = [req.userEmail, req.userPhone].filter(Boolean).join(' · ');
+
+    card.innerHTML =
+      '<h3>' + escapeHtml(name) + '</h3>' +
+      '<p class="meta">' + escapeHtml(meta) + ' — applied ' + new Date(req.createdAt).toLocaleString() + '</p>' +
+      '<img src="' + req.documentBase64 + '" alt="" />' +
+      (req.note ? '<p class="note">' + escapeHtml(req.note) + '</p>' : '') +
+      '<input type="text" class="review-note-input" placeholder="Optional note (shown to the applicant if rejected)" />' +
+      '<div class="actions"><button class="approve" type="button">Approve</button><button class="reject" type="button">Reject</button></div>';
+
+    var noteInput = card.querySelector('.review-note-input');
+
+    function review(decision) {
+      var buttons = card.querySelectorAll('button');
+      buttons.forEach(function (b) { b.disabled = true; });
+      adminApi('/admin/kyc/' + req.id + '/review', {
+        method: 'POST',
+        body: { decision: decision, reviewNote: noteInput.value.trim() || undefined },
+      })
+        .then(function () {
+          card.remove();
+          if (!listEl.children.length) emptyEl.hidden = false;
+        })
+        .catch(function (err) {
+          statusEl.textContent = err.message;
+          buttons.forEach(function (b) { b.disabled = false; });
+        });
+    }
+
+    card.querySelector('.approve').addEventListener('click', function () { review('approved'); });
+    card.querySelector('.reject').addEventListener('click', function () { review('rejected'); });
+
+    return card;
+  }
+
+  function load() {
+    if (!keyInput.value) {
+      statusEl.textContent = 'Enter the admin key first.';
+      return;
+    }
+    statusEl.textContent = '';
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Loading…';
+    listEl.innerHTML = '';
+    emptyEl.hidden = true;
+
+    adminApi('/admin/kyc/pending')
+      .then(function (requests) {
+        if (requests.length === 0) {
+          emptyEl.hidden = false;
+          return;
+        }
+        requests.forEach(function (req) {
+          listEl.appendChild(renderCard(req));
+        });
+      })
+      .catch(function (err) {
+        statusEl.textContent = err.message;
+      })
+      .finally(function () {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load pending';
+      });
+  }
+
+  loadBtn.addEventListener('click', load);
+  keyInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') load();
+  });
+</script>
+</body>
+</html>

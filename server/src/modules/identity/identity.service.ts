@@ -15,17 +15,22 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NIGERIAN_STATES } from '../../common/nigerian-states';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
+  ApplyForKycInput,
   AuthResult,
   CompleteRoleProfileInput,
   ForgotPasswordInput,
   IdentityPort,
   IdentityUser,
+  KycRequestAdminView,
+  KycRequestView,
   KycStatus,
   LoginInput,
   PayoutDestination,
   ResetPasswordInput,
+  ReviewKycInput,
   Role,
   SignupInput,
+  UpdateAvatarInput,
   UpdateProfileInput,
 } from './identity.interface';
 
@@ -34,8 +39,41 @@ const RESET_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_CODE_MAX_ATTEMPTS = 5;
 const GENERIC_RESET_MESSAGE = { message: 'If an account exists for that email or phone, a reset code has been sent.' };
 
+// ~2.6MB raw image, ~3.5MB once base64-encoded — leaves headroom under
+// Vercel's serverless request body ceiling (see main.ts/api/index.ts's
+// bodyParser limit) after JSON envelope overhead.
+const MAX_IMAGE_DATA_URI_LENGTH = 3_500_000;
+const IMAGE_DATA_URI_RE = /^data:image\/(png|jpe?g|webp);base64,/i;
+
 function generateResetCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function assertValidImageDataUri(value: string, fieldName: string): void {
+  if (!IMAGE_DATA_URI_RE.test(value)) {
+    throw new BadRequestException(`${fieldName} must be a base64 image data URI (png/jpeg/webp)`);
+  }
+  if (value.length > MAX_IMAGE_DATA_URI_LENGTH) {
+    throw new BadRequestException(`${fieldName} is too large — please use a smaller image`);
+  }
+}
+
+function toKycRequestView(request: {
+  id: string;
+  status: string;
+  note: string | null;
+  reviewNote: string | null;
+  createdAt: Date;
+  reviewedAt: Date | null;
+}): KycRequestView {
+  return {
+    id: request.id,
+    status: request.status as KycRequestView['status'],
+    note: request.note,
+    reviewNote: request.reviewNote,
+    createdAt: request.createdAt,
+    reviewedAt: request.reviewedAt,
+  };
 }
 
 /**
@@ -232,6 +270,82 @@ export class IdentityService implements IdentityPort {
     return this.getUser(userId);
   }
 
+  async updateAvatar(userId: string, input: UpdateAvatarInput): Promise<IdentityUser> {
+    assertValidImageDataUri(input.avatarBase64, 'avatarBase64');
+    await this.prisma.user.update({ where: { id: userId }, data: { avatarBase64: input.avatarBase64 } });
+    return this.getUser(userId);
+  }
+
+  // ---------------------------------------------------------------------
+  // KYC apply/review — manual pilot (see PLAN.md "Profile photo + KYC
+  // apply flow"). Professional-only: this is about a professional's odds
+  // of being picked for a gig, so a client applying wouldn't mean
+  // anything yet — enforced here, not just in the UI.
+  // ---------------------------------------------------------------------
+
+  async applyForKyc(userId: string, input: ApplyForKycInput): Promise<KycRequestView> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.roleFlags.includes('professional')) {
+      throw new ForbiddenException('Verification is for professionals — it affects your odds of being picked for gigs');
+    }
+    assertValidImageDataUri(input.documentBase64, 'documentBase64');
+
+    const [request] = await this.prisma.$transaction([
+      this.prisma.kycRequest.create({
+        data: { userId, documentBase64: input.documentBase64, note: input.note?.trim() || null },
+      }),
+      this.prisma.user.update({ where: { id: userId }, data: { kycStatus: 'pending' } }),
+    ]);
+
+    return toKycRequestView(request);
+  }
+
+  async getMyKycRequest(userId: string): Promise<KycRequestView | null> {
+    const request = await this.prisma.kycRequest.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return request ? toKycRequestView(request) : null;
+  }
+
+  /** Admin-only listing — see IdentityController's AdminGuard-gated route. */
+  async listPendingKycRequests(): Promise<KycRequestAdminView[]> {
+    const requests = await this.prisma.kycRequest.findMany({
+      where: { status: 'pending' },
+      orderBy: { createdAt: 'asc' },
+      include: { user: true },
+    });
+    return requests.map((r) => ({
+      ...toKycRequestView(r),
+      userId: r.userId,
+      userName: r.user.name,
+      userEmail: r.user.email,
+      userPhone: r.user.phone,
+      documentBase64: r.documentBase64,
+    }));
+  }
+
+  /** Admin-only — flips both the request status and the applicant's User.kycStatus in one transaction. */
+  async reviewKyc(requestId: string, input: ReviewKycInput): Promise<KycRequestView> {
+    const request = await this.prisma.kycRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException('KYC request not found');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedRequest = await tx.kycRequest.update({
+        where: { id: requestId },
+        data: { status: input.decision, reviewNote: input.reviewNote?.trim() || null, reviewedAt: new Date() },
+      });
+      await tx.user.update({
+        where: { id: request.userId },
+        data: { kycStatus: input.decision === 'approved' ? 'verified' : 'rejected' },
+      });
+      return updatedRequest;
+    });
+
+    return toKycRequestView(updated);
+  }
+
   // ---------------------------------------------------------------------
   // IdentityPort — the cross-module interface
   // ---------------------------------------------------------------------
@@ -249,6 +363,7 @@ export class IdentityService implements IdentityPort {
       email: user.email,
       name: user.name,
       state: user.state,
+      avatarBase64: user.avatarBase64,
       roles: user.roleFlags as Role[],
       kycStatus: user.kycStatus as KycStatus,
       serviceOfferingSubmarketIds: user.serviceOfferings.map((o) => o.submarketId),

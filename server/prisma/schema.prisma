@@ -46,6 +46,7 @@ model User {
   name                String?
   passwordHash        String?
   state               String? // Nigerian state — see common/nigerian-states.ts
+  avatarBase64        String? // data URI (e.g. "data:image/jpeg;base64,...") — profile photo, all roles. See PLAN.md "Profile photo + KYC apply flow".
   roleFlags           String[] // e.g. ["client","professional"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
   kycStatus           KycStatus @default(unverified)
   identityRef         String? // SEAM (§3.1): opaque ref into whichever IdentityVerifier produced kycStatus
@@ -70,6 +71,34 @@ model User {
   seekingCategories ClientSeekingCategory[]  // required when roleFlags includes "client"
 
   passwordResetTokens PasswordResetToken[]
+  kycRequests         KycRequest[]
+}
+
+// Manual-pilot professional verification — see PLAN.md "Profile photo + KYC
+// apply flow". A professional applies with a photo/ID; the founder reviews
+// by hand and approves/rejects (same disclosed-manual pattern as escrow
+// funding — see manual-pilot.provider.ts). This is NOT the same
+// "Verification" as HANDOFF.md §3.6 (criterion proof/sign-off, modules/
+// verification/) — this is KYC (User.kycStatus), owned by Identity §3.1,
+// hence the KycRequest name to keep the two apart.
+enum KycRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+model KycRequest {
+  id             String            @id @default(cuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id])
+  documentBase64 String // data URI — photo/ID uploaded for manual review
+  note           String?
+  status         KycRequestStatus  @default(pending)
+  reviewNote     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime          @default(now())
+
+  @@index([userId])
 }
 
 // Emailed 6-digit password-reset codes — see PLAN.md "Forgot password".

@@ -615,6 +615,68 @@ attempting an exact replica.
 
 ---
 
+### Profile photo + KYC apply flow — IMPLEMENTED
+
+Two asks bundled together: (1) any user can upload a profile photo, (2)
+professionals can apply for verification, which is meant to boost their
+odds of being picked for a gig. Two real infra decisions were confirmed
+with the founder before building, since neither is a style call:
+**storage** is base64-in-Postgres (no new vendor/cost — a deliberate
+pilot-scale choice, not the long-term answer: this bloats rows and
+response payloads, revisit with real object storage — S3/Vercel Blob —
+once volume matters) and **verification** is a manual pilot, same
+disclosed-human-review pattern as escrow funding: a professional applies
+with a photo, the founder reviews it by hand, no real BVN/NIN check
+happens yet (blocked on the same Monnify business KYC onboarding the
+payments integration is waiting on).
+
+**Naming note:** this is NOT `modules/verification/` (HANDOFF.md §3.6 —
+that's about proving a gig *criterion* is met, i.e. sign-off). This is
+KYC (`User.kycStatus`, Identity §3.1), so the new table is `KycRequest`,
+kept entirely inside the Identity module, to avoid two unrelated things
+both being called "verification" in the codebase.
+
+**Schema:** `User.avatarBase64` (nullable, any role) plus a new
+`KycRequest` table (userId, documentBase64, note, status pending/
+approved/rejected, reviewNote, reviewedAt). Applying sets
+`User.kycStatus = 'pending'`; admin review sets it to `verified` or
+`rejected` in the same transaction as the request's own status update.
+
+**Size cap:** `MAX_IMAGE_DATA_URI_LENGTH` (3.5MB) is enforced in
+`IdentityService`, and both `main.ts` and `api/index.ts` raise Nest's
+default 100kb JSON body limit to 4mb via `app.useBodyParser('json', ...)`
+— sized to stay under Vercel's own ~4.5MB serverless request-body ceiling
+(an app-level limit can't raise that platform one). Web and mobile both
+downscale/recompress the image client-side before upload (canvas resize
+on web, `ImagePicker`'s `quality` option on mobile) so a real photo
+doesn't get anywhere near either ceiling.
+
+**Endpoints** (`IdentityController`): `PATCH /me/avatar` (any role);
+`POST /me/kyc/apply` (professional-only — 403s otherwise, enforced in
+the service, not just hidden in the UI) and `GET /me/kyc` (my latest
+request, or null) for applicants; `GET /admin/kyc/pending` and
+`POST /admin/kyc/:id/review` (`AdminGuard`, same `x-admin-key` as
+escrow's confirm-funding) for the founder.
+
+**Web + mobile:** Profile screen gained a photo (any role) and, for
+professionals, a "Verification" card showing verified / pending /
+apply-with-a-photo-and-optional-note depending on current status —
+same three-state logic on both platforms.
+
+**`kyc-admin.html` (new, web root, NOT linked from the app's nav):** a
+standalone review page — enter the admin key (never persisted, re-typed
+each visit), see each pending application's photo/ID image plus
+applicant contact info, Approve/Reject with an optional note. This is
+the one admin surface in this feature that got a real page instead of a
+curl command: unlike confirming a bank transfer, reviewing a KYC
+document means actually *looking at an image*, which isn't practical
+from a terminal. It's still not linked anywhere a regular user's
+browsing would reach it, and still gated by the same shared secret as
+every other manual-pilot admin action — the safety property is "not
+discoverable and not persisted," not "not a page."
+
+---
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to
