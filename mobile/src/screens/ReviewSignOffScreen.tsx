@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Card, Heading, Screen, Subtext } from '../components/ui';
 import { getGig } from '../api/gigs';
 import { GigStackParamList } from '../navigation/types';
 import { GigRecord } from '../api/types';
-import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
+import { fonts, fontSizes, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 /** Screen 07 — Review & sign off ★. Client view, money slice (handoff §07). */
 export default function ReviewSignOffScreen({
   route,
 }: NativeStackScreenProps<GigStackParamList, 'ReviewSignOff'>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { gigId } = route.params;
   const [gig, setGig] = useState<GigRecord | null>(null);
   const [inspectionRequested, setInspectionRequested] = useState(false);
@@ -68,6 +71,8 @@ export default function ReviewSignOffScreen({
 }
 
 function ToggleLink({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Text onPress={onPress} style={[styles.link, active && styles.linkActive]}>
       {active ? '✓ ' : ''}
@@ -76,11 +81,13 @@ function ToggleLink({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
-const styles = StyleSheet.create({
-  link: {
-    fontFamily: fonts.sansMedium,
-    fontSize: fontSizes.sm,
-    color: colors.greenPrimary,
-  },
-  linkActive: { color: colors.greenDeep },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    link: {
+      fontFamily: fonts.sansMedium,
+      fontSize: fontSizes.sm,
+      color: colors.greenPrimary,
+    },
+    linkActive: { color: colors.greenDeep },
+  });
+}

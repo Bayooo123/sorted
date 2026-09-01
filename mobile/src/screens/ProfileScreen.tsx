@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext, TextField } from '../components/ui';
 import { useAuth } from '../auth/AuthContext';
 import { updateProfile } from '../api/identity';
 import { ApiError } from '../api/client';
-import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
+import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 // Keep in sync with server/src/common/nigerian-states.ts.
 const NIGERIAN_STATES = [
@@ -18,6 +19,8 @@ const NIGERIAN_STATES = [
 /** Screen 09 — Profile. Both roles, Reputation module (handoff §09). */
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
+  const { colors, mode, toggleMode } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -93,7 +96,7 @@ export default function ProfileScreen() {
         </Card>
       ) : null}
 
-      <Card style={{ marginBottom: spacing.xl }}>
+      <Card style={{ marginBottom: spacing.md }}>
         <Text style={styles.cardTitle}>Account</Text>
 
         {editing ? (
@@ -138,12 +141,25 @@ export default function ProfileScreen() {
         )}
       </Card>
 
+      <Card style={{ marginBottom: spacing.xl }}>
+        <Text style={styles.cardTitle}>Appearance</Text>
+        <Pressable onPress={toggleMode} style={styles.themeRow}>
+          <Text style={styles.statLabel}>Theme</Text>
+          <View style={styles.themeToggle}>
+            <Text style={[styles.themeOption, mode === 'light' && styles.themeOptionActive]}>Light</Text>
+            <Text style={[styles.themeOption, mode === 'dark' && styles.themeOptionActive]}>Dark</Text>
+          </View>
+        </Pressable>
+      </Card>
+
       <Button title="Sign out" variant="secondary" onPress={signOut} />
     </Screen>
   );
 }
 
 function StatRow({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.statRow}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -152,28 +168,41 @@ function StatRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, marginBottom: spacing.sm },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
-  statLabel: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted },
-  statValue: { fontFamily: fonts.sansMedium, fontSize: fontSizes.sm, color: colors.textBody },
-  editLink: { color: colors.greenPrimary, marginTop: spacing.sm },
-  stateLabel: {
-    fontFamily: fonts.sansMedium,
-    fontSize: fontSizes.sm,
-    color: colors.textBody,
-    marginBottom: spacing.xs,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    backgroundColor: colors.surface,
-  },
-  chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
-  chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
-  chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    cardTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, marginBottom: spacing.sm },
+    statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+    statLabel: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted },
+    statValue: { fontFamily: fonts.sansMedium, fontSize: fontSizes.sm, color: colors.textBody },
+    editLink: { color: colors.greenPrimary, marginTop: spacing.sm },
+    stateLabel: {
+      fontFamily: fonts.sansMedium,
+      fontSize: fontSizes.sm,
+      color: colors.textBody,
+      marginBottom: spacing.xs,
+    },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+    chip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 8,
+      backgroundColor: colors.surface,
+    },
+    chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
+    chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
+    chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
+    themeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+    themeToggle: { flexDirection: 'row', backgroundColor: colors.bgApp, borderRadius: 999, padding: 3, gap: 2 },
+    themeOption: {
+      fontFamily: fonts.sansMedium,
+      fontSize: fontSizes.xs,
+      color: colors.textMuted,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 5,
+      borderRadius: 999,
+    },
+    themeOptionActive: { backgroundColor: colors.surface, color: colors.textPrimary, fontFamily: fonts.sansSemiBold },
+  });
+}

@@ -7,9 +7,10 @@ import { useFonts as useInterFonts, Inter_400Regular, Inter_500Medium, Inter_600
 import { useFonts as useLoraFonts, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
 import { AuthProvider } from './src/auth/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
-import { colors } from './src/theme/tokens';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 
-export default function App() {
+function AppInner() {
+  const { mode, colors } = useTheme();
   const [interLoaded] = useInterFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
   const [loraLoaded] = useLoraFonts({ Lora_600SemiBold, Lora_700Bold });
 
@@ -22,12 +23,20 @@ export default function App() {
   }
 
   return (
+    <AuthProvider>
+      <RootNavigator />
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+    </AuthProvider>
+  );
+}
+
+export default function App() {
+  return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <RootNavigator />
-          <StatusBar style="dark" />
-        </AuthProvider>
+        <ThemeProvider>
+          <AppInner />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Heading, Screen, Subtext, TextField } from '../components/ui';
@@ -6,7 +6,8 @@ import { login, signup, forgotPassword, resetPassword } from '../api/identity';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { AuthStackParamList } from '../navigation/types';
-import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
+import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 // Keep in sync with server/src/common/nigerian-states.ts.
 const NIGERIAN_STATES = [
@@ -31,6 +32,8 @@ function PasswordField({
   onChangeText: (v: string) => void;
   placeholder: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [visible, setVisible] = useState(false);
   return (
     <View style={styles.passwordRow}>
@@ -48,9 +51,15 @@ function PasswordField({
  * Screen 01 — Sign in. Entry point, both roles (handoff §01). Replaces
  * the earlier phone+OTP flow (PhoneSignInScreen/OtpVerifyScreen) — auth
  * moved to email/phone + password, see PLAN.md "Password-based auth".
- * forgot/reset modes added later, see PLAN.md "Forgot password".
+ * forgot/reset modes added later, see PLAN.md "Forgot password". Restyled
+ * dark (PLAN.md "Dark theme") — the "app flow" mockups show this screen
+ * as phone+OTP, but that flow was already replaced with password auth
+ * this session and stays that way; only the visual language (dark bg,
+ * mint accents) was pulled from those mockups, not the OTP fields.
  */
 export default function SignInScreen(_props: NativeStackScreenProps<AuthStackParamList, 'SignIn'>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('login');
   const { signIn } = useAuth();
 
@@ -309,48 +318,50 @@ export default function SignInScreen(_props: NativeStackScreenProps<AuthStackPar
   );
 }
 
-const styles = StyleSheet.create({
-  tabRow: {
-    flexDirection: 'row',
-    gap: 6,
-    backgroundColor: colors.bgApp,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: spacing.lg,
-  },
-  tab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
-  tabActive: { backgroundColor: colors.surface },
-  tabText: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textMuted },
-  tabTextActive: { color: colors.textPrimary },
-  stateLabel: {
-    fontFamily: fonts.sansMedium,
-    fontSize: fontSizes.sm,
-    color: colors.textBody,
-    marginBottom: spacing.xs,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    backgroundColor: colors.surface,
-  },
-  chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
-  chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
-  chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
-  passwordRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  passwordToggle: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.input,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-  },
-  passwordToggleText: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.sm, color: colors.textMuted },
-  linkRight: { textAlign: 'right', color: colors.greenPrimary, marginBottom: spacing.lg },
-  linkCenter: { textAlign: 'center', color: colors.greenPrimary, marginTop: spacing.md },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    tabRow: {
+      flexDirection: 'row',
+      gap: 6,
+      backgroundColor: colors.bgApp,
+      borderRadius: 12,
+      padding: 4,
+      marginBottom: spacing.lg,
+    },
+    tab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+    tabActive: { backgroundColor: colors.surface },
+    tabText: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textMuted },
+    tabTextActive: { color: colors.textPrimary },
+    stateLabel: {
+      fontFamily: fonts.sansMedium,
+      fontSize: fontSizes.sm,
+      color: colors.textBody,
+      marginBottom: spacing.xs,
+    },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+    chip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 8,
+      backgroundColor: colors.surface,
+    },
+    chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
+    chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
+    chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
+    passwordRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    passwordToggle: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.input,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+    },
+    passwordToggleText: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.sm, color: colors.textMuted },
+    linkRight: { textAlign: 'right', color: colors.greenPrimary, marginBottom: spacing.lg },
+    linkCenter: { textAlign: 'center', color: colors.greenPrimary, marginTop: spacing.md },
+  });
+}

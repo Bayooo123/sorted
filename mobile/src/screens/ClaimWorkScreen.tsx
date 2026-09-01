@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,7 +6,8 @@ import { Banner, Body, Button, Card, Heading, Screen, Subtext } from '../compone
 import { getGig } from '../api/gigs';
 import { BrowseStackParamList } from '../navigation/types';
 import { GigRecord } from '../api/types';
-import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
+import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 /** Illustrative — real stake is EscrowRecord.stakeKobo, config per gig
  * (HANDOFF.md §3.5 §11: stake sizing policy is still an open decision). */
@@ -22,6 +23,8 @@ const ILLUSTRATIVE_STAKE_BPS = 1000;
 export default function ClaimWorkScreen({
   route,
 }: NativeStackScreenProps<BrowseStackParamList, 'ClaimWork'>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { gigId } = route.params;
   const [gig, setGig] = useState<GigRecord | null>(null);
   const [proofUri, setProofUri] = useState<string | null>(null);
@@ -89,21 +92,23 @@ export default function ClaimWorkScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  cardTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, marginBottom: 4 },
-  stakeAmount: { fontFamily: fonts.serifBold, fontSize: fontSizes.xxl, color: colors.textPrimary },
-  sectionTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, marginBottom: spacing.sm },
-  proofZone: {
-    height: 160,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    borderRadius: radii.cardSm,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  proofPrompt: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted },
-  proofImage: { width: '100%', height: '100%' },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    cardTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, marginBottom: 4 },
+    stakeAmount: { fontFamily: fonts.serifBold, fontSize: fontSizes.xxl, color: colors.textPrimary },
+    sectionTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, marginBottom: spacing.sm },
+    proofZone: {
+      height: 160,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.border,
+      borderRadius: radii.cardSm,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    proofPrompt: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted },
+    proofImage: { width: '100%', height: '100%' },
+  });
+}

@@ -5,7 +5,8 @@ import { completeRoleProfile, listSubmarkets } from '../api/identity';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { Role, Submarket } from '../api/types';
-import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
+import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 type AccountType = 'professional' | 'client' | 'hybrid';
 
@@ -25,6 +26,8 @@ const ROLES_BY_TYPE: Record<AccountType, Role[]> = {
  * later" the app can rely on.
  */
 export default function AccountTypeScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [accountType, setAccountType] = useState<AccountType>('hybrid');
   const [submarkets, setSubmarkets] = useState<Submarket[]>([]);
   const [offering, setOffering] = useState<Set<string>>(new Set());
@@ -100,6 +103,7 @@ export default function AccountTypeScreen() {
               submarkets={submarkets}
               selected={offering}
               onToggle={(id) => toggle(offering, setOffering, id)}
+              styles={styles}
             />
           </View>
         ) : null}
@@ -112,6 +116,7 @@ export default function AccountTypeScreen() {
               submarkets={submarkets}
               selected={seeking}
               onToggle={(id) => toggle(seeking, setSeeking, id)}
+              styles={styles}
             />
           </View>
         ) : null}
@@ -128,10 +133,12 @@ function CategoryGrid({
   submarkets,
   selected,
   onToggle,
+  styles,
 }: {
   submarkets: Submarket[];
   selected: Set<string>;
   onToggle: (id: string) => void;
+  styles: ReturnType<typeof createStyles>;
 }) {
   if (submarkets.length === 0) {
     return <Subtext>Loading categories…</Subtext>;
@@ -154,34 +161,36 @@ function CategoryGrid({
   );
 }
 
-const styles = StyleSheet.create({
-  typeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl },
-  typeCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.cardSm,
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    gap: 4,
-  },
-  typeCardActive: { borderColor: colors.greenPrimary, backgroundColor: colors.greenMintBg },
-  typeLabel: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textBody },
-  typeLabelActive: { color: colors.greenDeep },
-  typeBadge: { fontFamily: fonts.sans, fontSize: 10, color: colors.greenDeep },
-  section: { marginBottom: spacing.xl },
-  sectionTitle: { fontFamily: fonts.sansSemiBold, marginBottom: 2 },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    backgroundColor: colors.surface,
-  },
-  chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
-  chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
-  chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    typeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl },
+    typeCard: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.cardSm,
+      backgroundColor: colors.surface,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+      gap: 4,
+    },
+    typeCardActive: { borderColor: colors.greenPrimary, backgroundColor: colors.greenMintBg },
+    typeLabel: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textBody },
+    typeLabelActive: { color: colors.greenDeep },
+    typeBadge: { fontFamily: fonts.sans, fontSize: 10, color: colors.greenDeep },
+    section: { marginBottom: spacing.xl },
+    sectionTitle: { fontFamily: fonts.sansSemiBold, marginBottom: 2 },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    chip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 8,
+      backgroundColor: colors.surface,
+    },
+    chipActive: { borderColor: colors.greenBright, backgroundColor: colors.greenMintBg },
+    chipText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
+    chipTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
+  });
+}

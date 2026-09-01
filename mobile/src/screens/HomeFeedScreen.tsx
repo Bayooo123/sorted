@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,7 +7,8 @@ import { listMyGigs } from '../api/gigs';
 import { ApiError } from '../api/client';
 import { GigStackParamList } from '../navigation/types';
 import { GigRecord } from '../api/types';
-import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
+import { fonts, fontSizes, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const STATUS_LABEL: Record<GigRecord['status'], string> = {
   draft: 'Draft',
@@ -27,6 +28,8 @@ const STATUS_LABEL: Record<GigRecord['status'], string> = {
 export default function HomeFeedScreen({
   navigation,
 }: NativeStackScreenProps<GigStackParamList, 'HomeFeed'>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [gigs, setGigs] = useState<GigRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,9 +103,11 @@ export default function HomeFeedScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  gigTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
-  gigBounty: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg, color: colors.textPrimary, marginBottom: spacing.xs },
-  link: { fontFamily: fonts.sansMedium, fontSize: fontSizes.sm, color: colors.greenPrimary, marginTop: spacing.xs },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    gigTitle: { fontFamily: fonts.sansSemiBold, fontSize: fontSizes.base, color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
+    gigBounty: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg, color: colors.textPrimary, marginBottom: spacing.xs },
+    link: { fontFamily: fonts.sansMedium, fontSize: fontSizes.sm, color: colors.greenPrimary, marginTop: spacing.xs },
+  });
+}

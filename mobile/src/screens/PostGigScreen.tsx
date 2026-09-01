@@ -7,7 +7,8 @@ import { createGig, publishGig } from '../api/gigs';
 import { ApiError } from '../api/client';
 import { GigStackParamList } from '../navigation/types';
 import { ClientTypeRef, Domain, MaterialsMode, Submarket } from '../api/types';
-import { colors, fonts, fontSizes, radii, spacing } from '../theme/tokens';
+import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 /** ★ money-adjacent floor, matching HANDOFF.md §5's fee floor example. */
 const MIN_BOUNTY_NAIRA = 3000; // max(bps×bounty, ₦300) fee floor implies a sane minimum bounty
@@ -21,6 +22,8 @@ const MIN_BOUNTY_NAIRA = 3000; // max(bps×bounty, ₦300) fee floor implies a s
 export default function PostGigScreen({
   navigation,
 }: NativeStackScreenProps<GigStackParamList, 'PostGig'>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [locationText, setLocationText] = useState('');
@@ -226,6 +229,8 @@ function ChipRow({
   selected: string | null;
   onSelect: (key: string) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.chipWrap}>
       {items.map((item) => {
@@ -240,7 +245,8 @@ function ChipRow({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   label: { fontFamily: fonts.sansSemiBold, marginBottom: spacing.sm, marginTop: 4 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   chip: {
@@ -268,6 +274,7 @@ const styles = StyleSheet.create({
   toggleTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
   criterionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   removeBtn: { padding: spacing.sm, marginBottom: spacing.lg },
-  removeBtnText: { color: colors.textMuted, fontSize: fontSizes.md },
-  addLink: { fontFamily: fonts.sansMedium, color: colors.greenPrimary, fontSize: fontSizes.sm },
-});
+    removeBtnText: { color: colors.textMuted, fontSize: fontSizes.md },
+    addLink: { fontFamily: fonts.sansMedium, color: colors.greenPrimary, fontSize: fontSizes.sm },
+  });
+}

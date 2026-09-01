@@ -5,9 +5,32 @@
  * cards, 999px pills; Iowan Old Style (falls back to Lora) for
  * headings/serif moments, Inter for everything else including the
  * wordmark lockup.
+ *
+ * lightColors/darkColors: two color palettes behind the same key set (see
+ * ThemeContext.tsx) — dark added per the "app flow" mockups (near-black
+ * app background, dark cards, mint-green accents). Every screen reads
+ * colors via useTheme() now, never this file directly, so the active
+ * palette can be swapped by mode alone. spacing/radii/fonts/fontSizes stay
+ * theme-independent — only color changes between light and dark.
  */
 
-export const colors = {
+export interface ThemeColors {
+  greenPrimary: string;
+  greenDeep: string;
+  greenBright: string;
+  greenMintBg: string;
+  greenMintPale: string;
+  bgApp: string;
+  surface: string;
+  border: string;
+  textPrimary: string;
+  textBody: string;
+  textMuted: string;
+  error: string;
+  errorBg: string;
+}
+
+export const lightColors: ThemeColors = {
   greenPrimary: '#027A61',
   greenDeep: '#007B5C',
   greenBright: '#04C29C',
@@ -20,7 +43,24 @@ export const colors = {
   textBody: '#3A4A47',
   textMuted: '#7E8F8D',
   error: '#B3261E',
-} as const;
+  errorBg: '#FBEAE8',
+};
+
+export const darkColors: ThemeColors = {
+  greenPrimary: '#04C29C',
+  greenDeep: '#04C29C',
+  greenBright: '#04C29C',
+  greenMintBg: '#123830',
+  greenMintPale: '#0F2E27',
+  bgApp: '#0A1614',
+  surface: '#13221E',
+  border: '#213A33',
+  textPrimary: '#F4FAF8',
+  textBody: '#AFC4BE',
+  textMuted: '#6E8A83',
+  error: '#FF6B5E',
+  errorBg: '#3A1512',
+};
 
 export const radii = {
   input: 11,

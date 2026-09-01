@@ -11,13 +11,15 @@ import LedgerScreen from '../screens/LedgerScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { BrowseStackParamList, GigStackParamList, MainTabParamList } from './types';
 import { useAuth } from '../auth/AuthContext';
-import { colors, fonts } from '../theme/tokens';
+import { fonts } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const GigStack = createNativeStackNavigator<GigStackParamList>();
 const BrowseStack = createNativeStackNavigator<BrowseStackParamList>();
 
 function GigStackNavigator() {
+  const { colors } = useTheme();
   return (
     <GigStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgApp } }}>
       <GigStack.Screen name="HomeFeed" component={HomeFeedScreen} />
@@ -29,6 +31,7 @@ function GigStackNavigator() {
 }
 
 function BrowseStackNavigator() {
+  const { colors } = useTheme();
   return (
     <BrowseStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgApp } }}>
       <BrowseStack.Screen name="BrowseMarket" component={BrowseMarketScreen} />
@@ -46,6 +49,7 @@ function BrowseStackNavigator() {
  */
 export default function MainNavigator() {
   const { user } = useAuth();
+  const { colors } = useTheme();
   const isClient = user?.roles.includes('client') ?? false;
   const isProfessional = user?.roles.includes('professional') ?? false;
 

@@ -4,10 +4,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { isMidSignup, useAuth } from '../auth/AuthContext';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function RootNavigator() {
   const { user } = useAuth();
+  const { colors } = useTheme();
 
   if (user === undefined) {
     return (

@@ -564,6 +564,57 @@ would leak an interval per visit to an unfunded gig's card.
 
 ---
 
+### Dark theme (mobile) — IMPLEMENTED
+
+Requested from a set of "app flow" mockups showing a dark visual language
+(near-black backgrounds, dark cards, mint-green accents). Two things from
+those mockups were explicitly NOT carried over, confirmed with the
+founder before building: the mockups show phone+OTP sign-in, but that
+flow was already replaced with email/phone+password earlier this session
+and stays that way — only the dark color language was pulled from those
+screens, not the OTP fields/copy. Scope is mobile-only; the web app's
+light theme is untouched.
+
+**Architecture:** `theme/tokens.ts` now exports `lightColors` and
+`darkColors` — same key set (`ThemeColors` interface), so nothing that
+reads a color needs to know which palette is active. `theme/
+ThemeContext.tsx` (new) is a `ThemeProvider`/`useTheme()` pair holding
+`{ mode, colors, setMode, toggleMode }`, persisted via SecureStore (the
+same module already used for the access token) so the choice survives an
+app restart. Defaults to **dark** — the mockups that prompted this are
+dark, and light was already the one proven live.
+
+**Every screen and `components/ui.tsx` primitive now reads colors via
+`useTheme()`, never a static import** — this was the actual work: RN's
+`StyleSheet.create` is evaluated once at whatever scope it's called in,
+so a color-dependent stylesheet can't be a module-level constant anymore.
+Every file that used to do `import { colors } from '../theme/tokens'`
+now calls `const { colors } = useTheme()` inside the component and builds
+its styles via a `createStyles(colors)` factory wrapped in
+`useMemo(() => createStyles(colors), [colors])` — recomputed only when
+the palette actually changes, not every render. Small sub-components
+that rendered off a parent's module-level `styles` object (e.g.
+`PostGigScreen`'s `ChipRow`, `AccountTypeScreen`'s `CategoryGrid`,
+`FundEscrowScreen`'s `Row`) needed the same treatment, since they can't
+read a parent's local `useMemo`'d styles without either calling
+`useTheme()` themselves or having it threaded down as a prop — did
+whichever was less code per case.
+
+**Toggle:** Profile screen, new "Appearance" card — a Light/Dark segmented
+control that calls `toggleMode()` directly (mirrors the founder's own
+answer: "toggle if possible... for now build dark" — dark is the
+default, but the toggle exists now rather than as a follow-up, since the
+Context made it nearly free once built).
+
+**Not done:** the web app was explicitly scoped out (mobile only). The
+dark palette's exact colors are a judgment call, not a pixel-match of the
+mockups — Nigerian-market screenshots don't hand over exact hex values,
+so the accent green was shifted brighter for dark-background contrast and
+neutrals were picked to read as "the same brand, dark mode" rather than
+attempting an exact replica.
+
+---
+
 ## Slice 3 — Gigs + intake seam — IMPLEMENTED
 
 **Goal:** post-a-gig, criteria lock, taxonomy seed tables, matching wired to

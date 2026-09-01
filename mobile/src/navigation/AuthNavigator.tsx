@@ -4,7 +4,7 @@ import SignInScreen from '../screens/SignInScreen';
 import AccountTypeScreen from '../screens/AccountTypeScreen';
 import { AuthStackParamList } from './types';
 import { useAuth, isMidSignup } from '../auth/AuthContext';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -15,6 +15,7 @@ const Stack = createNativeStackNavigator<AuthStackParamList>();
  */
 export default function AuthNavigator() {
   const { user } = useAuth();
+  const { colors } = useTheme();
   const midSignup = isMidSignup(user);
 
   return (

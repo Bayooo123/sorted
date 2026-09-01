@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext } from '../components/ui';
@@ -7,7 +7,8 @@ import { GigStackParamList } from '../navigation/types';
 import { fundGig, getEscrow } from '../api/escrow';
 import { ApiError } from '../api/client';
 import { EscrowRecordView, FundGigResult, GigRecord } from '../api/types';
-import { colors, fonts, fontSizes, spacing } from '../theme/tokens';
+import { fonts, fontSizes, spacing, ThemeColors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -29,6 +30,8 @@ function formatNaira(kobo: number) {
 export default function FundEscrowScreen({
   route,
 }: NativeStackScreenProps<GigStackParamList, 'FundEscrow'>) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { gigId } = route.params;
   const [gig, setGig] = useState<GigRecord | null>(null);
   const bountyKobo = gig?.bountyKobo ?? 0;
@@ -144,6 +147,8 @@ export default function FundEscrowScreen({
 }
 
 function Row({ label, value, muted, bold }: { label: string; value: string; muted?: boolean; bold?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={[styles.rowLabel, muted && styles.rowLabelMuted]}>{label}</Text>
@@ -152,16 +157,18 @@ function Row({ label, value, muted, bold }: { label: string; value: string; mute
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
-  rowLabel: { fontFamily: fonts.sans, fontSize: fontSizes.base, color: colors.textBody, flex: 1, paddingRight: spacing.sm },
-  rowLabelMuted: { color: colors.textMuted, fontSize: fontSizes.sm },
-  rowValue: { fontFamily: fonts.sansMedium, fontSize: fontSizes.base, color: colors.textPrimary },
-  rowValueBold: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg },
-  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
-  transferLabel: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted, marginBottom: spacing.xs },
-  transferAccount: { fontFamily: fonts.serifBold, fontSize: fontSizes.xl, color: colors.textPrimary },
-  transferBank: { fontFamily: fonts.sans, fontSize: fontSizes.base, color: colors.textBody, marginTop: spacing.xs },
-  statusRow: { flexDirection: 'row' },
-  errorText: { color: colors.error, marginBottom: spacing.md },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
+    rowLabel: { fontFamily: fonts.sans, fontSize: fontSizes.base, color: colors.textBody, flex: 1, paddingRight: spacing.sm },
+    rowLabelMuted: { color: colors.textMuted, fontSize: fontSizes.sm },
+    rowValue: { fontFamily: fonts.sansMedium, fontSize: fontSizes.base, color: colors.textPrimary },
+    rowValueBold: { fontFamily: fonts.serifBold, fontSize: fontSizes.lg },
+    divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
+    transferLabel: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textMuted, marginBottom: spacing.xs },
+    transferAccount: { fontFamily: fonts.serifBold, fontSize: fontSizes.xl, color: colors.textPrimary },
+    transferBank: { fontFamily: fonts.sans, fontSize: fontSizes.base, color: colors.textBody, marginTop: spacing.xs },
+    statusRow: { flexDirection: 'row' },
+    errorText: { color: colors.error, marginBottom: spacing.md },
+  });
+}
