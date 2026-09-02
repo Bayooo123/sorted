@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sorted — Consider it sorted.</title>
-<meta name="description" content="Sorted is an escrow-protected marketplace for getting real-world jobs done. Post a gig, fund it in escrow, pay only when it's verified done." />
+<title>Sorted — Safe payments for every job.</title>
+<meta name="description" content="Sorted holds your payment safely until the job is done right. Hire trusted workers or get hired with 100% payment protection." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="alternate icon" href="/favicon.svg" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -546,6 +546,88 @@
     color: var(--text-muted);
   }
 
+  /* ---------- audience split ---------- */
+
+  .audience {
+    padding: 30px 0 60px;
+  }
+
+  .audience-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 760px) {
+    .audience-grid { grid-template-columns: 1fr; }
+  }
+
+  .audience-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04);
+  }
+
+  .audience-badge {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--green-deep);
+    background: var(--green-mint-bg);
+    padding: 5px 11px;
+    border-radius: 7px;
+    margin-bottom: 14px;
+  }
+
+  .audience-badge.provider {
+    color: #0C1F1B;
+    background: #E4F1EE;
+  }
+
+  .audience-card h3 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    color: var(--text-primary);
+    margin: 0 0 10px;
+  }
+
+  .audience-card p {
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin: 0 0 18px;
+  }
+
+  .audience-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .audience-list li {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .receipt-note {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green-primary);
+    text-align: center;
+    padding-top: 10px;
+  }
+
   /* ---------- footer ---------- */
 
   footer {
@@ -671,50 +753,75 @@
     </nav>
   </div>
 </header>
-
-<section class="hero">
+<section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow"><span class="dot"></span> Escrow-protected · Nigeria-first</span>
-      <h1>Get the job done.<br>Pay when it&rsquo;s <em>actually</em> done.</h1>
+      <span class="eyebrow"><span class="dot"></span> Safe Payments &middot; Built for Nigeria</span>
+      <h1>Hire anyone safely.<br>Pay only when it&rsquo;s <em>done right</em>.</h1>
       <p class="subhead">
-        Sorted holds the money in the middle. Post a gig, fund it into escrow,
-        and release payment only once the work meets the criteria you set —
-        no chasing, no guessing, no trust required on either side.
+        Sorted holds your payment safely in the middle until the work is completed and verified.
+        No upfront payment scams for clients, no unpaid jobs for service providers.
       </p>
 
       <form class="cta-form" id="waitlist-form">
         <input type="email" id="waitlist-email" placeholder="you@email.com" required aria-label="Email address" />
-        <button class="btn" type="submit">Get notified</button>
+        <button class="btn" type="submit">Get early access</button>
       </form>
-      <p class="form-note" id="waitlist-note">Be first to know when Sorted launches.</p>
+      <p class="form-note" id="waitlist-note">Be first to experience safe, stress-free payments.</p>
     </div>
 
     <div class="escrow-card" aria-hidden="true">
       <div class="card-head">
-        <span class="card-tag">Escrow</span>
-        <span class="card-state"><span class="led"></span>Funded</span>
+        <span class="card-tag">Protected Payment</span>
+        <span class="card-state"><span class="led"></span>Payment Secured</span>
       </div>
       <p class="job-title">Fix leaking kitchen pipe</p>
-      <p class="job-loc">Lekki Phase 1 &middot; Physical &middot; Individual</p>
+      <p class="job-loc">Lekki Phase 1 &middot; Lagos</p>
 
       <div class="row">
-        <span class="k">Bounty funded</span>
+        <span class="k">Agreed job price</span>
         <span class="v">&#8358;85,000</span>
       </div>
       <div class="row">
-        <span class="k">Solver stake (held)</span>
-        <span class="v">&#8358;8,500</span>
+        <span class="k">Payment status</span>
+        <span class="v" style="color:var(--green-primary);">Held safely in Sorted</span>
       </div>
       <div class="divider"></div>
       <div class="row total">
-        <span class="k">Released on sign-off</span>
-        <span class="v">&#8358;85,000</span>
+        <span class="k">Released to worker</span>
+        <span class="v">Only on your approval</span>
       </div>
 
       <div class="lock-note">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Criteria locked at publish — no changes after funding
+        Money is held safely until both sides confirm completion
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="audience">
+  <div class="wrap">
+    <div class="audience-grid">
+      <div class="audience-card">
+        <span class="audience-badge">For Clients &amp; Buyers</span>
+        <h3>Never get scammed upfront.</h3>
+        <p>Stop risking your money on advance deposits or half-done jobs. With Sorted, your payment stays safe until you inspect and approve the finished work.</p>
+        <ul class="audience-list">
+          <li>✓ 100% money-back protection if work isn&rsquo;t done</li>
+          <li>✓ Set clear job terms before locking payment</li>
+          <li>✓ Release money only when completely satisfied</li>
+        </ul>
+      </div>
+      <div class="audience-card">
+        <span class="audience-badge provider">For Workers &amp; Freelancers</span>
+        <h3>Never worry about unpaid work.</h3>
+        <p>Stop chasing clients to collect your hard-earned money. Know that funds are locked and waiting in Sorted before you even start working.</p>
+        <ul class="audience-list">
+          <li>✓ Guaranteed payout immediately upon job approval</li>
+          <li>✓ Prove your reliability with verified job history</li>
+          <li>✓ Instant bank payouts straight to your local account</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -724,29 +831,29 @@
   <div class="wrap">
     <div class="section-head">
       <p class="kicker">How it works</p>
-      <h2>Three steps. Money moves only on the last one.</h2>
+      <h2>Protected payments in 3 simple steps</h2>
     </div>
     <div class="flow">
       <div class="flow-step">
         <div class="flow-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/></svg>
         </div>
-        <h3>Post a gig</h3>
-        <p>Describe the job and the criteria that define &ldquo;done.&rdquo; Once published, those criteria lock — no moving the goalposts.</p>
+        <h3>1. Agree on job &amp; price</h3>
+        <p>Describe the task, define clear criteria for what &ldquo;done&rdquo; means, and agree on the total price.</p>
       </div>
       <div class="flow-step">
         <div class="flow-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
-        <h3>Fund it in escrow</h3>
-        <p>The bounty is held before anyone starts work — not with Sorted, not with the payer. Safely in the middle, always.</p>
+        <h3>2. Lock payment safely</h3>
+        <p>The client deposits the funds into Sorted. The worker sees the money is 100% secured before starting work.</p>
       </div>
       <div class="flow-step">
         <div class="flow-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         </div>
-        <h3>Sign off, get paid</h3>
-        <p>The payer confirms each criterion is met. Escrow releases automatically — solver paid, stake returned.</p>
+        <h3>3. Approve &amp; get paid</h3>
+        <p>Once the work is completed and approved by the client, funds are instantly transferred to the worker.</p>
       </div>
     </div>
   </div>
@@ -756,21 +863,18 @@
   <div class="wrap">
     <div class="math-panel">
       <div class="math-copy">
-        <p class="kicker">Transparent by design</p>
-        <h3>Every naira, accounted for before work even starts.</h3>
-        <p>No hidden cuts. Sorted's fee is fixed and shown up front — the
-        same math the payer sees when funding, and the solver sees when
-        claiming. Nothing changes after criteria are locked.</p>
+        <p class="kicker">Simple, Transparent Pricing</p>
+        <h3>Zero hidden fees. Zero surprises.</h3>
+        <p>Clients pay the exact agreed price with no hidden add-ons. Service providers get paid reliably with a simple, fair 10% platform fee upon successful job completion.</p>
       </div>
       <div class="receipt">
-        <div class="r-row"><span class="k">Payer funds</span><span class="v">&#8358;85,000</span></div>
-        <div class="r-row sub"><span class="k">Solver stake (10%)</span><span class="v">&#8358;8,500</span></div>
+        <div class="r-row"><span class="k">Client deposits</span><span class="v">&#8358;85,000</span></div>
+        <div class="r-row sub"><span class="k">Funds held safely in Sorted</span><span class="v">&#8358;85,000</span></div>
         <hr>
-        <div class="r-row"><span class="k">On sign-off &mdash; solver receives</span><span class="v">&#8358;76,500</span></div>
-        <div class="r-row sub"><span class="k">+ stake returned</span><span class="v">&#8358;8,500</span></div>
-        <div class="r-row"><span class="k">Sorted fee (10%)</span><span class="v">&#8358;8,500</span></div>
+        <div class="r-row"><span class="k">Sorted service fee (10%)</span><span class="v">&#8358;8,500</span></div>
+        <div class="r-row final"><span class="k">Worker receives on sign-off</span><span class="v">&#8358;76,500</span></div>
         <hr>
-        <div class="r-row final"><span class="k">Solver walks away with</span><span class="v">&#8358;85,000</span></div>
+        <div class="receipt-note">&check; No surprise charges. No deposit scams. No unpaid work.</div>
       </div>
     </div>
   </div>
@@ -783,22 +887,22 @@
         <div class="icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8.6 8 11 4.5-2.4 8-6 8-11V5l-8-3Z"/></svg>
         </div>
-        <div class="label">Escrow-protected</div>
-        <div class="desc">Money moves only when work is verified — never before, never without a record.</div>
+        <div class="label">100% Payment Protection</div>
+        <div class="desc">Money is held safely and released only when work is completed &mdash; protecting both sides.</div>
       </div>
       <div class="trust-item">
         <div class="icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
         </div>
         <div class="label">Built for Nigeria</div>
-        <div class="desc">Naira-first, phone + OTP sign-in, no card required to get started.</div>
+        <div class="desc">Pay easily via Bank Transfer or USSD, fast payouts to any bank, phone number sign-in.</div>
       </div>
       <div class="trust-item">
         <div class="icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4M9 13h6M9 17h6"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v4a1 1 0 0 1 1h4M9 13h6M9 17h6"/></svg>
         </div>
-        <div class="label">Every gig, on record</div>
-        <div class="desc">A full, append-only ledger of every payment on every gig — nothing edited, nothing lost.</div>
+        <div class="label">Verified Work History</div>
+        <div class="desc">Build a verifiable digital track record with proof and receipts for every completed job.</div>
       </div>
     </div>
   </div>
