@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext } from '../components/ui';
 import { getGig } from '../api/gigs';
@@ -17,15 +17,20 @@ function formatNaira(kobo: number) {
 }
 
 /**
- * Screen 06 — Fund escrow ★. Wired to the manual-pilot funding flow
- * (server/src/modules/escrow/escrow.controller.ts): there is no automated
- * payment rail yet, so this screen requests a transfer target, shows it,
- * then polls for the founder to manually confirm the transfer landed.
- *
- * The disclosure copy below is load-bearing, not decoration — the account
- * shown is the founder's own personal Opay account during this pilot
- * (confirmed explicitly, not a registered Sorted business account), so the
- * screen must never claim automated or business-grade escrow protection.
+ * Screen 06 — Fund escrow ★. Wired to POST /gigs/:id/fund
+ * (server/src/modules/escrow/escrow.controller.ts), whose response shape
+ * now depends on the active PaymentsProvider (server/src/modules/payments/
+ * payments.module.ts's PAYMENTS_PROVIDER_KEY):
+ *  - Paystack: holdingAccount.checkoutUrl — a one-time payment link, opened
+ *    in-browser; funding confirms automatically via webhook once paid.
+ *  - manual-pilot (default until Paystack credentials are live):
+ *    holdingAccount.accountNumber/bankName — a static transfer target,
+ *    confirmed by hand. The disclosure copy below only applies to that
+ *    path — the account shown there is the founder's own personal account
+ *    during this pilot (confirmed explicitly, not a registered Sorted
+ *    business account), so it must never claim automated/business-grade
+ *    escrow protection.
+ * Either way this screen polls for the state to leave 'awaiting_funding'.
  */
 export default function FundEscrowScreen({
   route,
@@ -86,20 +91,24 @@ export default function FundEscrowScreen({
 
   const feeKobo = result ? Math.round((result.bountyKobo * result.platformFeeBps) / 10_000) : 0;
   const confirmed = escrow?.state === 'funded' || (escrow && escrow.state !== 'awaiting_funding');
+  const checkoutUrl = result?.holdingAccount?.checkoutUrl;
+  const isManualPilot = !!result?.holdingAccount && !checkoutUrl;
 
   return (
     <Screen>
       <Heading>Fund escrow</Heading>
       <Subtext>Your gig is published and criteria are locked.</Subtext>
 
-      <Banner tone="warning">
-        Sorted is running a manual funding pilot while our licensed payment
-        provider onboarding is pending. There is no automated escrow yet:
-        the account below is held personally by Sorted&apos;s founder, and
-        funding is confirmed by hand once the transfer is seen — not
-        released automatically. Treat this as a disclosed, temporary
-        stopgap, not business-grade payment protection.
-      </Banner>
+      {isManualPilot ? (
+        <Banner tone="warning">
+          Sorted is running a manual funding pilot while our licensed payment
+          provider onboarding is pending. There is no automated escrow yet:
+          the account below is held personally by Sorted&apos;s founder, and
+          funding is confirmed by hand once the transfer is seen — not
+          released automatically. Treat this as a disclosed, temporary
+          stopgap, not business-grade payment protection.
+        </Banner>
+      ) : null}
 
       {!result ? (
         <>
@@ -121,11 +130,19 @@ export default function FundEscrowScreen({
 
           <View style={{ height: spacing.lg }} />
 
-          <Card>
-            <Text style={styles.transferLabel}>Transfer to</Text>
-            <Text selectable style={styles.transferAccount}>{result.transferInstructions.accountNumber}</Text>
-            <Text style={styles.transferBank}>{result.transferInstructions.bankName}</Text>
-          </Card>
+          {checkoutUrl ? (
+            <>
+              <Body>Pay securely with Paystack — card, bank transfer, or USSD.</Body>
+              <View style={{ height: spacing.sm }} />
+              <Button title="Pay now" onPress={() => Linking.openURL(checkoutUrl)} />
+            </>
+          ) : result.holdingAccount ? (
+            <Card>
+              <Text style={styles.transferLabel}>Transfer to</Text>
+              <Text selectable style={styles.transferAccount}>{result.holdingAccount.accountNumber}</Text>
+              <Text style={styles.transferBank}>{result.holdingAccount.bankName}</Text>
+            </Card>
+          ) : null}
 
           <View style={{ height: spacing.lg }} />
 
@@ -137,8 +154,10 @@ export default function FundEscrowScreen({
           </View>
           <Body style={{ marginTop: spacing.sm }}>
             {confirmed
-              ? 'The founder has confirmed your transfer. Your gig is now open to professionals.'
-              : "Once you've sent the transfer, this updates automatically after the founder confirms it landed — usually within a few hours."}
+              ? 'Your gig is now open to professionals.'
+              : checkoutUrl
+                ? 'This updates automatically as soon as your payment is confirmed.'
+                : "Once you've sent the transfer, this updates automatically after the founder confirms it landed — usually within a few hours."}
           </Body>
         </>
       )}

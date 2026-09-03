@@ -1,7 +1,6 @@
-import { Body, Controller, ForbiddenException, Get, Inject, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { EscrowService } from './escrow.service';
 import { GigsService } from '../gigs/gigs.service';
-import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interface';
 import { JwtAuthGuard, AuthenticatedUser } from '../../common/auth/jwt-auth.guard';
 import { AdminGuard } from '../../common/auth/admin.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -18,16 +17,16 @@ export class EscrowController {
   constructor(
     private readonly escrow: EscrowService,
     private readonly gigs: GigsService,
-    @Inject(PAYMENTS_PROVIDER) private readonly payments: PaymentsProvider,
   ) {}
 
   /**
-   * Client-only. Creates the EscrowRecord and returns the transfer
-   * instructions to show on FundEscrowScreen. During the manual pilot
-   * this is the same fixed account every time (manual-pilot.provider.ts)
-   * — re-calling this for a gig that's already funded just re-returns its
-   * current state (EscrowService.fundGig is idempotent), it never opens a
-   * second holding account.
+   * Client-only. Creates the EscrowRecord (idempotent — re-calling this
+   * for a gig that already has one just returns the same record and the
+   * same holdingAccount details, never opens a second holding account /
+   * a second Paystack checkout session for the same gig). The record's
+   * `holdingAccount` field is what the client actually pays with —
+   * shape depends on the active PaymentsProvider (see
+   * payments.interface.ts's HoldingAccount doc comment).
    */
   @UseGuards(JwtAuthGuard)
   @Post(':id/fund')
@@ -36,18 +35,7 @@ export class EscrowController {
     if (gig.clientId !== user.userId) {
       throw new ForbiddenException('Only the gig owner can fund it');
     }
-    const [record, holdingAccount] = await Promise.all([
-      this.escrow.fundGig(id),
-      this.payments.createHoldingAccount(id),
-    ]);
-    return {
-      ...record,
-      transferInstructions: {
-        accountNumber: holdingAccount.accountNumber,
-        bankName: holdingAccount.bankName,
-        provider: holdingAccount.provider,
-      },
-    };
+    return this.escrow.fundGig(id);
   }
 
   /**

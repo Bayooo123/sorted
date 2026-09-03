@@ -2118,7 +2118,7 @@
         note.style.marginTop = '0';
         note.style.paddingTop = '0';
         note.style.borderTop = 'none';
-        note.textContent = 'Sorted is running a manual funding pilot — there is no automated payment rail yet. Get the transfer details, send the bounty, and funding is confirmed by hand once the transfer is seen.';
+        note.textContent = 'Get your funding details to send the bounty into escrow.';
         body.appendChild(note);
         var err = document.createElement('p');
         err.className = 'modal-error';
@@ -2144,27 +2144,39 @@
       function renderInstructions(result) {
         body.innerHTML = '';
         var feeKobo = Math.round((result.bountyKobo * result.platformFeeBps) / 10000);
+        var holding = result.holdingAccount || {};
+        var payHtml = holding.checkoutUrl
+          ? '<button type="button" class="btn btn-block funding-pay-btn">Pay now with Paystack</button>' +
+            '<p class="gig-card-note" style="margin-top:8px;padding-top:8px;">Card, bank transfer, or USSD — funding confirms automatically once payment lands.</p>'
+          : '<div class="funding-transfer">' +
+              '<p class="funding-transfer-label">Transfer to</p>' +
+              '<p class="funding-transfer-account"></p>' +
+              '<p class="funding-transfer-bank"></p>' +
+            '</div>' +
+            '<p class="gig-card-note" style="margin-top:8px;padding-top:8px;">Sorted is running a manual funding pilot — there is no automated payment rail on this account yet. Send the transfer, and funding is confirmed by hand once it is seen.</p>';
         var box = document.createElement('div');
         box.innerHTML =
           '<p class="funding-row"><span>Bounty</span><span class="v-bounty"></span></p>' +
           '<p class="funding-row funding-row-muted"><span>Platform fee (deducted at release)</span><span class="v-fee"></span></p>' +
           '<p class="funding-row funding-row-bold"><span>Send exactly</span><span class="v-total"></span></p>' +
-          '<div class="funding-transfer">' +
-            '<p class="funding-transfer-label">Transfer to</p>' +
-            '<p class="funding-transfer-account"></p>' +
-            '<p class="funding-transfer-bank"></p>' +
-          '</div>' +
+          payHtml +
           '<span class="status-pill" data-tone="neutral"></span>' +
-          '<p class="gig-card-note" style="margin-top:8px;padding-top:8px;"></p>';
+          '<p class="gig-card-note funding-status-note" style="margin-top:8px;padding-top:8px;"></p>';
         box.querySelector('.v-bounty').textContent = formatNaira(result.bountyKobo);
         box.querySelector('.v-fee').textContent = formatNaira(feeKobo);
         box.querySelector('.v-total').textContent = formatNaira(result.bountyKobo);
-        box.querySelector('.funding-transfer-account').textContent = result.transferInstructions.accountNumber;
-        box.querySelector('.funding-transfer-bank').textContent = result.transferInstructions.bankName;
+        if (holding.checkoutUrl) {
+          box.querySelector('.funding-pay-btn').addEventListener('click', function () {
+            window.open(holding.checkoutUrl, '_blank', 'noopener');
+          });
+        } else {
+          box.querySelector('.funding-transfer-account').textContent = holding.accountNumber || '';
+          box.querySelector('.funding-transfer-bank').textContent = holding.bankName || '';
+        }
         body.appendChild(box);
 
         var statusPill = box.querySelector('.status-pill');
-        var noteEl = box.querySelector('.gig-card-note');
+        var noteEl = box.querySelector('.funding-status-note');
 
         function applyState(escrow) {
           var confirmed = escrow.state !== 'awaiting_funding';

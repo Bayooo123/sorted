@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { kobo } from '../../../common/money';
+import { Kobo, kobo } from '../../../common/money';
 import {
   DisbursementResult,
   DisbursementSplit,
@@ -28,11 +28,12 @@ import {
  * actual sending of money to a professional (or refund to a client) is a
  * manual transfer the founder does OUTSIDE the app, same as funding.
  *
- * This is a deliberate, disclosed stopgap, not a shortcut around Monnify —
- * the mobile/web copy calling this "manual pilot, not automated escrow" is
- * the actual safety mechanism here, not this code. Swap PAYMENTS_PROVIDER_KEY
- * to "monnify" once real Monnify credentials exist; nothing in EscrowService
- * or above needs to change (PaymentsModule's binding is the only thing that
+ * This is a deliberate, disclosed stopgap, not a shortcut around a real
+ * rail — the mobile/web copy calling this "manual pilot, not automated
+ * escrow" is the actual safety mechanism here, not this code. Swap
+ * PAYMENTS_PROVIDER_KEY to "paystack" once real Paystack credentials
+ * exist (see paystack.provider.ts); nothing in EscrowService or above
+ * needs to change (PaymentsModule's binding is the only thing that
  * flips) — that's the whole point of the interface being here.
  */
 @Injectable()
@@ -42,7 +43,8 @@ export class ManualPilotProvider implements PaymentsProvider {
 
   constructor(private readonly config: ConfigService) {}
 
-  async createHoldingAccount(gigId: string): Promise<HoldingAccount> {
+  /** amountKobo/payerEmail unused — the account is a fixed, amount-agnostic account shared across every gig during the pilot. */
+  async createHoldingAccount(gigId: string, _amountKobo: Kobo, _payerEmail: string): Promise<HoldingAccount> {
     const accountNumber = this.config.get<string>('MANUAL_PILOT_ACCOUNT_NUMBER');
     const accountName = this.config.get<string>('MANUAL_PILOT_ACCOUNT_NAME');
     const bankName = this.config.get<string>('MANUAL_PILOT_BANK');

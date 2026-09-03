@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interface';
 import { LEDGER_PORT, LedgerPort } from '../ledger/ledger.interface';
 import { GigsService } from '../gigs/gigs.service';
+import { IdentityService } from '../identity/identity.service';
 import { ConfigService } from '@nestjs/config';
 import { Kobo, kobo } from '../../common/money';
 import { EscrowPort, EscrowRecordView, EscrowState } from './escrow.interface';
@@ -33,6 +34,7 @@ export class EscrowService implements EscrowPort {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly gigs: GigsService,
+    private readonly identity: IdentityService,
     @Inject(PAYMENTS_PROVIDER) private readonly payments: PaymentsProvider,
     @Inject(LEDGER_PORT) private readonly ledger: LedgerPort,
   ) {}
@@ -46,11 +48,18 @@ export class EscrowService implements EscrowPort {
 
     // Idempotent: a gig that already has a holding account (e.g. the
     // client re-opened the funding screen) just gets that same record
-    // back instead of a duplicate, error, or a second holding account.
+    // back instead of a duplicate, error, or a second holding account —
+    // this is also why holdingAccountDetails is captured once here and
+    // reused on every later read, never recomputed by calling the
+    // provider again (a checkout-link provider can't cheaply reconstruct
+    // the same link after the fact, unlike a static account number).
     const existing = await this.prisma.escrowRecord.findUnique({ where: { gigId } });
     if (existing) return this.toView(existing);
 
-    const holdingAccount = await this.payments.createHoldingAccount(gigId);
+    const client = await this.identity.getUser(gig.clientId);
+    if (!client.email) throw new BadRequestException('Client has no email on file — required to fund a gig');
+
+    const holdingAccount = await this.payments.createHoldingAccount(gigId, kobo(Number(gig.bountyKobo)), client.email);
     const platformFeeBps = Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
 
     const record = await this.prisma.escrowRecord.create({
@@ -58,6 +67,12 @@ export class EscrowService implements EscrowPort {
         gigId,
         provider: holdingAccount.provider,
         holdingAccountRef: holdingAccount.holdingAccountRef,
+        holdingAccountDetails: {
+          provider: holdingAccount.provider,
+          accountNumber: holdingAccount.accountNumber,
+          bankName: holdingAccount.bankName,
+          checkoutUrl: holdingAccount.checkoutUrl,
+        },
         bountyKobo: gig.bountyKobo,
         platformFeeBps,
         state: 'awaiting_funding',
@@ -140,6 +155,7 @@ export class EscrowService implements EscrowPort {
       bountyKobo: kobo(Number(record.bountyKobo)),
       stakeKobo: kobo(Number(record.stakeKobo)),
       platformFeeBps: record.platformFeeBps,
+      holdingAccount: record.holdingAccountDetails as EscrowRecordView['holdingAccount'],
     };
   }
 }

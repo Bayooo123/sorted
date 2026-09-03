@@ -27,6 +27,13 @@ export interface EscrowRecordView {
   bountyKobo: Kobo;
   stakeKobo: Kobo;
   platformFeeBps: number;
+  /** Present once fundGig has been called — what the client sees to actually pay. Shape depends on the active PaymentsProvider (see payments.interface.ts's HoldingAccount). */
+  holdingAccount?: {
+    provider: string;
+    accountNumber?: string;
+    bankName?: string;
+    checkoutUrl?: string;
+  };
 }
 
 /** The only surface other modules may call into Escrow through. */

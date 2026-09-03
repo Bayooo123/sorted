@@ -1,21 +1,26 @@
 /**
  * HANDOFF.md §3.4 — Payments
  * Owns: all contact with the money rail. Nothing else in the codebase may
- * import the Monnify SDK (or any provider SDK) — everything else calls
+ * import a provider's SDK/REST client directly — everything else calls
  * PaymentsProvider.
  *
- * SEAM: Monnify is an implementation, not the interface. A second provider
- * (redundancy, or a future procurement/government funding flow with
- * entirely different mechanics) is a new class behind this same interface.
- * Escrow (§3.5) calls only this interface, never a provider SDK directly.
+ * SEAM: the concrete provider is an implementation, not the interface.
+ * v1 was going to be Monnify; replaced with Paystack before Monnify
+ * onboarding finished (see PLAN.md "Paystack integration" — product
+ * decision, not in HANDOFF.md). A second/future provider is a new class
+ * behind this same interface. Escrow (§3.5) calls only this interface,
+ * never a provider SDK directly.
  */
 import { Kobo } from '../../common/money';
 
 export interface HoldingAccount {
   provider: string;
   holdingAccountRef: string;
-  accountNumber: string;
-  bankName: string;
+  /** Account-number-based providers (manual pilot) populate this; checkout-link providers may omit it. */
+  accountNumber?: string;
+  bankName?: string;
+  /** Checkout-link-based providers (Paystack Transaction Initialize) populate this instead of accountNumber/bankName. */
+  checkoutUrl?: string;
 }
 
 export interface FundingConfirmation {
@@ -47,7 +52,8 @@ export interface WebhookVerificationResult {
 
 export interface PaymentsProvider {
   readonly name: string;
-  createHoldingAccount(gigId: string): Promise<HoldingAccount>;
+  /** payerEmail: checkout-link providers (Paystack) require a customer email at session creation; account-number providers ignore it. */
+  createHoldingAccount(gigId: string, amountKobo: Kobo, payerEmail: string): Promise<HoldingAccount>;
   confirmFunding(ref: string): Promise<FundingConfirmation>;
   disburse(splits: DisbursementSplit[], idempotencyKey: string): Promise<DisbursementResult>;
   refund(ref: string): Promise<RefundResult>;

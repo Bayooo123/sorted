@@ -141,19 +141,19 @@ export interface EscrowRecordView {
   bountyKobo: number;
   stakeKobo: number;
   platformFeeBps: number;
-}
-
-/**
- * Only present on the response from POST /gigs/:id/fund — the manual-pilot
- * transfer target to show the client (server/src/modules/payments/
- * providers/manual-pilot.provider.ts). Swaps to real Monnify virtual-
- * account instructions later with no shape change the app needs to know
- * about beyond this same field.
- */
-export interface FundGigResult extends EscrowRecordView {
-  transferInstructions: {
-    accountNumber: string;
-    bankName: string;
+  /**
+   * Present once fundGig has been called — what the client sees to
+   * actually pay. Shape depends on the active PaymentsProvider
+   * (server/src/modules/payments/payments.interface.ts's HoldingAccount):
+   * manual-pilot populates accountNumber/bankName, Paystack populates
+   * checkoutUrl instead.
+   */
+  holdingAccount?: {
     provider: string;
+    accountNumber?: string;
+    bankName?: string;
+    checkoutUrl?: string;
   };
 }
+
+export type FundGigResult = EscrowRecordView;

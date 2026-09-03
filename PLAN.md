@@ -869,6 +869,110 @@ mockup — see the file's own doc comment for why that copy is load-bearing.
 
 ---
 
+## Paystack integration (replaces Monnify as the real `PaymentsProvider`) — IMPLEMENTED
+
+**Goal:** give `PAYMENTS_PROVIDER_KEY` a real, non-manual option — Paystack
+calls a webhook when a client's payment lands, so `EscrowService.
+confirmFunding` runs automatically instead of a founder confirming by hand
+via `POST /gigs/:id/confirm-funding`. `manual_pilot` stays the default and
+remains fully working; nothing about it changed except the interface it
+implements got wider (see below). Monnify was never actually built (the
+prior slice's "Monnify is an implementation, not the interface" language
+described a plan, not code) — replaced outright rather than kept alongside,
+per explicit instruction.
+
+**Why Transaction Initialize, not a Dedicated Virtual Account:** a DVA is
+issued per *customer* and is persistent — it can't tell which of a client's
+several gigs-awaiting-funding a given bank transfer was meant to pay for.
+A one-time Transaction Initialize checkout session, keyed to the gig's own
+id as Paystack's `reference`, sidesteps that entirely — `EscrowService.
+fundGig` already guarantees at most one `EscrowRecord` per gig, so `gigId`
+is already a safe idempotency/lookup key on Paystack's side too.
+
+**Interface widened, not just a new class behind the old one** (unlike the
+Monnify plan, which assumed Monnify's Reserved Account shape would fit any
+provider): `PaymentsProvider.createHoldingAccount` gained `amountKobo` and
+`payerEmail` params — Paystack's Transaction Initialize needs both upfront,
+where the manual-pilot's static account didn't need either. `HoldingAccount`
+gained an optional `checkoutUrl`, and its `accountNumber`/`bankName` became
+optional — account-number-based providers (manual pilot) populate one pair,
+checkout-link-based providers (Paystack) populate the other.
+
+**A duplicate-call bug caught while designing this, not yet triggered in
+production:** `EscrowController.fund()` was calling `createHoldingAccount`
+twice — once inside `EscrowService.fundGig()` (the record-creating call)
+and again directly in the controller, just to get account details for the
+HTTP response. Harmless against the manual-pilot's static, idempotent
+account; against Paystack it would have opened two separate checkout
+sessions (two different payment links) for one funding request. Fixed by
+having `fundGig` persist what the provider returned — `EscrowRecord.
+holdingAccountDetails Json?` — and having `EscrowRecordView.holdingAccount`
+read it back, so the controller never calls the provider a second time and
+a re-fetch of an already-funded gig doesn't call it again either.
+
+**Webhook-based auto-confirmation (`PaystackWebhookController`, `POST
+/webhooks/paystack`):**
+- **Signature verification is the real guarantee**: HMAC-SHA512 over the
+  *raw* request bytes (not the parsed/re-serialized JSON — re-serializing
+  can reorder or reformat and silently break the signature), compared to
+  the `x-paystack-signature` header. Raw bytes are captured via a `verify`
+  callback on the JSON body parser in both `main.ts` and `api/index.ts`
+  (`req.rawBody = buf`), since by the time Nest hands the controller a
+  parsed body the exact original bytes are gone.
+- **IP-allowlist is soft/logged-only, not a hard gate**: `PAYSTACK_
+  WEBHOOK_IP_ALLOWLIST` (optional). Paystack's published source IPs can
+  change and can't be verified from this environment, so a mismatch is
+  logged, never blocked — consistent with this codebase's existing
+  honesty-first documentation elsewhere about what can and can't be
+  verified from this sandbox.
+- **Idempotency was already there.** `EscrowService.confirmFunding`'s
+  state-guard (no-op once the record has left `awaiting_funding`) plus
+  `LedgerService.record`'s upsert on the deterministic `fund:${gigId}`
+  event id — both written in the manual-pilot slice specifically because
+  its own doc comment already anticipated "a webhook handler calls it in
+  production." A replayed webhook (Paystack retries on anything but 2xx)
+  is already a safe no-op with zero new code in this controller.
+- Always responds `200` once the signature check has run — including for
+  an invalid signature or an event kind not acted on (`transfer.success`,
+  `refund.processed`, ...) — because Paystack retries non-2xx responses,
+  and retrying an event deliberately ignored is noise, not a fix.
+
+**Schema:** `EscrowRecord.holdingAccountDetails Json?` (provider-shaped —
+account-number-based and checkout-link-based providers genuinely return
+different things, so `Json` rather than fixed columns); `EscrowRecord.
+provider`'s default changed from `"monnify"` to `"manual_pilot"` to match
+what was actually ever running. Migration:
+`20260901160000_escrow_holding_account_details`.
+
+**Env (`server/.env.example`):** `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY`,
+`PAYSTACK_WEBHOOK_IP_ALLOWLIST` (optional) — real values live only in the
+gitignored `server/.env` locally / Vercel's `sorted-api` project env vars in
+production, never in this repo or in chat. `PAYMENTS_PROVIDER_KEY` stays
+`manual_pilot` until those are set and switched to `paystack`. The webhook
+URL to register in the Paystack dashboard is
+`https://sorted-api.vercel.app/webhooks/paystack`.
+
+**Screens updated:** screen 06 (`FundEscrowScreen.tsx`) and the web funding
+card (`index.html`'s `fundingCard`) both now branch on `holdingAccount.
+checkoutUrl` — a "Pay now" action opening Paystack's hosted checkout when
+present, falling back to the existing account-number/bank-name display (and
+its pilot-disclosure copy, which only applies to that path) when it isn't.
+Both still poll for the escrow state to leave `awaiting_funding`, unchanged.
+
+**Explicitly deferred — not this change:**
+- `disburse`/`refund` (`PaystackProvider`) have no real callers yet —
+  `releaseToProfessional`/`refundClient` are still stubs (slices 7/8);
+  implemented ahead of need so the interface is exercised end-to-end for
+  the one method that does have a caller (`createHoldingAccount`).
+- Whether Paystack's refund API supports refunding a bank-transfer-funded
+  transaction (as opposed to a card payment) is unconfirmed — flagged in
+  `PaystackProvider.refund`'s own doc comment rather than assumed.
+- End-to-end verification of the live checkout → webhook → `confirmFunding`
+  path needs real `PAYSTACK_SECRET_KEY` test-mode credentials in the
+  deployed environment; not runnable from this sandbox.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

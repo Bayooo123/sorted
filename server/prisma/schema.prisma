@@ -336,8 +336,17 @@ model EscrowRecord {
   id                 String      @id @default(cuid())
   gigId              String      @unique
   gig                Gig         @relation(fields: [gigId], references: [id])
-  provider           String      @default("monnify") // SEAM (§3.4): PaymentsProvider key
+  provider           String      @default("manual_pilot") // SEAM (§3.4): PaymentsProvider key
   holdingAccountRef  String?
+  // Whatever the provider returned to show the client at funding time —
+  // { accountNumber?, bankName?, checkoutUrl? } — captured once at
+  // creation (see PaystackProvider.createHoldingAccount) so a re-fetch of
+  // an already-created escrow record never needs to call the provider
+  // again. Shape varies by provider on purpose (Json, not fixed columns):
+  // account-number-based providers (manual pilot) vs. checkout-link-based
+  // providers (Paystack Transaction Initialize) genuinely return different
+  // things — see PLAN.md "Paystack integration".
+  holdingAccountDetails Json?
 
   bountyKobo         BigInt // ★
   stakeKobo          BigInt      @default(0) // ★

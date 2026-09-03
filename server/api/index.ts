@@ -33,7 +33,15 @@ async function bootstrap(): Promise<void> {
   // upload — see identity.service.ts's MAX_IMAGE_DATA_URI_LENGTH. Vercel's
   // own serverless function request body ceiling is ~4.5MB regardless of
   // this setting, so 4mb here stays under that with a little headroom.
-  app.useBodyParser('json', { limit: '4mb' });
+  // `verify` stashes the raw request bytes on req.rawBody —
+  // PaystackProvider.verifyWebhook needs the exact raw body to check the
+  // HMAC signature; the parsed object won't match.
+  app.useBodyParser('json', {
+    limit: '4mb',
+    verify: (req: { rawBody?: Buffer }, _res: unknown, buf: Buffer) => {
+      req.rawBody = buf;
+    },
+  });
   await app.init();
 }
 
