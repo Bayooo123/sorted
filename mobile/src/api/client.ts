@@ -1,10 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 
 /**
- * Points at the local NestJS server by default (HANDOFF.md §2: Railway/
- * Render in prod). Override with EXPO_PUBLIC_API_URL for a device/tunnel.
- * No fallback to a hardcoded prod URL — no prod deploy exists yet
- * (PLAN.md: "no migration has been run against a live database").
+ * Points at the local NestJS server by default — for `expo start` during
+ * dev. Real builds (EAS) override this via EXPO_PUBLIC_API_URL baked in at
+ * build time — see mobile/eas.json's preview/production profiles, which
+ * point at the deployed API (https://sorted-api.vercel.app). No hardcoded
+ * prod fallback here on purpose: a dev build should never silently talk to
+ * production data.
  */
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
