@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sorted — Consider it sorted.</title>
-<meta name="description" content="Sorted is an escrow-protected marketplace for getting real-world jobs done. Post a gig, fund it in escrow, pay only when it's verified done." />
+<meta name="description" content="Sorted connects you with skilled Nigerian artisans and professionals you can trust — your payment is only released once the job is done right. Live now: dry cleaning &amp; laundry in Yaba, Lagos." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="alternate icon" href="/favicon.svg" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -135,14 +135,6 @@
 
   .hero-grid {
     position: relative;
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 56px;
-    align-items: center;
-  }
-
-  @media (max-width: 900px) {
-    .hero-grid { grid-template-columns: 1fr; gap: 48px; }
   }
 
   .eyebrow {
@@ -199,31 +191,151 @@
     color: var(--text-muted);
   }
 
-  .cta-form {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    max-width: 440px;
-    margin: 0 0 14px;
+  /* ---------- availability marker ---------- */
+
+  .availability {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 11px;
+    background: var(--green-mint-bg);
+    border: 1px solid rgba(2,122,97,0.18);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--green-deep);
+    margin: 0 0 20px;
+    max-width: 480px;
   }
 
-  .cta-form input[type="email"] {
-    flex: 1;
-    min-width: 220px;
-    padding: 14px 16px;
-    border-radius: 11px;
+  .availability .live-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.22);
+  }
+
+  /* ---------- category chips ---------- */
+
+  .category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 480px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--surface);
-    font-size: 15px;
-    color: var(--text-primary);
-    box-shadow: 0 1px 2px rgba(12,31,27,0.03);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-body);
+    cursor: pointer;
   }
 
-  .cta-form input[type="email"]:focus {
+  .chip[data-live="true"] {
+    border-color: rgba(2,122,97,0.3);
+    color: var(--green-deep);
+    background: var(--green-mint-bg);
+    cursor: default;
+  }
+
+  .chip .chip-soon {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .chip[data-live="true"] .chip-soon { display: none; }
+
+  .raise-hand {
+    max-width: 480px;
+    margin: 0 0 22px;
+    padding: 14px 16px;
+    border-radius: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .raise-hand[hidden] { display: none; }
+
+  .raise-hand p {
+    margin: 0 0 10px;
+    font-size: 13.5px;
+    color: var(--text-body);
+  }
+
+  .raise-hand-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .raise-hand input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 11px 13px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .raise-hand input[type="text"]:focus {
     outline: none;
     border-color: var(--green-bright);
     box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
   }
+
+  /* ---------- two doors ---------- */
+
+  .doors {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 440px;
+    margin: 0 0 8px;
+  }
+
+  .door {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 13px;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 700;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+
+  .door:hover { transform: translateY(-1px); }
+
+  .door-primary {
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 6px 16px -6px rgba(2,122,97,0.55);
+  }
+
+  .door-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  .door .door-arrow { flex: none; opacity: 0.75; }
 
   .btn {
     padding: 14px 24px;
@@ -240,106 +352,6 @@
 
   .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 10px 22px -8px rgba(2,122,97,0.6); }
   .btn:active { transform: translateY(0); }
-
-  .form-note {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-
-  .form-note[data-state="sent"] { color: var(--green-primary); font-weight: 600; }
-  .form-note[data-state="error"] { color: #B3261E; font-weight: 600; }
-
-  /* ---------- hero visual: escrow card ---------- */
-
-  .escrow-card {
-    position: relative;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 26px 26px 22px;
-    box-shadow: 0 1px 2px rgba(12,31,27,0.04), 0 24px 48px -20px rgba(12,31,27,0.22);
-    max-width: 400px;
-    margin: 0 auto;
-  }
-
-  .escrow-card .card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 18px;
-  }
-
-  .escrow-card .card-tag {
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--green-deep);
-    background: var(--green-mint-bg);
-    padding: 5px 9px;
-    border-radius: 7px;
-  }
-
-  .escrow-card .card-state {
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .escrow-card .card-state .led {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--green-bright);
-  }
-
-  .escrow-card .job-title {
-    font-size: 15.5px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 2px;
-  }
-
-  .escrow-card .job-loc {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin: 0 0 20px;
-  }
-
-  .escrow-card .row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-top: 1px solid var(--border);
-    font-size: 14px;
-  }
-
-  .escrow-card .row:first-of-type { border-top: none; }
-
-  .escrow-card .row .k { color: var(--text-muted); }
-  .escrow-card .row .v { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .escrow-card .row.total .v { color: var(--green-deep); font-weight: 700; }
-
-  .escrow-card .divider {
-    border-top: 1px dashed var(--border);
-    margin: 4px 0;
-  }
-
-  .escrow-card .lock-note {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    font-size: 12.5px;
-    color: var(--text-muted);
-  }
 
   /* ---------- sections ---------- */
 
@@ -554,12 +566,131 @@
     color: var(--text-muted);
   }
 
+  /* ---------- professional pitch ---------- */
+
+  .pro-pitch {
+    padding: 90px 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pro-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px 32px;
+    max-width: 720px;
+    margin: 0 0 36px;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 700px) {
+    .pro-list { grid-template-columns: 1fr; }
+  }
+
+  .pro-list li {
+    display: flex;
+    gap: 12px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+  }
+
+  .pro-list .pro-check {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+
+  .pro-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: 520px;
+    margin: 0 0 10px;
+  }
+
+  .pro-form input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 13px 15px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 14.5px;
+    color: var(--text-primary);
+  }
+
+  .pro-form input[type="text"]:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
   /* ---------- footer ---------- */
 
   footer {
     border-top: 1px solid var(--border);
-    padding: 32px 0;
+    padding: 0 0 32px;
   }
+
+  .legit-strip {
+    padding: 36px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .legit-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: center;
+  }
+
+  @media (max-width: 640px) {
+    .legit-grid { grid-template-columns: 1fr; text-align: center; }
+    .legit-person { justify-content: center; }
+  }
+
+  .legit-person {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .legit-avatar {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--green-primary);
+    color: #fff;
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .legit-person .name { font-weight: 700; color: var(--text-primary); font-size: 14.5px; }
+  .legit-person .role { font-size: 13px; color: var(--text-muted); }
+  .legit-person a { color: var(--green-deep); text-decoration: none; font-weight: 600; }
+
+  .legit-facts {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+
+  .legit-facts strong { color: var(--text-body); font-weight: 600; }
 
   footer .wrap {
     display: flex;
@@ -567,6 +698,7 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
+    padding-top: 24px;
   }
 
   footer .f-brand {
@@ -664,11 +796,18 @@
   /* ---------- header auth button ---------- */
 
   .btn-nav {
-    padding: 9px 18px;
-    font-size: 13.5px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
     margin-left: 22px;
     border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    box-shadow: none;
   }
+
+  .btn-nav:hover { box-shadow: none; background: var(--surface); }
 
   @media (max-width: 560px) {
     nav a { display: none; }
@@ -1097,8 +1236,8 @@
     </a>
     <nav>
       <a href="#how-it-works">How it works</a>
-      <a href="#math">Pricing</a>
-      <button class="btn btn-nav" id="open-auth-modal" type="button">Log in / Sign up</button>
+      <a href="#for-professionals">For professionals</a>
+      <button class="btn btn-nav" id="open-auth-modal" type="button">Log in</button>
     </nav>
   </div>
 </header>
@@ -1114,40 +1253,37 @@
         accounting, legal work, and web design. Post the job, and your
         payment only gets released once it&rsquo;s done right.
       </p>
-      <p class="category-line">Plumbing · Electrical · Cleaning · Furniture repair · Accounting · Legal · Web &amp; digital · Surveying — and more</p>
 
-      <form class="cta-form" id="waitlist-form">
-        <input type="email" id="waitlist-email" placeholder="you@email.com" required aria-label="Email address" />
-        <button class="btn" type="submit">Get notified</button>
-      </form>
-      <p class="form-note" id="waitlist-note">Be first to know when Sorted launches.</p>
-    </div>
+      <p class="availability"><span class="live-dot"></span> Live now: dry cleaning &amp; laundry in Yaba, Lagos. More trades and areas opening as we go.</p>
 
-    <div class="escrow-card" aria-hidden="true">
-      <div class="card-head">
-        <span class="card-tag">Escrow</span>
-        <span class="card-state"><span class="led"></span>Funded</span>
-      </div>
-      <p class="job-title">Fix leaking kitchen pipe</p>
-      <p class="job-loc">Lekki Phase 1 &middot; Physical &middot; Individual</p>
+      <ul class="category-chips" id="category-chips">
+        <li class="chip" data-category="Plumbing">Plumbing <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Electrical">Electrical <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Cleaning">Cleaning <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Furniture repair">Furniture repair <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Accounting">Accounting <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Legal">Legal <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Web &amp; digital">Web &amp; digital <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Surveying">Surveying <span class="chip-soon">soon</span></li>
+      </ul>
 
-      <div class="row">
-        <span class="k">Bounty funded</span>
-        <span class="v">&#8358;85,000</span>
-      </div>
-      <div class="row">
-        <span class="k">Professional stake (held)</span>
-        <span class="v">&#8358;8,500</span>
-      </div>
-      <div class="divider"></div>
-      <div class="row total">
-        <span class="k">Released on sign-off</span>
-        <span class="v">&#8358;85,000</span>
+      <div class="raise-hand" id="raise-hand" hidden>
+        <p>Tell us your area and we&rsquo;ll message you when <strong id="raise-hand-category">this trade</strong> opens near you.</p>
+        <div class="raise-hand-row">
+          <input type="text" id="raise-hand-area" placeholder="Your area, e.g. Surulere" aria-label="Your area" />
+          <button class="btn" type="button" id="raise-hand-send">Message us on WhatsApp</button>
+        </div>
       </div>
 
-      <div class="lock-note">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Locked once posted — no changes after funding
+      <div class="doors">
+        <a class="door door-primary" id="door-customer" href="#" target="_blank" rel="noopener">
+          I need something done
+          <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="door door-secondary" href="#for-professionals">
+          I&rsquo;m a professional or artisan
+          <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
       </div>
     </div>
   </div>
@@ -1172,7 +1308,7 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
         <h3>Fund it in escrow</h3>
-        <p>The payment is set aside before anyone starts work. It&rsquo;s not with Sorted and it&rsquo;s not with the Client — it just sits safely in the middle until the job is done.</p>
+        <p>The payment is set aside before anyone starts work — held safely until you approve the job. Nothing moves until then. (For small orders like laundry, the full escrow flow may not apply — you&rsquo;ll always be told upfront.)</p>
       </div>
       <div class="flow-step">
         <div class="flow-icon">
@@ -1182,6 +1318,30 @@
         <p>The Client checks the work against that list. Once approved, payment goes out automatically — the Professional gets paid, and gets their stake (a small deposit) back.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="pro-pitch" id="for-professionals">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">For professionals & artisans</p>
+      <h2>Built for your trade, whichever one it is.</h2>
+    </div>
+    <ul class="pro-list">
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Get your business registered with CAC — we help you do it.</li>
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Keep a record of every job you&rsquo;ve done and what you&rsquo;re owed.</li>
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Buy materials cheaper, alongside other professionals in your trade.</li>
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Get paid for your work without chasing anyone.</li>
+    </ul>
+    <p class="subhead" style="margin-bottom:16px;">Tell us your trade and area — we&rsquo;ll message you back on WhatsApp.</p>
+    <div class="pro-form">
+      <input type="text" id="pro-trade" placeholder="Your trade, e.g. Tailoring" aria-label="Your trade" />
+      <input type="text" id="pro-area" placeholder="Your area, e.g. Ikeja" aria-label="Your area" />
+    </div>
+    <a class="door door-primary" id="pro-whatsapp" style="max-width:320px;" href="#" target="_blank" rel="noopener">
+      Message us on WhatsApp
+      <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
   </div>
 </section>
 
@@ -1196,14 +1356,13 @@
         Professional sees it, and it never changes once the job is posted.</p>
       </div>
       <div class="receipt">
-        <div class="r-row"><span class="k">Client funds</span><span class="v">&#8358;85,000</span></div>
-        <div class="r-row sub"><span class="k">Professional stake (10%)</span><span class="v">&#8358;8,500</span></div>
+        <div class="r-row"><span class="k">Client funds</span><span class="v">&#8358;120,000</span></div>
+        <div class="r-row sub"><span class="k">Professional stake (held, refundable)</span><span class="v">&#8358;12,000</span></div>
         <hr>
-        <div class="r-row"><span class="k">On sign-off &mdash; Professional receives</span><span class="v">&#8358;76,500</span></div>
-        <div class="r-row sub"><span class="k">+ stake returned</span><span class="v">&#8358;8,500</span></div>
-        <div class="r-row"><span class="k">Sorted fee (10%)</span><span class="v">&#8358;8,500</span></div>
+        <div class="r-row"><span class="k">Sorted fee (10%)</span><span class="v">&#8358;12,000</span></div>
+        <div class="r-row final"><span class="k">Professional earns</span><span class="v">&#8358;108,000</span></div>
         <hr>
-        <div class="r-row final"><span class="k">Professional walks away with</span><span class="v">&#8358;85,000</span></div>
+        <div class="r-row sub"><span class="k">Stake returned separately — his own money, not extra income</span><span class="v">&#8358;12,000</span></div>
       </div>
     </div>
   </div>
@@ -1237,7 +1396,32 @@
   </div>
 </section>
 
+<section class="pro-pitch" style="padding:60px 0; text-align:center;">
+  <div class="wrap">
+    <h2 style="font-family:'Iowan Old Style',Georgia,serif; font-size:24px; color:var(--text-primary); margin:0 0 18px;">Ready when you are.</h2>
+    <a class="door door-primary" id="door-customer-bottom" href="#" target="_blank" rel="noopener" style="max-width:340px; margin:0 auto; justify-content:center;">
+      Message us on WhatsApp
+      <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+</section>
+
 <footer>
+  <div class="legit-strip">
+    <div class="wrap legit-grid">
+      <div class="legit-person">
+        <div class="legit-avatar">AG</div>
+        <div>
+          <div class="name">Adebayo Gbadebo — Founder</div>
+          <div class="role"><a href="tel:+2349031812675">+234 903 181 2675</a> · <a href="https://wa.me/2349031812675" target="_blank" rel="noopener">WhatsApp</a></div>
+        </div>
+      </div>
+      <div class="legit-facts">
+        <strong>Reforma Digital Solutions Limited</strong> · RC 8801487<br>
+        26 Ebun Street, Abule Oja, Yaba, Lagos
+      </div>
+    </div>
+  </div>
   <div class="wrap">
     <div class="f-brand">
       <svg width="18" height="18" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1470,69 +1654,54 @@
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 
-  // Waitlist signups go straight to a dedicated Supabase project
-  // (project "sorted", table public.waitlist) via PostgREST. The key below
-  // is a publishable/anon key — safe to expose client-side by design.
-  // Row Level Security on the table allows INSERT only, for anyone; there
-  // is no SELECT policy, so this key cannot be used to read the list back.
-  var SUPABASE_URL = 'https://mnlrixtrqwrdypzyepby.supabase.co';
-  var SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_9u2JEhg3ZUs84BHT4pHrwA_Sk-LpFmG';
+  // ---------- WhatsApp CTAs ----------
+  // One number for every door — set once, used everywhere below.
+  var WHATSAPP_NUMBER = '2349031812675';
 
-  document.getElementById('waitlist-form').addEventListener('submit', function (e) {
+  function waLink(text) {
+    return 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(text);
+  }
+
+  // "I need something done" — one tap, no form, straight into WhatsApp
+  // with the only thing that's actually live right now.
+  var customerMessage = "Hi Sorted, I'd like to book a dry cleaning / laundry pickup in Yaba.";
+  document.getElementById('door-customer').href = waLink(customerMessage);
+  document.getElementById('door-customer-bottom').href = waLink(customerMessage);
+
+  // ---------- category chips -> "raise your hand" ----------
+  // Closed-category handoff (PLAN.md-equivalent for the landing page): a
+  // trade/area that isn't live yet is never a dead end — it becomes a
+  // WhatsApp message we actually read, not a hidden or generic
+  // "coming soon." The data lives in that WhatsApp thread; no backend
+  // needed for a single-operator pilot.
+  var raiseHand = document.getElementById('raise-hand');
+  var raiseHandCategory = document.getElementById('raise-hand-category');
+  var raiseHandArea = document.getElementById('raise-hand-area');
+  var selectedCategory = '';
+
+  document.getElementById('category-chips').addEventListener('click', function (e) {
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    selectedCategory = chip.dataset.category;
+    raiseHandCategory.textContent = selectedCategory;
+    raiseHand.hidden = false;
+    raiseHandArea.focus();
+  });
+
+  document.getElementById('raise-hand-send').addEventListener('click', function () {
+    var area = raiseHandArea.value.trim() || 'my area';
+    var message = 'Hi Sorted, I\'m looking for ' + selectedCategory + ' in ' + area +
+      '. I saw dry cleaning is live in Yaba — please let me know when you open in my category/area.';
+    window.open(waLink(message), '_blank', 'noopener');
+  });
+
+  // ---------- professional pitch -> WhatsApp ----------
+  document.getElementById('pro-whatsapp').addEventListener('click', function (e) {
     e.preventDefault();
-    var form = this;
-    var emailInput = document.getElementById('waitlist-email');
-    var note = document.getElementById('waitlist-note');
-    var button = form.querySelector('button[type="submit"]');
-    var email = emailInput.value.trim();
-
-    button.disabled = true;
-    note.textContent = 'Adding you…';
-    note.dataset.state = '';
-
-    fetch(SUPABASE_URL + '/rest/v1/waitlist', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_PUBLISHABLE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_PUBLISHABLE_KEY,
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ email: email, source: 'landing_pwa' }),
-    })
-      .then(function (res) {
-        // 201 = inserted. 409 = unique violation, i.e. already on the
-        // list — treat that as success too, not an error.
-        if (res.ok || res.status === 409) {
-          note.textContent = "Thanks — we'll let you know.";
-          note.dataset.state = 'sent';
-          form.reset();
-
-          // Only send the welcome email on a genuinely new signup (201),
-          // not on a 409 replay of an address already on the list — they
-          // already got it once. Fire-and-forget: a failure here must
-          // never surface as a failed signup, the insert already
-          // succeeded above.
-          if (res.status === 201) {
-            fetch('/api/send-welcome-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: email }),
-            }).catch(function () {
-              // Swallow — the waitlist signup itself already succeeded.
-            });
-          }
-        } else {
-          throw new Error('Request failed: ' + res.status);
-        }
-      })
-      .catch(function () {
-        note.textContent = "Something went wrong — try again in a moment.";
-        note.dataset.state = 'error';
-      })
-      .finally(function () {
-        button.disabled = false;
-      });
+    var trade = document.getElementById('pro-trade').value.trim() || 'a professional';
+    var area = document.getElementById('pro-area').value.trim() || 'my area';
+    var message = "Hi Sorted, I'm " + trade + " in " + area + " — tell me more about joining.";
+    window.open(waLink(message), '_blank', 'noopener');
   });
 
   // ---------- service worker ----------
@@ -1603,8 +1772,8 @@
   })();
 
   // ---------- auth modal: real email/phone + password against server/'s Identity API ----------
-  // Not the waitlist Supabase project above; this is the actual product's
-  // Identity module (server/src/modules/identity).
+  // The actual product's Identity module (server/src/modules/identity) —
+  // unrelated to the WhatsApp CTAs above, which are the primary path now.
   (function () {
     var API_BASE_URL = 'https://sorted-api.vercel.app';
     var TOKEN_KEY = 'sorted_access_token';
