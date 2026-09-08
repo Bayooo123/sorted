@@ -70,6 +70,9 @@ export interface GigRecord {
   criteria: GigCriterionView[];
   createdAt: Date;
   publishedAt: Date | null;
+  /** Set by submitForReview — whole-gig proof (v1 simplification, see PLAN.md "Release + sign-off flow"). */
+  submissionProofBase64: string | null;
+  submissionNote: string | null;
 }
 
 /**
@@ -96,4 +99,10 @@ export interface GigsPort {
   /** tx: pass the caller's transaction client for an atomic cross-module write — see PrismaTx. */
   transitionStatus(gigId: string, to: GigStatus, tx?: PrismaTx): Promise<GigRecord>;
   listGigs(filter: GigListFilter): Promise<GigRecord[]>;
+  /**
+   * SUBMIT: the assigned professional's whole-gig proof + note, transitions
+   * in_progress -> submitted. Only the professional with an active Claim on
+   * this gig may call this — enforced here, not by the controller.
+   */
+  submitForReview(gigId: string, professionalId: string, proofBase64: string, note?: string): Promise<GigRecord>;
 }

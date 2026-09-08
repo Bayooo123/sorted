@@ -11,6 +11,7 @@
  * constant — see EscrowRecord.platform_fee_bps in prisma/schema.prisma.
  */
 import { Kobo } from '../../common/money';
+import { PrismaTx } from '../../common/prisma-tx';
 
 export type EscrowState =
   | 'awaiting_funding'
@@ -52,14 +53,26 @@ export interface EscrowPort {
    * state transition + LedgerEntry, provider-agnostically.
    */
   confirmFunding(gigId: string, providerRef: string): Promise<EscrowRecordView>;
-  /** CLAIM+STAKE: professional's ~10% stake is held. */
-  holdStake(gigId: string, professionalId: string, stakeKobo: Kobo): Promise<EscrowRecordView>;
+  /**
+   * CLAIM+STAKE: assigns the professional (via MatchingStrategy) and
+   * records their stake. stakeKobo is computed from DEFAULT_STAKE_BPS
+   * config, never caller-supplied — same reasoning as platformFeeBps in
+   * fundGig. See PLAN.md "Release + sign-off flow" for why no real money
+   * moves for the stake in this pilot (stakeKobo is tracked/displayed
+   * only, not collected).
+   */
+  holdStake(gigId: string, professionalId: string): Promise<EscrowRecordView>;
   /** SIGN-OFF happy path: disburse professional 90% + Sorted fee, return stake. */
   releaseToProfessional(gigId: string): Promise<EscrowRecordView>;
   /** Client-side refund (client bad-faith withholding is a penalty, not this). */
   refundClient(gigId: string): Promise<EscrowRecordView>;
-  /** DISPUTE: state = dispute_hold. Release becomes impossible while set. */
-  freezeForDispute(gigId: string): Promise<EscrowRecordView>;
+  /**
+   * DISPUTE: state = dispute_hold. Release becomes impossible while set.
+   * tx: DisputesService.raiseDispute passes its own transaction so the
+   * freeze, the Dispute row, and the Gig status transition to 'disputed'
+   * land atomically — never a freeze with no Dispute row, or vice versa.
+   */
+  freezeForDispute(gigId: string, tx?: PrismaTx): Promise<EscrowRecordView>;
   /** Applies a neutral's ruling (for_professional | for_client | split) post-freeze. */
   resolveFrozen(
     gigId: string,

@@ -13,6 +13,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NIGERIAN_STATES } from '../../common/nigerian-states';
+import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
   ApplyForKycInput,
@@ -39,22 +40,15 @@ const RESET_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_CODE_MAX_ATTEMPTS = 5;
 const GENERIC_RESET_MESSAGE = { message: 'If an account exists for that email or phone, a reset code has been sent.' };
 
-// ~2.6MB raw image, ~3.5MB once base64-encoded — leaves headroom under
-// Vercel's serverless request body ceiling (see main.ts/api/index.ts's
-// bodyParser limit) after JSON envelope overhead.
-const MAX_IMAGE_DATA_URI_LENGTH = 3_500_000;
-const IMAGE_DATA_URI_RE = /^data:image\/(png|jpe?g|webp);base64,/i;
-
 function generateResetCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 function assertValidImageDataUri(value: string, fieldName: string): void {
-  if (!IMAGE_DATA_URI_RE.test(value)) {
-    throw new BadRequestException(`${fieldName} must be a base64 image data URI (png/jpeg/webp)`);
-  }
-  if (value.length > MAX_IMAGE_DATA_URI_LENGTH) {
-    throw new BadRequestException(`${fieldName} is too large — please use a smaller image`);
+  if (!isValidImageDataUri(value)) {
+    throw new BadRequestException(
+      `${fieldName} must be a base64 image data URI (png/jpeg/webp) under ${MAX_IMAGE_DATA_URI_LENGTH} chars`,
+    );
   }
 }
 

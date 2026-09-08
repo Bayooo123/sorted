@@ -1,4 +1,4 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   AssignmentResult,
   ClaimAttempt,
@@ -23,7 +23,13 @@ export class FixedPriceAcceptStrategy implements MatchingStrategy {
     return Promise.resolve({ finalPriceKobo: gig.bountyKobo });
   }
 
-  assignProfessional(_gig: GigForPricing, _claim: ClaimAttempt): Promise<AssignmentResult> {
-    throw new NotImplementedException('FixedPriceAcceptStrategy.assignProfessional — slice 6');
+  // v1: first credible professional to claim gets it — no shortlist, no
+  // competing offers. EscrowService.holdStake is the only caller and has
+  // already checked the gig is still 'open' before this runs, so there's
+  // nothing left for this strategy to arbitrate; kept as a real call
+  // (not inlined into EscrowService) so a reverse-auction/shortlist
+  // strategy can replace just this class later — see matching.interface.ts.
+  assignProfessional(gig: GigForPricing, claim: ClaimAttempt): Promise<AssignmentResult> {
+    return Promise.resolve({ gigId: gig.id, professionalId: claim.professionalId });
   }
 }

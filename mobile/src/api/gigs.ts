@@ -33,3 +33,8 @@ export function listGigs(filter?: GigListFilter) {
 export function listMyGigs(filter?: GigListFilter) {
   return api.get<GigRecord[]>(`gigs/mine${toQuery(filter)}`);
 }
+
+/** Professional-only, must hold the active claim. Whole-gig proof + note, transitions in_progress -> submitted. */
+export function submitForReview(gigId: string, proofBase64: string, note?: string) {
+  return api.post<GigRecord>(`gigs/${gigId}/submit`, { proofBase64, note });
+}

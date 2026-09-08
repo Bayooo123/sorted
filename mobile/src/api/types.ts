@@ -117,6 +117,9 @@ export interface GigRecord {
   criteria: GigCriterionView[];
   createdAt: string;
   publishedAt: string | null;
+  /** Set by submitForReview — whole-gig proof (v1 simplification). */
+  submissionProofBase64: string | null;
+  submissionNote: string | null;
 }
 
 export interface GigListFilter {
@@ -157,3 +160,17 @@ export interface EscrowRecordView {
 }
 
 export type FundGigResult = EscrowRecordView;
+
+export type DisputeStatus = 'open' | 'assigned' | 'ruled' | 'closed';
+export type DisputeRuling = 'for_professional' | 'for_client' | 'split';
+
+export interface DisputeRecord {
+  id: string;
+  gigId: string;
+  raisedBy: string;
+  reason: string;
+  neutralId: string | null;
+  ruling: DisputeRuling | null;
+  penaltyKobo: number | null;
+  status: DisputeStatus;
+}

@@ -1,9 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interface';
 import { kobo } from '../../common/money';
+import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { PrismaTx } from '../../common/prisma-tx';
 import {
   CreateGigInput,
@@ -140,7 +141,21 @@ export class GigsService implements GigsPort {
     if (!gig) throw new NotFoundException('Gig not found');
     this.assertTransitionAllowed(gig.status as GigStatus, to);
 
-    const updated = await client.gig.update({ where: { id: gigId }, data: { status: to }, include: GIG_INCLUDE });
+    // Compare-and-swap on the FROM status, not a blind update — closes a
+    // race where two concurrent callers (e.g. two professionals claiming
+    // the same 'open' gig) both pass assertTransitionAllowed above before
+    // either write commits. A count of 0 means someone else's transition
+    // already won; the caller should treat that as "try again", not as an
+    // unrelated failure.
+    const result = await client.gig.updateMany({
+      where: { id: gigId, status: gig.status },
+      data: { status: to },
+    });
+    if (result.count === 0) {
+      throw new ConflictException(`Gig status changed concurrently — expected "${gig.status}"`);
+    }
+
+    const updated = await client.gig.findUniqueOrThrow({ where: { id: gigId }, include: GIG_INCLUDE });
     return this.toGigRecord(updated);
   }
 
@@ -187,6 +202,34 @@ export class GigsService implements GigsPort {
     return gigs.map((g) => this.toGigRecord(g));
   }
 
+  async submitForReview(
+    gigId: string,
+    professionalId: string,
+    proofBase64: string,
+    note?: string,
+  ): Promise<GigRecord> {
+    const claim = await this.prisma.claim.findFirst({ where: { gigId, professionalId, status: 'active' } });
+    if (!claim) {
+      throw new ForbiddenException('Only the professional assigned to this gig can submit it for review');
+    }
+    if (!isValidImageDataUri(proofBase64)) {
+      throw new BadRequestException(
+        `proofBase64 must be a base64 image data URI (png/jpeg/webp) under ${MAX_IMAGE_DATA_URI_LENGTH} chars`,
+      );
+    }
+
+    // Proof/note land in the same transaction as the status flip — a gig
+    // should never be visible as 'submitted' with no proof attached (e.g.
+    // a crash between the two writes).
+    return this.prisma.$transaction(async (tx) => {
+      await tx.gig.update({
+        where: { id: gigId },
+        data: { submissionProofBase64: proofBase64, submissionNote: note ?? null },
+      });
+      return this.transitionStatus(gigId, 'submitted', tx);
+    });
+  }
+
   private assertTransitionAllowed(from: GigStatus, to: GigStatus): void {
     if (!ALLOWED_TRANSITIONS[from]?.includes(to)) {
       throw new BadRequestException(`Cannot transition gig from "${from}" to "${to}"`);
@@ -211,6 +254,8 @@ export class GigsService implements GigsPort {
       criteria: gig.criteria.map((c) => ({ text: c.text, locked: c.locked })),
       createdAt: gig.createdAt,
       publishedAt: gig.publishedAt,
+      submissionProofBase64: gig.submissionProofBase64,
+      submissionNote: gig.submissionNote,
     };
   }
 }

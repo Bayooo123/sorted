@@ -277,6 +277,14 @@ model Gig {
   createdAt   DateTime  @default(now())
   publishedAt DateTime?
 
+  // Whole-gig proof submission (v1 simplification — PLAN.md "Release +
+  // sign-off flow": one proof photo + note for the whole gig rather than
+  // per-Criterion, matching what ClaimWorkScreen/ReviewSignOffScreen
+  // already show. Base64-in-Postgres, same pattern/size cap as
+  // avatarBase64/KycRequest.documentBase64 (identity.service.ts).
+  submissionProofBase64 String?
+  submissionNote        String?
+
   criteria      Criterion[]
   claims        Claim[]
   escrow        EscrowRecord?

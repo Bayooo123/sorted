@@ -973,6 +973,112 @@ Both still poll for the escrow state to leave `awaiting_funding`, unchanged.
 
 ---
 
+## Release + sign-off flow (slices 6/7, plus a minimal slice-8 safety net) — IMPLEMENTED
+
+**Goal:** close the loop the Paystack integration opened — money could go
+*in* (fund a gig) but nowhere had ever built a way to pay it back *out*.
+`holdStake`, `releaseToProfessional`, `refundClient`, `freezeForDispute`,
+`resolveFrozen` were all still `NotImplementedException` stubs; a gig could
+reach `open` and then go nowhere. This closes the whole remaining
+lifecycle: claim → stake → submit → sign-off/release, plus a minimal
+admin-mediated dispute freeze/resolve, so a first real pilot gig can
+actually complete end to end.
+
+**Two scope decisions made explicitly before writing any of this (not
+assumed):**
+- **No real stake money in this pilot.** `EscrowRecord.stakeKobo` is
+  computed (`DEFAULT_STAKE_BPS` × bounty) and displayed, but never
+  collected — claiming a gig doesn't trigger a second funding flow for the
+  professional. Building a real stake-collection rail (its own checkout/
+  transfer flow, mirroring `fundGig`) was explicitly deferred as its own
+  future slice once there's real volume to justify it. `Claim.staked` is
+  set `false` accordingly — an honest field, not a placeholder.
+- **Whole-gig sign-off, not per-criterion.** One proof photo + note for
+  the entire gig (`Gig.submissionProofBase64`/`submissionNote`, same
+  base64-in-Postgres pattern as `avatarBase64`/`KycRequest.documentBase64`
+  — validation pulled out to `common/image-data-uri.ts` so Identity and
+  Gigs share it instead of duplicating the regex/size-cap). Matches what
+  `ClaimWorkScreen`/`ReviewSignOffScreen` already showed (one upload zone,
+  one approve button) — no UI redesign needed. Per-criterion proof/met
+  toggles (`Criterion.proofUrl`/`met`, the real `VerificationStrategy`
+  seam) stay unbuilt; `ClientSignoffStrategy` is still a stub.
+
+**Claim + stake (`EscrowService.holdStake`, `POST /gigs/:id/claim`):**
+one call does what the state machine models as two hops (`open` →
+`claimed` → `in_progress`) — there's no real stake-payment step to wait on
+between them, so splitting this into two professional-facing actions would
+just be extra taps for no reason. Calls `MatchingStrategy.assignProfessional`
+(now implemented — v1: trivial accept, first claim wins) before writing
+anything, so a future shortlist/bidding strategy can reject a claim before
+any state changes. `GigsService.transitionStatus` was hardened alongside
+this: the update is now a compare-and-swap on the FROM status
+(`updateMany` + count check, not a blind `update`) — closes a real race
+where two professionals claiming the same `open` gig could otherwise both
+pass the transition-allowed check before either write commits.
+
+**Submit for review (`GigsService.submitForReview`, `POST /gigs/:id/submit`):**
+professional-only, enforced by checking for an active `Claim` row — proof +
+note land in the same transaction as the `in_progress` → `submitted` flip,
+so a gig is never visibly "submitted" with no proof attached.
+
+**Release (`EscrowService.releaseToProfessional`, `POST /gigs/:id/release`
+— "Approve & release payment"):** the money-safety-sensitive part.
+`PaymentsProvider.disburse()` is an external call a DB transaction can't
+roll back, so the sequencing is deliberate: (1) idempotency check
+(`disbursementRef` already set, or `state === 'released'` → safe no-op
+return); (2) compare-and-swap into `state: 'releasing'` — this is what
+actually prevents two concurrent "Approve" taps from both calling
+`disburse()`, since only one `updateMany` wins; (3) call `disburse()`
+against the professional's `payoutBankCode`/`payoutAccountNumber`/
+`payoutAccountName` (`IdentityService.getPayoutDestination`, already
+existed — never built until now); (4) only once that succeeds, persist
+`state: 'released'`, `feeKobo`, `professionalPayoutKobo`, `disbursementRef`,
+the `signed_off`→`released` transitions, and two `LedgerEntry` rows
+(`release` + `fee`) all in one transaction. A `disburse()` failure leaves
+the record in `releasing` with no `disbursementRef` **on purpose** — a
+retried "Approve" tap can pick the CAS back up and try again, rather than
+being permanently stuck.
+
+**Minimal dispute safety net (`DisputesService`, admin-mediated, no
+neutral panel):** `POST /gigs/:id/dispute` — either the client or the
+assigned professional — creates the `Dispute` row, calls
+`EscrowService.freezeForDispute`, and transitions the gig to `disputed`,
+all in **one transaction** (HANDOFF.md §7's "thin is OK; freeze is not
+optional" upheld literally: never a freeze with no `Dispute` row, or vice
+versa). `POST /disputes/:id/resolve` (`AdminGuard`, same disclosed-manual
+pattern as escrow's confirm-funding) applies the founder's ruling:
+`for_professional` reuses the same disbursement CAS/idempotency mechanics
+as `releaseToProfessional` (entered from `dispute_hold` instead of
+`submitted` — `disputed` → `released` is a direct hop, no `signed_off`
+step); `for_client` calls the newly-implemented `refundClient`, which
+reuses `disbursementRef` as its CAS lock too (a gig only ever settles once,
+in one direction, so "already has a ref" is a valid "don't do this again"
+regardless of which direction it was). `assignNeutral` and `ruling: 'split'`
+are explicit `NotImplementedException`s, not guesses — a real neutral panel
+and how platform fee applies to a partial payout/refund are both genuinely
+undesigned, not oversights.
+
+**Schema:** `Gig.submissionProofBase64`/`submissionNote` (both nullable).
+Migration: `20260908120000_gig_submission_proof`. Nothing else needed new
+columns — `Claim`, `EscrowRecord` (`stakeKobo`, `feeKobo`,
+`professionalPayoutKobo`, `disbursementRef`), and `Dispute` already had
+every field this needed, unused until now.
+
+**Screens wired (mobile only — sign-off/claim still isn't on web, same as
+before):** `ClaimWorkScreen` (open gig → "Claim this gig" → proof capture →
+"Submit for review") and `ReviewSignOffScreen` (proof review → "Approve &
+release payment" or "Raise a dispute" with a reason).
+
+**Explicitly deferred — not this change:**
+- Real stake collection, per-criterion verification, GPS check-in, in-app
+  chat evidence (HANDOFF.md §3.6) — all still open, see above.
+- Neutral-panel dispute assignment and `split` rulings.
+- Materials-advance escrow state, stake-sizing policy beyond a flat
+  `DEFAULT_STAKE_BPS` — both still flagged open decisions in HANDOFF.md §11.
+- Web app parity for claim/submit/sign-off/dispute — mobile-only for now.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

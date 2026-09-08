@@ -4,6 +4,7 @@ import { AuthenticatedUser, JwtAuthGuard } from '../../common/auth/jwt-auth.guar
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { CreateGigDto } from './dto/create-gig.dto';
 import { ListGigsDto } from './dto/list-gigs.dto';
+import { SubmitForReviewDto } from './dto/submit-for-review.dto';
 import { kobo } from '../../common/money';
 
 /**
@@ -66,5 +67,16 @@ export class GigsController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.gigs.getGig(id);
+  }
+
+  /**
+   * Professional-only (must hold the active Claim on this gig — enforced
+   * in GigsService, not here). Transitions in_progress -> submitted with
+   * the whole-gig proof photo attached.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/submit')
+  submit(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: SubmitForReviewDto) {
+    return this.gigs.submitForReview(id, user.userId, dto.proofBase64, dto.note);
   }
 }

@@ -57,4 +57,31 @@ export class EscrowController {
   getEscrow(@Param('id') id: string) {
     return this.escrow.getEscrow(id);
   }
+
+  /**
+   * Professional-only. Claims an open gig and holds its stake in one call
+   * — see EscrowService.holdStake's doc comment for why (no real stake
+   * money moves in this pilot, so there's no separate payment step to
+   * wait on between "claimed" and "in_progress").
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/claim')
+  claim(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.escrow.holdStake(id, user.userId);
+  }
+
+  /**
+   * Client-only, owner-only. "Approve & release payment" on
+   * ReviewSignOffScreen — never a client-side-only status flip, always
+   * this call, which disburses to the professional via PaymentsProvider.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/release')
+  async release(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    const gig = await this.gigs.getGig(id);
+    if (gig.clientId !== user.userId) {
+      throw new ForbiddenException('Only the gig owner can release payment');
+    }
+    return this.escrow.releaseToProfessional(id);
+  }
 }
