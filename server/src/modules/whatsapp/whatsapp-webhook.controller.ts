@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { IdentityService } from '../identity/identity.service';
 import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
+import { WhatsappGigConversationService } from './whatsapp-gig-conversation.service';
 
 interface RequestWithRawBody extends Request {
   rawBody?: Buffer;
@@ -26,6 +27,7 @@ export class WhatsappWebhookController {
     private readonly config: ConfigService,
     private readonly identity: IdentityService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
+    private readonly gigConversation: WhatsappGigConversationService,
   ) {}
 
   /**
@@ -137,27 +139,25 @@ export class WhatsappWebhookController {
   }
 
   /**
-   * Phase 1 scope: greet an unregistered sender with the signup link, or
-   * tell a registered one that the full ordering flow isn't built yet.
-   * Ignores the actual message content — there's no conversation state
-   * machine yet (PLAN.md "WhatsApp integration" tracks what's next).
+   * Unregistered sender -> the signup link (Phase 1). Registered sender ->
+   * the guided gig-posting conversation (Phase 2, WhatsappGigConversationService)
+   * — see PLAN.md "WhatsApp integration" for what's still deferred past this
+   * (professional-side matching/broadcast over WhatsApp, outbound template
+   * messages for >24h notifications).
    */
-  private async handleText(phone: string, _text: string): Promise<void> {
+  private async handleText(phone: string, text: string): Promise<void> {
     const user = await this.identity.findUserByPhone(phone);
 
-    if (user) {
+    if (!user) {
       await this.whatsapp.sendMessage(
         phone,
-        "You're already signed up! The full WhatsApp ordering flow is coming soon — for now, post or manage gigs at https://sorted.com.ng",
+        'Welcome to Sorted — every job you complete here builds a track record that unlocks more customers, funding, and business support over time. ' +
+          'Sign up to get started: https://sorted.com.ng',
       );
       return;
     }
 
-    await this.whatsapp.sendMessage(
-      phone,
-      'Welcome to Sorted — every job you complete here builds a track record that unlocks more customers, funding, and business support over time. ' +
-        'Sign up to get started: https://sorted.com.ng',
-    );
+    await this.gigConversation.handle(user, phone, text);
   }
 }
 

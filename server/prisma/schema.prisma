@@ -449,4 +449,15 @@ model WhatsAppSession {
   phone         String   @unique // E.164, same shape as User.phone
   lastInboundAt DateTime @default(now())
   createdAt     DateTime @default(now())
+
+  // Gig-posting conversation state (WhatsApp integration Phase 2 — see
+  // PLAN.md). A guided, USSD-style sequence rather than free-text NLP:
+  // idle -> awaiting_category -> awaiting_location -> awaiting_price ->
+  // awaiting_confirmation -> idle. Draft fields hold whatever's been
+  // collected so far; cleared back to null on post or cancel.
+  conversationState String   @default("idle")
+  draftDescription  String?
+  draftSubmarketId  String?
+  draftLocationText String?
+  draftBountyKobo   BigInt?
 }

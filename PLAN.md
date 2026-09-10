@@ -1168,28 +1168,96 @@ production. Webhook URL to register in Meta's dashboard:
 `https://sorted-api.vercel.app/webhooks/whatsapp`.
 
 **Explicitly deferred — not this change:**
-- Everything past the greeting: no conversation state machine, no gig
-  posting/matching/payment over WhatsApp yet. `handleText` ignores the
-  actual message content in Phase 1 — every text from an unregistered
-  number gets the same signup-link reply, every text from a registered
-  one gets the same "coming soon" reply.
 - Outbound-initiated template messages (for notifying someone who hasn't
   messaged in >24h — "a professional accepted your job" being the clearest
   future case) — needs Meta template approval, an external multi-day
   process not started as part of this change.
-- Whether the eventual ordering flow should be LLM-agent-driven (as
-  Reforma is) or menu/state-machine-driven — flagged as a real decision,
-  not resolved here. Recommendation on record: keep money-adjacent steps
-  (price agreement, payment confirmation, state transitions) strictly
-  deterministic, matching this backend's existing discipline everywhere
-  else (compare-and-swap releases, idempotent ledger entries) — an LLM
-  agent improvising over what a client agreed to pay is the wrong place
-  to introduce nondeterminism. A lighter LLM layer for open-ended "describe
-  what you want done" free-text capture is fine, as long as anything it
-  produces is recapped and explicitly confirmed before any state change.
 - "Request a professional you already use" (direct-invite to one named
   professional, vs. today's open-to-all-matching-professionals claim) —
   new capability, not built.
+
+---
+
+## WhatsApp integration, Phase 2 — client gig posting — IMPLEMENTED
+
+**Goal:** close the loop Phase 1 opened — a registered client can post a
+real, fundable gig by texting, no app needed, matching the original brief
+("it will work like USSD"). Deliberately a guided, numbered-menu sequence,
+not free-text NLP extraction — the decision flagged as open in Phase 1
+("LLM-agent-driven vs. menu/state-machine-driven") is resolved here for
+this slice: taxonomy/location/price are hard requirements of
+`GigsService.createGig`, and a wrong NLP guess on a money field is a worse
+failure mode than one extra question. The broader LLM-vs-deterministic
+question stays open for whatever comes after posting (matching,
+negotiation) — not resolved wholesale by this choice.
+
+**Flow:** any free text from a registered client with no draft in progress
+is treated as a job description → numbered list of submarkets (taxonomy,
+same list `/taxonomy/submarkets` already serves) → location text → price →
+a recap ("Here's the job: ... Reply YES to post it, or CANCEL to start
+over.") → on YES, creates + publishes the gig and calls `EscrowService.
+fundGig` immediately, then messages back either the Paystack checkout link
+or the manual-pilot bank details — same two paths `FundEscrowScreen`
+already handles in the app. "cancel"/"stop"/"start over" resets to idle
+from any state.
+
+**State lives on `WhatsAppSession`** (the same one-row-per-phone table
+Phase 1 already added for the 24h window), not a new table — a
+`conversationState` string column (`idle` | `awaiting_category` |
+`awaiting_location` | `awaiting_price` | `awaiting_confirmation`) plus four
+nullable draft fields, cleared back to null on post or cancel. One
+gig-posting conversation per phone at a time, same as one messaging
+session per phone.
+
+**Client-role prerequisite handled transparently, not surfaced as a
+separate step.** `GigsService.createGig` requires `roleFlags` to include
+`'client'`, which bare signup doesn't set (`POST /me/role-profile` does,
+normally a separate app screen). Since the submarket picked for the gig
+IS the category `completeRoleProfile` needs (`seekingCategorySubmarketIds`),
+the WhatsApp flow calls `completeRoleProfile` itself right before
+`createGig` when the user doesn't already have the `'client'` role —
+preserving any existing `'professional'` role/service-offerings untouched
+(`completeRoleProfile` replaces role data wholesale, so those are read
+from `IdentityUser` and passed straight through, not dropped).
+
+**Fixed defaults, not additional questions:** `clientType: 'individual'`
+(the WhatsApp-first audience), `materialsMode: 'bounty_covers'`, and a
+single `criteria` entry equal to the free-text description. All narrower
+than what the web/app form collects — acceptable for this channel's
+audience; revisit if WhatsApp-posted gigs turn out to need per-criterion
+sign-off in practice.
+
+**New module wiring:** `WhatsappGigConversationService` lives in
+`WhatsappWebhookModule` (needs `GigsService` + `EscrowService`, both of
+which only this module — not `WhatsappModule` — may depend on, keeping
+Phase 1's circular-dependency fix intact). `WhatsappWebhookModule` now
+imports `GigsModule` and `EscrowModule` in addition to `IdentityModule`/
+`WhatsappModule`; neither import chains back to `WhatsappWebhookModule`,
+so no new cycle. Verified the same way as Phase 1: a real `ts-node
+src/main.ts` boot, confirming every module (including the two new imports)
+initializes and every route maps before the expected DB-connectivity
+crash.
+
+**Explicitly deferred — not this change:**
+- The professional side: nothing here broadcasts a newly-posted gig to
+  professionals over WhatsApp, or lets a professional claim one by texting
+  back. Professionals still find/claim gigs through the existing app/web
+  flow; a WhatsApp-posted gig is visible there like any other.
+- A "your job just went live" follow-up once escrow funding actually
+  clears — `NotificationsService` has no `gig_funded`/`escrow_released`
+  event implemented yet (still `NotImplementedException`, per its own doc
+  comment) and building that pipeline is its own slice, not folded in
+  here. The one message sent is the payment link/details, immediately
+  after posting.
+- Editing an in-progress draft (e.g. going back to fix the location) —
+  today only `cancel` (start over) exists, no "back" step.
+- Multi-turn free text for the description itself (e.g. someone splitting
+  their job description across two messages) — the first message after
+  `idle` is taken as the whole description.
+
+**Schema:** four nullable draft fields + `conversationState` (default
+`'idle'`) added to `WhatsAppSession`. Migration:
+`20260910140000_whatsapp_gig_conversation`.
 
 ---
 
