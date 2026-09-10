@@ -95,6 +95,15 @@ export class WhatsappService implements WhatsAppPort {
     );
   }
 
+  async promptForRating(clientPhone: string, gigId: string, professionalName: string): Promise<void> {
+    await this.prisma.whatsAppSession.upsert({
+      where: { phone: clientPhone },
+      create: { phone: clientPhone, conversationState: 'awaiting_rating', pendingRatingGigId: gigId },
+      update: { conversationState: 'awaiting_rating', pendingRatingGigId: gigId },
+    });
+    await this.sendMessage(clientPhone, `${professionalName} has been paid for the job — how did it go? Reply with a number from 1 (poor) to 5 (excellent).`);
+  }
+
   async recordInboundMessage(phone: string): Promise<void> {
     await this.prisma.whatsAppSession.upsert({
       where: { phone },

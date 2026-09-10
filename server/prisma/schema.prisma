@@ -62,6 +62,8 @@ model User {
   disputesRaised  Dispute[]  @relation("DisputeRaisedBy")
   disputesRuled   Dispute[]  @relation("DisputeNeutral")
   gigTemplates    GigTemplate[]
+  ratingsGiven     Rating[]   @relation("RatingsGiven")
+  ratingsReceived  Rating[]   @relation("RatingsReceived")
 
   // Registration decision (not in the original HANDOFF.md — agreed in a
   // later product session, see PLAN.md "Registration: account type"):
@@ -299,6 +301,7 @@ model Gig {
   escrow        EscrowRecord?
   disputes      Dispute[]
   ledgerEntries LedgerEntry[]
+  rating        Rating?
 }
 
 model Criterion {
@@ -445,6 +448,25 @@ model LedgerEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Ratings (product decision, not in HANDOFF.md — see PLAN.md "Simple
+// professional ratings"). One-directional (client rates professional) and
+// gig-scoped — see ratings.interface.ts's doc comment for why.
+// ---------------------------------------------------------------------------
+
+model Rating {
+  id      String @id @default(cuid())
+  gigId   String @unique // one rating per gig — enforces "released transaction only," not a general review
+  gig     Gig    @relation(fields: [gigId], references: [id])
+  raterId String
+  rater   User   @relation("RatingsGiven", fields: [raterId], references: [id])
+  rateeId String
+  ratee   User   @relation("RatingsReceived", fields: [rateeId], references: [id])
+  stars   Int // 1-5, enforced in RatingsService — no DB check constraint (Prisma doesn't express one directly)
+  comment String?
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
 // WhatsApp (product decision, not in HANDOFF.md — see PLAN.md "WhatsApp
 // integration"). Owned entirely by the whatsapp module: tracks the Meta
 // Cloud API 24h free-form messaging window per phone number. Deliberately
@@ -497,4 +519,11 @@ model WhatsAppSession {
   // professional's own accept/decline field — a client and a professional
   // are different phones with independent state.
   reassignGigId String?
+
+  // Simple professional ratings (PLAN.md) — set on the CLIENT's own
+  // session (conversationState = "awaiting_rating") right after
+  // EscrowService.releaseToProfessional, prompting for a 1-5 reply.
+  // Plain string, not a relation to Rating — same "stay a leaf table"
+  // reasoning as every other pending* field here.
+  pendingRatingGigId String?
 }

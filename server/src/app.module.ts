@@ -10,13 +10,15 @@ import { VerificationModule } from './modules/verification/verification.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { ReputationNotificationsModule } from './modules/reputation-notifications/reputation-notifications.module';
+import { RatingsModule } from './modules/ratings/ratings.module';
 import { WhatsappWebhookModule } from './modules/whatsapp/whatsapp-webhook.module';
 
 /**
- * Composition root. The nine modules below correspond 1:1 to HANDOFF.md §3.
- * Import order here is documentation order, not a dependency order — modules
- * depend on each other only through the interfaces each module exports, never
- * by importing another module's internals or touching its Prisma tables.
+ * Composition root. The modules below correspond 1:1 to HANDOFF.md §3, plus
+ * later product-decision additions (Ratings, WhatsApp — see PLAN.md). Import
+ * order here is documentation order, not a dependency order — modules depend
+ * on each other only through the interfaces each module exports, never by
+ * importing another module's internals or touching its Prisma tables.
  */
 @Module({
   imports: [
@@ -31,6 +33,7 @@ import { WhatsappWebhookModule } from './modules/whatsapp/whatsapp-webhook.modul
     DisputesModule,
     LedgerModule,
     ReputationNotificationsModule,
+    RatingsModule,
     WhatsappWebhookModule,
   ],
 })

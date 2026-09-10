@@ -433,7 +433,24 @@ export class EscrowService implements EscrowPort {
       return updated;
     });
 
+    // Best-effort, outside the transaction — same reasoning as the WhatsApp
+    // hooks elsewhere in this file (PLAN.md "Simple professional ratings"):
+    // a prompt failing to send must never fail a real payout that already
+    // happened. Only reached once per real release (the CAS above already
+    // guards the idempotent-retry paths from getting here twice).
+    await this.promptForRating(gigId, claim.professionalId, gig.clientId).catch((err) => {
+      this.logger.warn(`Rating prompt failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+    });
+
     return this.toView(record);
+  }
+
+  private async promptForRating(gigId: string, professionalId: string, clientId: string): Promise<void> {
+    const client = await this.identity.getUser(clientId);
+    if (!client.phone) return;
+    const professional = await this.identity.getUser(professionalId);
+    const firstName = professional.name?.trim().split(/\s+/)[0] ?? 'The professional';
+    await this.whatsapp.promptForRating(client.phone, gigId, firstName);
   }
 
   async refundClient(gigId: string): Promise<EscrowRecordView> {

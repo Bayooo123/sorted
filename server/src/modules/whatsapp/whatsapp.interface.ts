@@ -48,6 +48,15 @@ export interface WhatsAppPort {
    * whatsapp-webhook.module.ts) as well as from WhatsappInviteService.
    */
   offerReassignment(clientPhone: string, gigId: string, reasonText: string): Promise<void>;
+  /**
+   * Puts `clientPhone`'s WhatsAppSession into the post-release rating
+   * prompt (PLAN.md "Simple professional ratings") and sends the "how
+   * was it, reply 1-5" message — same reasoning as offerReassignment for
+   * why this lives here rather than in a higher-level conversation
+   * service: EscrowService.releaseToProfessional needs to call it and
+   * cannot depend on WhatsappGigConversationService without a cycle.
+   */
+  promptForRating(clientPhone: string, gigId: string, professionalName: string): Promise<void>;
 }
 
 export const WHATSAPP_PORT = 'WHATSAPP_PORT';

@@ -1499,6 +1499,63 @@ behavior here, not a shortcut.
 
 ---
 
+## Simple professional ratings — IMPLEMENTED
+
+**Goal:** the trust gap Phase 4's broadcast opened — a job can now go to
+a professional the client has never dealt with before, with zero signal
+beyond "they're on the platform." Deliberately the SIMPLE version this
+was scoped as: a 1-5 star rating from the client, prompted right after
+`EscrowService.releaseToProfessional`, no richer trust score.
+
+**One-directional and gig-scoped, not a general review system.** New
+`Rating` model: one row per gig (`gigId` unique — enforces "this is about
+a real completed transaction," not a free-standing review), `raterId`
+always the client, `rateeId` always the professional who held the active
+`Claim`. Client rates professional only, matching the recommendation on
+record from earlier in this build (professional reputation feeds
+matching decisions; customer-side rating was flagged as lower priority
+and stays unbuilt). Upsert, not insert-only — a client correcting a
+fat-fingered rating doesn't need a support path.
+
+**New `RatingsModule`**, same shape as every other domain module here
+(`ratings.interface.ts`'s `RatingsPort`, service, controller, own
+migration) — `POST /gigs/:id/rate` (JWT, caller must be the gig's own
+client, gig must be `released`) and `GET /professionals/:id/rating`
+(public, `{average, count}`) for whatever screen eventually shows it.
+
+**Prompted over WhatsApp, same architecture as the last three phases.**
+`EscrowService.releaseToProfessional` — right after the payout actually
+lands, guarded by its own existing idempotency CAS so this only fires
+once per real release — best-effort calls the new `WhatsAppPort.
+promptForRating(clientPhone, gigId, professionalName)`. Same reasoning as
+`offerReassignment`: this piece of conversation-state logic lives in the
+lean `WhatsappService`, not a higher-level conversation service, because
+`EscrowService` can't depend on `WhatsappGigConversationService` without
+recreating the cycle Phase 1 split modules to avoid. The reply (a bare
+1-5) is handled in `WhatsappGigConversationService`'s existing state
+machine (`awaiting_rating`), which now also injects `RatingsService` —
+requiring `WhatsappWebhookModule` to import the new `RatingsModule` (safe:
+neither it nor `GigsModule`/`AuthModule` chains back to
+`WhatsappWebhookModule`).
+
+**Explicitly deferred — not this change:**
+- Any richer signal (on-time completion rate, dispute history, repeat-
+  client rate) — flagged as the fuller version when this was scoped,
+  intentionally not built now.
+- Customer-side rating (a client's own reliability/no-show track record).
+- Surfacing the rating anywhere in the app UI (professional profile card,
+  browse-list badge, etc.) — the aggregate endpoint exists
+  (`GET /professionals/:id/rating`); no mobile screen reads it yet.
+- A prompt over the app itself (only WhatsApp prompts today) — a client
+  who never messages the bot has no in-app equivalent nudge to rate.
+
+**Schema:** new `Rating` model (`gigId` unique FK to `Gig`, `raterId`/
+`rateeId` FKs to `User`, `stars` 1-5, optional `comment`) +
+`WhatsAppSession.pendingRatingGigId` (nullable). Migration:
+`20260910180000_ratings`.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

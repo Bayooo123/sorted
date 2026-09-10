@@ -4,6 +4,7 @@ import { IdentityService } from '../identity/identity.service';
 import { IdentityUser } from '../identity/identity.interface';
 import { GigsService } from '../gigs/gigs.service';
 import { EscrowService } from '../escrow/escrow.service';
+import { RatingsService } from '../ratings/ratings.service';
 import { kobo } from '../../common/money';
 import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
 
@@ -29,6 +30,7 @@ export class WhatsappGigConversationService {
     private readonly identity: IdentityService,
     private readonly gigs: GigsService,
     private readonly escrow: EscrowService,
+    private readonly ratings: RatingsService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
 
@@ -58,6 +60,8 @@ export class WhatsappGigConversationService {
         return this.handleConfirmation(user, phone, trimmed, session!);
       case 'awaiting_reassignment':
         return this.handleReassignment(phone, trimmed, session!);
+      case 'awaiting_rating':
+        return this.handleRating(user, phone, trimmed, session!);
       case 'idle':
       default:
         return this.startDraft(phone, trimmed);
@@ -354,6 +358,36 @@ export class WhatsappGigConversationService {
     // second "couldn't reach them" message would just be a duplicate.
   }
 
+  /**
+   * The reply to EscrowService's post-release prompt (PLAN.md "Simple
+   * professional ratings") — `session.pendingRatingGigId` names the
+   * just-paid-out gig. Anything that isn't a clean 1-5 re-asks rather
+   * than guessing; a rating is a real, attributed record, not worth
+   * accepting a fuzzy match on.
+   */
+  private async handleRating(
+    user: IdentityUser,
+    phone: string,
+    reply: string,
+    session: { pendingRatingGigId: string | null },
+  ): Promise<void> {
+    const gigId = session.pendingRatingGigId;
+    if (!gigId) {
+      await this.reset(phone);
+      return;
+    }
+
+    const stars = Number.parseInt(reply, 10);
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5 || reply.trim() !== String(stars)) {
+      await this.whatsapp.sendMessage(phone, 'Just reply with a single number from 1 to 5.');
+      return;
+    }
+
+    await this.ratings.rateGig(gigId, user.id, stars);
+    await this.reset(phone);
+    await this.whatsapp.sendMessage(phone, 'Thanks for the feedback!');
+  }
+
   private async reset(phone: string): Promise<void> {
     await this.prisma.whatsAppSession.update({
       where: { phone },
@@ -366,6 +400,7 @@ export class WhatsappGigConversationService {
         draftInviteeProfessionalId: null,
         draftInviteeName: null,
         reassignGigId: null,
+        pendingRatingGigId: null,
       },
     });
   }
