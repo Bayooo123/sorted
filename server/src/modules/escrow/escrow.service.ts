@@ -130,14 +130,24 @@ export class EscrowService implements EscrowPort {
     if (!alreadyFunded) {
       // Best-effort, outside the transaction (a WhatsApp send failing must
       // never roll back a real funding confirmation) — see PLAN.md
-      // "WhatsApp integration, Phase 3". No-ops for a gig that wasn't
-      // restricted to one professional (the normal open-claim path).
-      await this.sendInvite(gigId).catch((err) => {
-        this.logger.warn(`Invite notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+      // "WhatsApp integration, Phase 3/4". Restricted -> sendInvite (one
+      // named professional); otherwise -> broadcastOpenGig (everyone
+      // matching the category, first YES wins).
+      await this.notifyGigIsOpen(gigId).catch((err) => {
+        this.logger.warn(`Open-gig notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
       });
     }
 
     return this.toView(result);
+  }
+
+  private async notifyGigIsOpen(gigId: string): Promise<void> {
+    const gig = await this.gigs.getGig(gigId);
+    if (gig.restrictedToProfessionalId) {
+      await this.sendInvite(gigId);
+    } else {
+      await this.broadcastOpenGig(gigId);
+    }
   }
 
   /**
@@ -149,14 +159,11 @@ export class EscrowService implements EscrowPort {
    * No-ops (returns true) for a gig that isn't restricted to anyone —
    * the normal open-claim path has nothing to notify.
    *
-   * Tries free-form text first (works if the professional messaged the
-   * bot within the last 24h), falls back to a Meta-approved template
-   * message otherwise (WHATSAPP_INVITE_TEMPLATE_NAME — external, manual
-   * approval required, see .env.example). If BOTH fail — no template
-   * configured/approved, or Meta rejects the send — tells the CLIENT
-   * honestly instead of the invite silently vanishing, via
-   * WhatsAppPort.offerReassignment (same offer a decline triggers).
-   * Returns whether the professional was actually reached.
+   * Returns whether the professional was actually reached — see
+   * sendJobMessage's doc comment for the free-text/template mechanics.
+   * If BOTH fail, tells the CLIENT honestly instead of the invite
+   * silently vanishing, via WhatsAppPort.offerReassignment (same offer a
+   * decline triggers).
    */
   async sendInvite(gigId: string): Promise<boolean> {
     const gig = await this.gigs.getGig(gigId);
@@ -173,22 +180,10 @@ export class EscrowService implements EscrowPort {
 
     const amountNaira = Number(gig.bountyKobo) / 100;
     const bodyText = `You've been invited to a job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nReply YES to accept, or NO to decline.`;
+    const templateParams = [gig.description, gig.locationText, `₦${amountNaira.toLocaleString('en-NG')}`];
 
-    if (await this.whatsapp.isSessionOpen(professional.phone)) {
-      await this.whatsapp.sendMessage(professional.phone, bodyText);
-      return true;
-    }
-
-    const templateName = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_NAME');
-    if (templateName) {
-      const templateLang = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_LANG') || 'en_US';
-      const sent = await this.whatsapp.sendTemplate(professional.phone, templateName, templateLang, [
-        gig.description,
-        gig.locationText,
-        `₦${amountNaira.toLocaleString('en-NG')}`,
-      ]);
-      if (sent) return true;
-    }
+    const sent = await this.sendJobMessage(professional.phone, bodyText, templateParams);
+    if (sent) return true;
 
     const client = await this.identity.getUser(gig.clientId);
     if (client.phone) {
@@ -199,6 +194,82 @@ export class EscrowService implements EscrowPort {
       );
     }
     return false;
+  }
+
+  /**
+   * The other half of "matching professional gets notified" (PLAN.md
+   * "WhatsApp integration, Phase 4") — a gig with no restriction goes to
+   * EVERY professional whose ProfessionalServiceOffering matches its
+   * submarket, not one named person. First to reply YES claims it (real
+   * claim via holdStake — see WhatsappBroadcastService, which owns that
+   * reply and the "sorry, taken" fan-out to everyone else); this method
+   * only sends. No shortlist/cap on how many get notified — v1's
+   * FixedPriceAcceptStrategy is already "first credible claim wins" with
+   * no arbitration beyond the restriction check, so this matches.
+   *
+   * Silent no-op for anyone unreachable (no phone, closed window, no
+   * template) — unlike sendInvite, there's no single point of failure to
+   * report back to the client about: the gig is still visible in the
+   * app's normal browse list (GigsService.listGigs) regardless of who a
+   * WhatsApp broadcast did or didn't reach.
+   */
+  private async broadcastOpenGig(gigId: string): Promise<void> {
+    const gig = await this.gigs.getGig(gigId);
+    if (gig.restrictedToProfessionalId) return; // sendInvite's job, not this method's
+
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: gig.submarket } });
+    if (!submarket) return;
+
+    const offerings = await this.prisma.professionalServiceOffering.findMany({
+      where: { submarketId: submarket.id },
+      select: { userId: true },
+    });
+    if (offerings.length === 0) return;
+
+    const professionals = await this.prisma.user.findMany({
+      where: { id: { in: offerings.map((o) => o.userId) }, phone: { not: null } },
+      select: { phone: true },
+    });
+
+    const amountNaira = Number(gig.bountyKobo) / 100;
+    const bodyText = `New job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nFirst to reply YES gets it.`;
+    const templateParams = [gig.description, gig.locationText, `₦${amountNaira.toLocaleString('en-NG')}`];
+
+    await Promise.all(
+      professionals.map(async ({ phone }) => {
+        if (!phone) return;
+        await this.prisma.whatsAppSession.upsert({
+          where: { phone },
+          create: { phone, pendingBroadcastGigId: gigId },
+          update: { pendingBroadcastGigId: gigId },
+        });
+        await this.sendJobMessage(phone, bodyText, templateParams).catch((err) => {
+          this.logger.warn(`Broadcast send to ${phone} failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+        });
+      }),
+    );
+  }
+
+  /**
+   * Free-form text if the recipient's 24h window is open, else a
+   * Meta-approved template (WHATSAPP_INVITE_TEMPLATE_NAME — external,
+   * manual approval required, see .env.example; the same template covers
+   * both the direct-invite and broadcast wording, deliberately generic:
+   * "New job... reply YES to respond" reads fine either way). Returns
+   * whether the recipient was actually reached, never throws — a
+   * notification failing must never break the funding confirmation or
+   * reassignment flow that called this.
+   */
+  private async sendJobMessage(phone: string, bodyText: string, templateParams: string[]): Promise<boolean> {
+    if (await this.whatsapp.isSessionOpen(phone)) {
+      await this.whatsapp.sendMessage(phone, bodyText);
+      return true;
+    }
+
+    const templateName = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_NAME');
+    if (!templateName) return false;
+    const templateLang = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_LANG') || 'en_US';
+    return this.whatsapp.sendTemplate(phone, templateName, templateLang, templateParams);
   }
 
   async getEscrow(gigId: string): Promise<EscrowRecordView> {

@@ -482,6 +482,14 @@ model WhatsAppSession {
   // so WhatsappModule never needs another module's Prisma types.
   pendingInviteGigId String?
 
+  // WhatsApp integration Phase 4 (PLAN.md) — set on a MATCHING
+  // professional's session when a gig they weren't specifically invited
+  // to (open, unrestricted) was broadcast to them. Distinct from
+  // pendingInviteGigId: many phones can have the same pendingBroadcastGigId
+  // at once (one gig, many candidates), first YES wins, the rest get
+  // cleared and told it's taken — see WhatsappBroadcastService.
+  pendingBroadcastGigId String?
+
   // WhatsApp integration Phase 3.1 (PLAN.md) — set on the CLIENT's own
   // session (conversationState = "awaiting_reassignment") when their
   // invited professional declined or couldn't be reached, offering a new

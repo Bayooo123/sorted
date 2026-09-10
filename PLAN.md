@@ -1404,13 +1404,14 @@ submitted in Meta's WhatsApp Manager (category **UTILITY** — this
 notifies about an existing job, not marketing) and can take anywhere from
 hours to several days for Meta to review, sometimes rejected outright
 requiring a resubmission. Exact body to submit (`server/.env.example` has
-the same copy): *"You've been invited to a job on Sorted: {{1}}. Location:
-{{2}}. Pay: {{3}}. Reply YES to accept or NO to decline."* — 3 variables,
-in that order. Once approved, set `WHATSAPP_INVITE_TEMPLATE_NAME` (the
-name given at submission) and `WHATSAPP_INVITE_TEMPLATE_LANG` (must match
-the submitted language exactly, e.g. `en_US` not `en`) and redeploy.
-Until then, the system behaves exactly as Phase 3 did — honestly degraded,
-not broken.
+the same copy — kept deliberately generic so ONE template covers both
+this and Phase 4's broadcast, rather than needing Meta to approve two):
+*"New job on Sorted: {{1}}. Location: {{2}}. Pay: {{3}}. Reply YES to
+respond."* — 3 variables, in that order. Once approved, set
+`WHATSAPP_INVITE_TEMPLATE_NAME` (the name given at submission) and
+`WHATSAPP_INVITE_TEMPLATE_LANG` (must match the submitted language
+exactly, e.g. `en_US` not `en`) and redeploy. Until then, the system
+behaves exactly as Phase 3 did — honestly degraded, not broken.
 
 **Explicitly still deferred — not this change:**
 - The reassignment offer to the CLIENT is itself sent via `sendMessage`
@@ -1425,6 +1426,76 @@ not broken.
 
 **Schema:** `WhatsAppSession.reassignGigId` (nullable). Migration:
 `20260910160000_whatsapp_reassignment`.
+
+---
+
+## WhatsApp integration, Phase 4 — broadcast open gigs to matching professionals — IMPLEMENTED
+
+**Goal:** the other half of "open it up" that Phase 2 always claimed but
+never actually did. An unrestricted gig going `open` had NO notification
+mechanism at all — professionals could only ever discover it by opening
+the app and browsing. This is the real product-critical gap: without it,
+a WhatsApp-posted "search for someone" job has no path to getting seen by
+anyone, defeating the whole point of that path existing.
+
+**Trigger and audience.** Same hook as the direct invite (`EscrowService.
+confirmFunding`, once — not per retry, guarded by the existing
+`alreadyFunded` idempotency check), now branching on whether the gig is
+restricted: `sendInvite` for one named professional (Phase 3), or the new
+`broadcastOpenGig` for everyone else. Audience is every `User` with a
+`ProfessionalServiceOffering` row matching the gig's submarket — the same
+taxonomy pick made at role-profile completion, no separate "job alert
+preferences" concept invented for this. No cap or shortlist: v1's
+`FixedPriceAcceptStrategy` is already "first credible claim wins" with no
+arbitration beyond the restriction check (Phase 3), so notifying everyone
+who matches and letting the DB-level compare-and-swap in `GigsService.
+transitionStatus` settle the race is consistent with that, not a new
+policy.
+
+**The race is resolved by real DB logic already in place, not new
+locking.** Many professionals can get `pendingBroadcastGigId` set to the
+same gig. Whoever's `YES` reply reaches `EscrowService.holdStake` first
+wins for real (`Gig.status`'s compare-and-swap already throws
+`ConflictException` on a second concurrent claim — see `transitionStatus`'s
+own doc comment). `WhatsappBroadcastService` (new, parallel to
+`WhatsappInviteService` but genuinely different shape: one gig, many
+candidates, not one) just needs to: try the claim, and on success fan out
+"someone else got it" to everyone else who had that `pendingBroadcastGigId`
+set, clearing their pending state so a late `YES` doesn't attempt (and
+fail) a claim for nothing.
+
+**Reuses Phase 3.1's free-text/template fallback wholesale.** Extracted
+the shared bit (`EscrowService.sendInvite`'s isSessionOpen → sendMessage →
+sendTemplate branching) into a private `sendJobMessage` helper, called
+from both `sendInvite` and `broadcastOpenGig` — one template
+(`WHATSAPP_INVITE_TEMPLATE_NAME`) covers both, worded generically enough
+("New job... reply YES to respond") to read naturally either way, rather
+than asking the founder to get a second template approved.
+
+**No client-facing failure handling for broadcast, unlike direct-invite
+— deliberately.** `sendInvite` tells the client via `offerReassignment`
+when its one target is unreachable, because that's a single point of
+failure worth surfacing. A broadcast has no single point of failure to
+report: some professionals reached, some not, and the gig is still fully
+visible in the app's normal browse list regardless (`GigsService.
+listGigs` — unaffected by this change for an unrestricted gig). Silently
+skipping an unreachable candidate and moving on to the next is the right
+behavior here, not a shortcut.
+
+**Explicitly deferred — not this change:**
+- Any shortlist/radius/rating-based targeting — every matching
+  professional gets notified regardless of proximity, track record, or
+  how many jobs they already have in progress. Fine at pilot scale;
+  revisit once professional volume in one category is large enough that
+  "notify everyone" becomes noisy rather than useful.
+- A cap on how many professionals get messaged per broadcast, or any
+  batching/rate-limiting of the sends — `Promise.all` over however many
+  match. Not a concern yet at Yaba-pilot scale.
+- Telling a losing professional WHY they lost (how fast the winner
+  replied, etc.) — just "claimed by someone else."
+
+**Schema:** `WhatsAppSession.pendingBroadcastGigId` (nullable). Migration:
+`20260910170000_whatsapp_broadcast`.
 
 ---
 

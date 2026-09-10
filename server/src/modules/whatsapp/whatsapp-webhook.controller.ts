@@ -8,6 +8,7 @@ import { IdentityService } from '../identity/identity.service';
 import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
 import { WhatsappGigConversationService } from './whatsapp-gig-conversation.service';
 import { WhatsappInviteService } from './whatsapp-invite.service';
+import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
 
 interface RequestWithRawBody extends Request {
   rawBody?: Buffer;
@@ -32,6 +33,7 @@ export class WhatsappWebhookController {
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
     private readonly gigConversation: WhatsappGigConversationService,
     private readonly invites: WhatsappInviteService,
+    private readonly broadcasts: WhatsappBroadcastService,
   ) {}
 
   /**
@@ -143,13 +145,17 @@ export class WhatsappWebhookController {
   }
 
   /**
-   * Unregistered sender -> the signup link (Phase 1). Registered sender with
-   * a pending direct-invite reply due -> WhatsappInviteService (Phase 3),
-   * checked BEFORE the gig-posting conversation since a person can be mid-
-   * way through posting their own gig (client) while also having an unread
-   * invite (professional) — the invite is short-lived and blocks their own
-   * flow until resolved, rather than the two interleaving. Otherwise ->
-   * the guided gig-posting conversation (Phase 2). See PLAN.md "WhatsApp
+   * Unregistered sender -> the signup link (Phase 1). Registered sender
+   * with something pending due -> resolve that first, checked BEFORE the
+   * gig-posting conversation since a person can be mid-way through
+   * posting their own gig (client) while also having a reply due
+   * (professional) — a pending reply is short-lived and blocks their own
+   * flow until resolved, rather than the two interleaving. Priority order
+   * for what "pending" means: a direct invite (Phase 3, one named
+   * professional) before a broadcast candidacy (Phase 4, many
+   * professionals racing for one gig) — a personal invite is the more
+   * specific ask if someone is somehow both. Otherwise -> the guided
+   * gig-posting conversation (Phase 2/3.1). See PLAN.md "WhatsApp
    * integration" for what's still deferred past this.
    */
   private async handleText(phone: string, text: string): Promise<void> {
@@ -167,6 +173,10 @@ export class WhatsappWebhookController {
     const session = await this.prisma.whatsAppSession.findUnique({ where: { phone } });
     if (session?.pendingInviteGigId) {
       await this.invites.handleReply(user, phone, text, session.pendingInviteGigId);
+      return;
+    }
+    if (session?.pendingBroadcastGigId) {
+      await this.broadcasts.handleReply(user, phone, text, session.pendingBroadcastGigId);
       return;
     }
 
