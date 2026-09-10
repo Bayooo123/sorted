@@ -57,6 +57,7 @@ model User {
   createdAt           DateTime @default(now())
 
   gigsAsClient     Gig[]      @relation("ClientGigs")
+  gigsInvitedTo    Gig[]      @relation("GigRestrictedTo")
   claims          Claim[]
   disputesRaised  Dispute[]  @relation("DisputeRaisedBy")
   disputesRuled   Dispute[]  @relation("DisputeNeutral")
@@ -271,6 +272,14 @@ model Gig {
   materialsMode MaterialsMode
   bountyKobo    BigInt // ★ money — integer kobo, never float
 
+  // WhatsApp "invite someone I already know" (PLAN.md "WhatsApp
+  // integration, Phase 3") — set only when the client named a specific
+  // professional instead of opening the gig to anyone matching the
+  // category. Enforced in FixedPriceAcceptStrategy.assignProfessional,
+  // not here: null/unset preserves the normal open-claim path untouched.
+  restrictedToProfessionalId String?
+  restrictedToProfessional   User?   @relation("GigRestrictedTo", fields: [restrictedToProfessionalId], references: [id])
+
   status           GigStatus @default(draft)
   matchingStrategy String    @default("fixed_price_accept") // SEAM (§3.3): key into MatchingStrategy registry
 
@@ -460,4 +469,16 @@ model WhatsAppSession {
   draftSubmarketId  String?
   draftLocationText String?
   draftBountyKobo   BigInt?
+  // "Invite someone I know" branch of the same draft (Phase 3) — set only
+  // when the client picked a specific professional instead of open search.
+  draftInviteeProfessionalId String?
+  draftInviteeName           String?
+
+  // WhatsApp integration Phase 3 (PLAN.md) — set when this phone (a
+  // professional) has been sent a direct job invite awaiting their
+  // YES/NO reply. Plain string, not a Prisma relation to Gig — same
+  // reasoning as this model having no FK to User (see the doc comment
+  // above): WhatsAppSession stays a leaf table with no relations out,
+  // so WhatsappModule never needs another module's Prisma types.
+  pendingInviteGigId String?
 }

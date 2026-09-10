@@ -3,9 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { waitUntil } from '@vercel/functions';
 import * as crypto from 'crypto';
 import type { Request, Response } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
 import { WhatsappGigConversationService } from './whatsapp-gig-conversation.service';
+import { WhatsappInviteService } from './whatsapp-invite.service';
 
 interface RequestWithRawBody extends Request {
   rawBody?: Buffer;
@@ -25,9 +27,11 @@ export class WhatsappWebhookController {
 
   constructor(
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
     private readonly gigConversation: WhatsappGigConversationService,
+    private readonly invites: WhatsappInviteService,
   ) {}
 
   /**
@@ -139,11 +143,14 @@ export class WhatsappWebhookController {
   }
 
   /**
-   * Unregistered sender -> the signup link (Phase 1). Registered sender ->
-   * the guided gig-posting conversation (Phase 2, WhatsappGigConversationService)
-   * — see PLAN.md "WhatsApp integration" for what's still deferred past this
-   * (professional-side matching/broadcast over WhatsApp, outbound template
-   * messages for >24h notifications).
+   * Unregistered sender -> the signup link (Phase 1). Registered sender with
+   * a pending direct-invite reply due -> WhatsappInviteService (Phase 3),
+   * checked BEFORE the gig-posting conversation since a person can be mid-
+   * way through posting their own gig (client) while also having an unread
+   * invite (professional) — the invite is short-lived and blocks their own
+   * flow until resolved, rather than the two interleaving. Otherwise ->
+   * the guided gig-posting conversation (Phase 2). See PLAN.md "WhatsApp
+   * integration" for what's still deferred past this.
    */
   private async handleText(phone: string, text: string): Promise<void> {
     const user = await this.identity.findUserByPhone(phone);
@@ -154,6 +161,12 @@ export class WhatsappWebhookController {
         'Welcome to Sorted — every job you complete here builds a track record that unlocks more customers, funding, and business support over time. ' +
           'Sign up to get started: https://sorted.com.ng',
       );
+      return;
+    }
+
+    const session = await this.prisma.whatsAppSession.findUnique({ where: { phone } });
+    if (session?.pendingInviteGigId) {
+      await this.invites.handleReply(user, phone, text, session.pendingInviteGigId);
       return;
     }
 

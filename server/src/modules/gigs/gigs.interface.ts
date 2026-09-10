@@ -46,6 +46,8 @@ export interface CreateGigInput {
   criteria: string[];
   /** SEAM (§3.2, RECURRENCE): nullable — v1 always null. */
   templateId?: string;
+  /** WhatsApp "invite someone I already know" (PLAN.md Phase 3) — unset means open to any matching professional, as before. */
+  restrictedToProfessionalId?: string;
 }
 
 export interface GigCriterionView {
@@ -68,6 +70,7 @@ export interface GigRecord {
   bountyKobo: Kobo;
   matchingStrategy: string;
   criteria: GigCriterionView[];
+  restrictedToProfessionalId: string | null;
   createdAt: Date;
   publishedAt: Date | null;
   /** Set by submitForReview — whole-gig proof (v1 simplification, see PLAN.md "Release + sign-off flow"). */

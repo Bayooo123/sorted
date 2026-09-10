@@ -1261,6 +1261,91 @@ crash.
 
 ---
 
+## WhatsApp integration, Phase 3 — invite a known professional — IMPLEMENTED
+
+**Goal:** the other half of the original brief — *"select someone you
+already know, tell him the exact work you need done"* — as an alternative
+to Phase 2's open-search posting. Phase 2's price step now asks one more
+question: invite someone specific, or open it to any matching
+professional. Choosing "invite" asks for that person's WhatsApp number,
+looks them up (`IdentityPort.findUserByPhone`, reused from Phase 1),
+confirms they're a registered professional, then folds their id into the
+same create-gig-and-fund flow Phase 2 already has.
+
+**A real gap in the matching layer, not a WhatsApp-only feature.**
+Nothing in Gigs/Matching/Escrow had any concept of "this gig is for one
+named professional" — `holdStake` was genuinely first-come-first-served,
+no restriction hook anywhere. Added `Gig.restrictedToProfessionalId`
+(nullable FK to `User`, null preserves the existing open-claim path
+exactly) and one real check in `FixedPriceAcceptStrategy.
+assignProfessional` — the seam that already existed specifically so a
+strategy could reject a claim (its own doc comment: "kept as a real call
+... so a reverse-auction/shortlist strategy can replace just this class
+later"). `GigForPricing` carries the restriction through; `EscrowService.
+holdStake` was the one caller to update.
+
+**Why the invite isn't sent until funding is confirmed, not at post
+time.** A gig only becomes claimable once its `EscrowRecord` reaches
+`funded` (`EscrowService.confirmFunding` — the ONE method both the
+Paystack webhook and the manual-pilot admin `confirm-funding` route funnel
+through, so hooking it there covers both funding paths for free). Messaging
+the invited professional any earlier would let them reply YES to a job
+that `holdStake` would then reject (`gig.status !== 'open'`) — a worse
+experience than a short wait. `confirmFunding` now tracks whether its own
+state-guard actually fired (not an idempotent re-call) and, only then,
+best-effort-notifies the invited professional — same "never fail the real
+action over a notification" pattern as the welcome WhatsApp message.
+
+**New module edge, no new cycle:** `EscrowModule` now imports
+`WhatsappModule` (lean — zero imports of its own, so `Escrow -> Whatsapp`
+is a dead end, same reasoning already used for `Notifications -> Whatsapp`
+and `WhatsappWebhookModule -> Escrow`). Verified the same way as Phases 1
+and 2: a real `ts-node src/main.ts` boot.
+
+**The professional's accept/decline lives in a new, separate
+`WhatsappInviteService`, not folded into the client's gig-posting
+conversation** — different person, different conversation. Tracked via
+`WhatsAppSession.pendingInviteGigId` (plain string, no Prisma relation to
+`Gig` — same "stay a leaf table" reasoning this model already uses for
+having no FK to `User`). `WhatsappWebhookController.handleText` checks
+this before routing into `WhatsappGigConversationService`, so a pending
+invite reply always takes priority over that phone's own in-progress gig
+draft, rather than the two interleaving.
+
+- **Accept** (`YES`) calls `EscrowService.holdStake` directly (the exact
+  same claim path the app's claim button uses) — a real claim, not a
+  WhatsApp-only shortcut. On success, tells the professional and
+  best-effort-notifies the client. On failure (job already taken,
+  cancelled, etc.) tells the professional plainly rather than retrying
+  silently.
+- **Decline** (`NO`) clears the pending invite and best-effort-notifies
+  the client that this professional couldn't take it — and stops there.
+  It does NOT offer to reopen the gig to search or re-invite someone else
+  over WhatsApp; `restrictedToProfessionalId` has no "clear/reassign" path
+  anywhere yet (not in this change, not in the app), so the reply
+  deliberately doesn't promise a next step that doesn't exist. See
+  "Explicitly deferred" below.
+
+**Explicitly deferred — not this change:**
+- Reassigning or reopening a declined/expired direct-invite gig — today a
+  decline just leaves the gig funded and unclaimed; a founder would have
+  to intervene manually (refund, or a direct DB fix) until this exists.
+- The 24h WhatsApp session-window limitation (Phase 1) applies here too,
+  unmitigated: if the invited professional hasn't messaged the bot
+  recently, the invite silently fails to deliver (logged server-side,
+  same best-effort pattern as everywhere else) — no fallback SMS/email/
+  outbound-template path exists yet.
+- Any UI (app/web) for `restrictedToProfessionalId` — it's entirely a
+  WhatsApp-only capability today; a gig created this way looks the same
+  as any other in the app aside from being unclaimable by anyone else.
+
+**Schema:** `Gig.restrictedToProfessionalId` (nullable FK to `User`) +
+three fields on `WhatsAppSession` (`draftInviteeProfessionalId`,
+`draftInviteeName`, `pendingInviteGigId`). Migration:
+`20260910150000_gig_direct_invite`.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

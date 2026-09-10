@@ -5,6 +5,7 @@ import { EscrowModule } from '../escrow/escrow.module';
 import { WhatsappModule } from './whatsapp.module';
 import { WhatsappWebhookController } from './whatsapp-webhook.controller';
 import { WhatsappGigConversationService } from './whatsapp-gig-conversation.service';
+import { WhatsappInviteService } from './whatsapp-invite.service';
 
 /**
  * Separate from WhatsappModule on purpose — see whatsapp.interface.ts's
@@ -18,6 +19,6 @@ import { WhatsappGigConversationService } from './whatsapp-gig-conversation.serv
 @Module({
   imports: [IdentityModule, WhatsappModule, GigsModule, EscrowModule],
   controllers: [WhatsappWebhookController],
-  providers: [WhatsappGigConversationService],
+  providers: [WhatsappGigConversationService, WhatsappInviteService],
 })
 export class WhatsappWebhookModule {}

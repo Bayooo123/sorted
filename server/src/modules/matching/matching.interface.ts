@@ -15,6 +15,8 @@ export interface GigForPricing {
   bountyKobo: Kobo;
   domain: string;
   submarket: string;
+  /** WhatsApp "invite someone I already know" (PLAN.md Phase 3) — set means only this professional may be assigned. */
+  restrictedToProfessionalId?: string | null;
 }
 
 export interface ClaimAttempt {

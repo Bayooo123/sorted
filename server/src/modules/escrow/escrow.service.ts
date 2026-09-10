@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, NotImplementedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, NotImplementedException } from '@nestjs/common';
 import { EscrowRecord } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interface';
@@ -9,6 +9,7 @@ import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interf
 import { ConfigService } from '@nestjs/config';
 import { Kobo, applyBps, kobo } from '../../common/money';
 import { PrismaTx } from '../../common/prisma-tx';
+import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
 import { EscrowPort, EscrowRecordView, EscrowState } from './escrow.interface';
 
 /**
@@ -32,6 +33,8 @@ import { EscrowPort, EscrowRecordView, EscrowState } from './escrow.interface';
  */
 @Injectable()
 export class EscrowService implements EscrowPort {
+  private readonly logger = new Logger(EscrowService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -40,6 +43,7 @@ export class EscrowService implements EscrowPort {
     @Inject(PAYMENTS_PROVIDER) private readonly payments: PaymentsProvider,
     @Inject(LEDGER_PORT) private readonly ledger: LedgerPort,
     @Inject(MATCHING_STRATEGY) private readonly matching: MatchingStrategy,
+    @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
 
   async fundGig(gigId: string): Promise<EscrowRecordView> {
@@ -86,14 +90,18 @@ export class EscrowService implements EscrowPort {
   }
 
   async confirmFunding(gigId: string, providerRef: string): Promise<EscrowRecordView> {
+    let alreadyFunded = false;
+
     const result = await this.prisma.$transaction(async (tx) => {
       const record = await tx.escrowRecord.findUnique({ where: { gigId } });
       if (!record) throw new NotFoundException('No escrow record for this gig — call fundGig first');
 
       // Idempotent: confirming an already-funded gig just returns its
       // current state rather than erroring — an admin double-clicking
-      // "confirm" shouldn't be able to break anything.
+      // "confirm" shouldn't be able to break anything. Also means the
+      // invite notification below never double-sends on a retry.
       if (record.state !== 'awaiting_funding') {
+        alreadyFunded = true;
         return record;
       }
 
@@ -119,7 +127,37 @@ export class EscrowService implements EscrowPort {
       return updated;
     });
 
+    if (!alreadyFunded) {
+      // Best-effort, outside the transaction (a WhatsApp send failing must
+      // never roll back a real funding confirmation) — see PLAN.md
+      // "WhatsApp integration, Phase 3". No-ops for a gig that wasn't
+      // restricted to one professional (the normal open-claim path).
+      await this.notifyInvitedProfessional(gigId).catch((err) => {
+        this.logger.warn(`Invite notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+      });
+    }
+
     return this.toView(result);
+  }
+
+  private async notifyInvitedProfessional(gigId: string): Promise<void> {
+    const gig = await this.gigs.getGig(gigId);
+    if (!gig.restrictedToProfessionalId) return;
+
+    const professional = await this.identity.getUser(gig.restrictedToProfessionalId);
+    if (!professional.phone) return;
+
+    await this.prisma.whatsAppSession.upsert({
+      where: { phone: professional.phone },
+      create: { phone: professional.phone, pendingInviteGigId: gigId },
+      update: { pendingInviteGigId: gigId },
+    });
+
+    const amountNaira = Number(gig.bountyKobo) / 100;
+    await this.whatsapp.sendMessage(
+      professional.phone,
+      `You've been invited to a job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nReply YES to accept, or NO to decline.`,
+    );
   }
 
   async getEscrow(gigId: string): Promise<EscrowRecordView> {
@@ -140,7 +178,13 @@ export class EscrowService implements EscrowPort {
     // strategy that genuinely needs to reject a claim (shortlist full,
     // professional not eligible) can throw before anything is written.
     await this.matching.assignProfessional(
-      { id: gig.id, bountyKobo: gig.bountyKobo, domain: gig.domain, submarket: gig.submarket },
+      {
+        id: gig.id,
+        bountyKobo: gig.bountyKobo,
+        domain: gig.domain,
+        submarket: gig.submarket,
+        restrictedToProfessionalId: gig.restrictedToProfessionalId,
+      },
       { gigId, professionalId, staked: false },
     );
 

@@ -50,6 +50,10 @@ export class WhatsappGigConversationService {
         return this.handleLocation(phone, trimmed);
       case 'awaiting_price':
         return this.handlePrice(phone, trimmed);
+      case 'awaiting_assignment_mode':
+        return this.handleAssignmentMode(phone, trimmed, session!);
+      case 'awaiting_invitee_phone':
+        return this.handleInviteePhone(phone, trimmed, session!);
       case 'awaiting_confirmation':
         return this.handleConfirmation(user, phone, trimmed, session!);
       case 'idle':
@@ -73,6 +77,8 @@ export class WhatsappGigConversationService {
         draftSubmarketId: null,
         draftLocationText: null,
         draftBountyKobo: null,
+        draftInviteeProfessionalId: null,
+        draftInviteeName: null,
       },
     });
 
@@ -116,18 +122,98 @@ export class WhatsappGigConversationService {
       return;
     }
 
-    const session = await this.prisma.whatsAppSession.update({
+    await this.prisma.whatsAppSession.update({
       where: { phone },
-      data: { conversationState: 'awaiting_confirmation', draftBountyKobo: BigInt(Math.round(amountNaira * 100)) },
+      data: { conversationState: 'awaiting_assignment_mode', draftBountyKobo: BigInt(Math.round(amountNaira * 100)) },
     });
 
-    const submarket = await this.prisma.submarket.findUniqueOrThrow({ where: { id: session.draftSubmarketId! } });
+    await this.whatsapp.sendMessage(
+      phone,
+      'One more thing — do you already have someone in mind for this, or should I open it up to any professional in that category?\n\n1. Invite someone I know\n2. Open it up (search)\n\nReply with the number.',
+    );
+  }
+
+  private async handleAssignmentMode(
+    phone: string,
+    reply: string,
+    session: { draftSubmarketId: string | null },
+  ): Promise<void> {
+    if (/^(1|invite|someone|know)$/i.test(reply)) {
+      await this.prisma.whatsAppSession.update({
+        where: { phone },
+        data: { conversationState: 'awaiting_invitee_phone' },
+      });
+      await this.whatsapp.sendMessage(phone, "What's their WhatsApp number? (e.g. 08031234567)");
+      return;
+    }
+
+    if (/^(2|open|search|anyone)$/i.test(reply)) {
+      await this.prisma.whatsAppSession.update({
+        where: { phone },
+        data: { conversationState: 'awaiting_confirmation', draftInviteeProfessionalId: null, draftInviteeName: null },
+      });
+      await this.sendRecap(phone, session.draftSubmarketId!);
+      return;
+    }
+
+    await this.whatsapp.sendMessage(phone, 'Reply 1 to invite someone you know, or 2 to open the job up to any professional.');
+  }
+
+  private async handleInviteePhone(
+    phone: string,
+    reply: string,
+    session: { draftSubmarketId: string | null },
+  ): Promise<void> {
+    if (/^(2|open|search|anyone)$/i.test(reply)) {
+      await this.prisma.whatsAppSession.update({
+        where: { phone },
+        data: { conversationState: 'awaiting_confirmation', draftInviteeProfessionalId: null, draftInviteeName: null },
+      });
+      await this.sendRecap(phone, session.draftSubmarketId!);
+      return;
+    }
+
+    const invitee = await this.identity.findUserByPhone(reply);
+    if (!invitee) {
+      await this.whatsapp.sendMessage(
+        phone,
+        "I couldn't find a Sorted account with that number. They'll need to sign up first (https://sorted.com.ng) — or reply \"search\" to open this job to any matching professional instead.",
+      );
+      return;
+    }
+    if (!invitee.roles.includes('professional')) {
+      await this.whatsapp.sendMessage(
+        phone,
+        "That number's on Sorted but not set up as a professional yet — try another number, or reply \"search\" to open this job to any matching professional instead.",
+      );
+      return;
+    }
+
+    await this.prisma.whatsAppSession.update({
+      where: { phone },
+      data: {
+        conversationState: 'awaiting_confirmation',
+        draftInviteeProfessionalId: invitee.id,
+        draftInviteeName: invitee.name,
+      },
+    });
+    await this.sendRecap(phone, session.draftSubmarketId!, invitee.name);
+  }
+
+  private async sendRecap(phone: string, submarketId: string, inviteeName?: string | null): Promise<void> {
+    const session = await this.prisma.whatsAppSession.findUniqueOrThrow({ where: { phone } });
+    const submarket = await this.prisma.submarket.findUniqueOrThrow({ where: { id: submarketId } });
+    const amountNaira = Number(session.draftBountyKobo) / 100;
+
+    const assignmentLine = inviteeName ? `👤 Sent directly to ${inviteeName} to accept or decline` : `🔍 Open to any matching professional`;
+
     const summary =
       `Here's the job:\n\n` +
       `📝 ${session.draftDescription}\n` +
       `🏷️ ${submarket.label}\n` +
       `📍 ${session.draftLocationText}\n` +
-      `💰 You pay: ₦${amountNaira.toLocaleString('en-NG')}\n\n` +
+      `💰 You pay: ₦${amountNaira.toLocaleString('en-NG')}\n` +
+      `${assignmentLine}\n\n` +
       `Reply YES to post it, or CANCEL to start over.`;
     await this.whatsapp.sendMessage(phone, summary);
   }
@@ -136,14 +222,20 @@ export class WhatsappGigConversationService {
     user: IdentityUser,
     phone: string,
     reply: string,
-    session: { draftDescription: string | null; draftSubmarketId: string | null; draftLocationText: string | null; draftBountyKobo: bigint | null },
+    session: {
+      draftDescription: string | null;
+      draftSubmarketId: string | null;
+      draftLocationText: string | null;
+      draftBountyKobo: bigint | null;
+      draftInviteeProfessionalId: string | null;
+    },
   ): Promise<void> {
     if (!/^(yes|y|confirm|post it)$/i.test(reply)) {
       await this.whatsapp.sendMessage(phone, 'Reply YES to post this job, or CANCEL to start over.');
       return;
     }
 
-    const { draftDescription, draftSubmarketId, draftLocationText, draftBountyKobo } = session;
+    const { draftDescription, draftSubmarketId, draftLocationText, draftBountyKobo, draftInviteeProfessionalId } = session;
     if (!draftDescription || !draftSubmarketId || !draftLocationText || !draftBountyKobo) {
       // Shouldn't happen (all four are set before reaching awaiting_confirmation) — recover rather than crash mid-conversation.
       await this.reset(phone);
@@ -180,6 +272,7 @@ export class WhatsappGigConversationService {
       materialsMode: 'bounty_covers',
       bountyKobo: kobo(Number(draftBountyKobo)),
       criteria: [draftDescription],
+      restrictedToProfessionalId: draftInviteeProfessionalId ?? undefined,
     });
     await this.gigs.publishGig(gig.id);
     const escrowRecord = await this.escrow.fundGig(gig.id);
@@ -187,16 +280,19 @@ export class WhatsappGigConversationService {
     await this.reset(phone);
 
     const amountNaira = Number(draftBountyKobo) / 100;
+    // The invited professional (if any) is only messaged once EscrowService
+    // confirms funding — see EscrowService.notifyInvitedProfessional — so
+    // there's nothing more to tell the client here about that leg yet.
     if (escrowRecord.holdingAccount?.checkoutUrl) {
       await this.whatsapp.sendMessage(
         phone,
-        `Job posted! To make it live for professionals, pay ₦${amountNaira.toLocaleString('en-NG')} here:\n${escrowRecord.holdingAccount.checkoutUrl}\n\nOnce payment is confirmed, your job goes live.`,
+        `Job posted! To make it live, pay ₦${amountNaira.toLocaleString('en-NG')} here:\n${escrowRecord.holdingAccount.checkoutUrl}\n\nOnce payment is confirmed, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
       );
     } else {
       const { accountNumber, bankName } = escrowRecord.holdingAccount ?? {};
       await this.whatsapp.sendMessage(
         phone,
-        `Job posted! To make it live, transfer ₦${amountNaira.toLocaleString('en-NG')} to:\n${bankName ?? 'Sorted'} — ${accountNumber ?? '(see sorted.com.ng)'}\n\nOnce we confirm receipt, your job goes live.`,
+        `Job posted! To make it live, transfer ₦${amountNaira.toLocaleString('en-NG')} to:\n${bankName ?? 'Sorted'} — ${accountNumber ?? '(see sorted.com.ng)'}\n\nOnce we confirm receipt, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
       );
     }
   }
@@ -210,6 +306,8 @@ export class WhatsappGigConversationService {
         draftSubmarketId: null,
         draftLocationText: null,
         draftBountyKobo: null,
+        draftInviteeProfessionalId: null,
+        draftInviteeName: null,
       },
     });
   }

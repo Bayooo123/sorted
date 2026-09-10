@@ -96,6 +96,7 @@ export class GigsService implements GigsPort {
         locationGeoLng: input.locationGeo?.lng,
         materialsMode: input.materialsMode,
         bountyKobo: BigInt(pricing.finalPriceKobo),
+        restrictedToProfessionalId: input.restrictedToProfessionalId ?? null,
         status: 'draft',
         matchingStrategy: this.matchingStrategy.name,
         criteria: {
@@ -252,6 +253,7 @@ export class GigsService implements GigsPort {
       bountyKobo: kobo(Number(gig.bountyKobo)),
       matchingStrategy: gig.matchingStrategy,
       criteria: gig.criteria.map((c) => ({ text: c.text, locked: c.locked })),
+      restrictedToProfessionalId: gig.restrictedToProfessionalId,
       createdAt: gig.createdAt,
       publishedAt: gig.publishedAt,
       submissionProofBase64: gig.submissionProofBase64,

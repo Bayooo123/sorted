@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
   AssignmentResult,
   ClaimAttempt,
@@ -24,12 +24,17 @@ export class FixedPriceAcceptStrategy implements MatchingStrategy {
   }
 
   // v1: first credible professional to claim gets it — no shortlist, no
-  // competing offers. EscrowService.holdStake is the only caller and has
-  // already checked the gig is still 'open' before this runs, so there's
-  // nothing left for this strategy to arbitrate; kept as a real call
-  // (not inlined into EscrowService) so a reverse-auction/shortlist
-  // strategy can replace just this class later — see matching.interface.ts.
+  // competing offers — UNLESS the gig was restricted to one named
+  // professional (WhatsApp "invite someone I already know", PLAN.md
+  // Phase 3), the one real arbitration this strategy does today.
+  // EscrowService.holdStake is the only caller and has already checked
+  // the gig is still 'open' before this runs; kept as a real call (not
+  // inlined into EscrowService) so a reverse-auction/shortlist strategy
+  // can replace just this class later — see matching.interface.ts.
   assignProfessional(gig: GigForPricing, claim: ClaimAttempt): Promise<AssignmentResult> {
+    if (gig.restrictedToProfessionalId && gig.restrictedToProfessionalId !== claim.professionalId) {
+      throw new ForbiddenException('This job was sent to a specific professional and cannot be claimed by anyone else');
+    }
     return Promise.resolve({ gigId: gig.id, professionalId: claim.professionalId });
   }
 }
