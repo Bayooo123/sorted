@@ -88,7 +88,7 @@ export class WhatsappInviteService {
     const client = await this.identity.getUser(gig.clientId);
     if (client.phone) {
       const firstName = user.name?.trim().split(/\s+/)[0] ?? 'The professional you invited';
-      await this.whatsapp.sendMessage(client.phone, `${firstName} wasn't able to take this job.`);
+      await this.whatsapp.offerReassignment(client.phone, gigId, `${firstName} wasn't able to take this job.`);
     }
   }
 

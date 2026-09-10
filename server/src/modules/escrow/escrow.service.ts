@@ -132,7 +132,7 @@ export class EscrowService implements EscrowPort {
       // never roll back a real funding confirmation) — see PLAN.md
       // "WhatsApp integration, Phase 3". No-ops for a gig that wasn't
       // restricted to one professional (the normal open-claim path).
-      await this.notifyInvitedProfessional(gigId).catch((err) => {
+      await this.sendInvite(gigId).catch((err) => {
         this.logger.warn(`Invite notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
       });
     }
@@ -140,12 +140,30 @@ export class EscrowService implements EscrowPort {
     return this.toView(result);
   }
 
-  private async notifyInvitedProfessional(gigId: string): Promise<void> {
+  /**
+   * Sends (or re-sends, for a reassignment — PLAN.md "WhatsApp
+   * integration, Phase 3.1") the direct-invite message to whoever a gig
+   * is currently restricted to. Public and idempotent-safe to call again
+   * — used both from confirmFunding above and from
+   * WhatsappGigConversationService's reassignment flow after a decline.
+   * No-ops (returns true) for a gig that isn't restricted to anyone —
+   * the normal open-claim path has nothing to notify.
+   *
+   * Tries free-form text first (works if the professional messaged the
+   * bot within the last 24h), falls back to a Meta-approved template
+   * message otherwise (WHATSAPP_INVITE_TEMPLATE_NAME — external, manual
+   * approval required, see .env.example). If BOTH fail — no template
+   * configured/approved, or Meta rejects the send — tells the CLIENT
+   * honestly instead of the invite silently vanishing, via
+   * WhatsAppPort.offerReassignment (same offer a decline triggers).
+   * Returns whether the professional was actually reached.
+   */
+  async sendInvite(gigId: string): Promise<boolean> {
     const gig = await this.gigs.getGig(gigId);
-    if (!gig.restrictedToProfessionalId) return;
+    if (!gig.restrictedToProfessionalId) return true;
 
     const professional = await this.identity.getUser(gig.restrictedToProfessionalId);
-    if (!professional.phone) return;
+    if (!professional.phone) return true; // nothing reachable to invite — not this method's problem to solve
 
     await this.prisma.whatsAppSession.upsert({
       where: { phone: professional.phone },
@@ -154,10 +172,33 @@ export class EscrowService implements EscrowPort {
     });
 
     const amountNaira = Number(gig.bountyKobo) / 100;
-    await this.whatsapp.sendMessage(
-      professional.phone,
-      `You've been invited to a job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nReply YES to accept, or NO to decline.`,
-    );
+    const bodyText = `You've been invited to a job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nReply YES to accept, or NO to decline.`;
+
+    if (await this.whatsapp.isSessionOpen(professional.phone)) {
+      await this.whatsapp.sendMessage(professional.phone, bodyText);
+      return true;
+    }
+
+    const templateName = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_NAME');
+    if (templateName) {
+      const templateLang = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_LANG') || 'en_US';
+      const sent = await this.whatsapp.sendTemplate(professional.phone, templateName, templateLang, [
+        gig.description,
+        gig.locationText,
+        `₦${amountNaira.toLocaleString('en-NG')}`,
+      ]);
+      if (sent) return true;
+    }
+
+    const client = await this.identity.getUser(gig.clientId);
+    if (client.phone) {
+      await this.whatsapp.offerReassignment(
+        client.phone,
+        gigId,
+        "We couldn't reach the professional you invited over WhatsApp — they haven't messaged Sorted recently, and no backup template is set up yet.",
+      );
+    }
+    return false;
   }
 
   async getEscrow(gigId: string): Promise<EscrowRecordView> {

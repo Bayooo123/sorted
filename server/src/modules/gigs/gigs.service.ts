@@ -136,6 +136,24 @@ export class GigsService implements GigsPort {
     return this.toGigRecord(gig);
   }
 
+  /**
+   * WhatsApp "invite someone I already know" reassignment (PLAN.md Phase
+   * 3.1) — swap or clear who a gig is restricted to, independent of
+   * status (a claimable 'open' gig stays 'open' either way; this is not a
+   * status transition, just who's allowed to claim it). Not on GigsPort —
+   * narrow enough, and specific enough to this one WhatsApp flow, that the
+   * concrete class is injected directly, same as elsewhere in this
+   * codebase (EscrowService takes GigsService, not GigsPort).
+   */
+  async setRestrictedProfessional(gigId: string, professionalId: string | null): Promise<GigRecord> {
+    const updated = await this.prisma.gig.update({
+      where: { id: gigId },
+      data: { restrictedToProfessionalId: professionalId },
+      include: GIG_INCLUDE,
+    });
+    return this.toGigRecord(updated);
+  }
+
   async transitionStatus(gigId: string, to: GigStatus, tx?: PrismaTx): Promise<GigRecord> {
     const client = tx ?? this.prisma;
     const gig = await client.gig.findUnique({ where: { id: gigId } });
@@ -167,6 +185,11 @@ export class GigsService implements GigsPort {
    * clientId unset -> public browse: draft is always excluded, regardless
    * of what `filter.status` asks for — an unpublished gig's title/
    * description/bounty isn't meant to be visible to anyone but its owner.
+   * Also excludes anything restricted to one professional (PLAN.md Phase
+   * 3) — this endpoint is unauthenticated (GigsController's `GET /gigs`
+   * has no guard), so there's no caller identity to check "is this you";
+   * showing a restricted gig here would just be a job nobody browsing it
+   * can actually claim.
    */
   async listGigs(filter: GigListFilter): Promise<GigRecord[]> {
     const where: Prisma.GigWhereInput = {};
@@ -176,6 +199,7 @@ export class GigsService implements GigsPort {
       if (filter.status) where.status = filter.status;
     } else {
       where.status = filter.status && filter.status !== 'draft' ? filter.status : { not: 'draft' };
+      where.restrictedToProfessionalId = null;
     }
 
     if (filter.domain) {

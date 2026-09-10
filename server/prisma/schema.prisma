@@ -481,4 +481,12 @@ model WhatsAppSession {
   // above): WhatsAppSession stays a leaf table with no relations out,
   // so WhatsappModule never needs another module's Prisma types.
   pendingInviteGigId String?
+
+  // WhatsApp integration Phase 3.1 (PLAN.md) — set on the CLIENT's own
+  // session (conversationState = "awaiting_reassignment") when their
+  // invited professional declined or couldn't be reached, offering a new
+  // number or "open it up". Distinct from pendingInviteGigId, which is the
+  // professional's own accept/decline field — a client and a professional
+  // are different phones with independent state.
+  reassignGigId String?
 }

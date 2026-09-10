@@ -1327,14 +1327,11 @@ draft, rather than the two interleaving.
   "Explicitly deferred" below.
 
 **Explicitly deferred — not this change:**
-- Reassigning or reopening a declined/expired direct-invite gig — today a
-  decline just leaves the gig funded and unclaimed; a founder would have
-  to intervene manually (refund, or a direct DB fix) until this exists.
-- The 24h WhatsApp session-window limitation (Phase 1) applies here too,
-  unmitigated: if the invited professional hasn't messaged the bot
-  recently, the invite silently fails to deliver (logged server-side,
-  same best-effort pattern as everywhere else) — no fallback SMS/email/
-  outbound-template path exists yet.
+~~Reassigning or reopening a declined/expired direct-invite gig~~ and
+~~the 24h WhatsApp session-window limitation~~ — both addressed in Phase
+3.1, immediately below.
+
+**Explicitly still deferred — not this change:**
 - Any UI (app/web) for `restrictedToProfessionalId` — it's entirely a
   WhatsApp-only capability today; a gig created this way looks the same
   as any other in the app aside from being unclaimable by anyone else.
@@ -1343,6 +1340,91 @@ draft, rather than the two interleaving.
 three fields on `WhatsAppSession` (`draftInviteeProfessionalId`,
 `draftInviteeName`, `pendingInviteGigId`). Migration:
 `20260910150000_gig_direct_invite`.
+
+---
+
+## WhatsApp integration, Phase 3.1 — reassignment + template fallback — IMPLEMENTED
+
+**Goal:** close the two real gaps Phase 3 shipped honestly-documented but
+unsolved — a declined or unreachable direct invite was a dead end, and the
+24h session-window limitation meant an invite could just silently vanish.
+
+**Reassignment.** Both failure modes (professional says NO, or can't be
+reached at all — see below) now land the CLIENT in the same follow-up:
+`WhatsAppPort.offerReassignment(clientPhone, gigId, reasonText)` puts their
+`WhatsAppSession` into a new `awaiting_reassignment` state (`reassignGigId`
+set) and offers "reply with a new number, or OPEN." New `GigsService.
+setRestrictedProfessional(gigId, professionalId | null)` — not a status
+transition (the gig stays `open`), just who's allowed to claim it — backs
+both branches: `null` opens it to any matching professional (via
+`FixedPriceAcceptStrategy`'s existing check, which already treats
+`null`/unset as "anyone"); a new professional id re-triggers
+`EscrowService.sendInvite` (extracted from Phase 3's private method,
+now public and reused here) to message them.
+
+**Where this logic lives, and why.** `offerReassignment` had to be
+callable from `EscrowService` (an unreachable-professional failure is
+discovered there) as well as from `WhatsappInviteService` (a decline).
+`EscrowService` cannot depend on `WhatsappGigConversationService` or
+`WhatsappInviteService` without recreating the exact cycle Phase 1 split
+modules to avoid (`WhatsappWebhookModule` already imports `EscrowModule`,
+so the reverse would be circular). So `offerReassignment` — the one piece
+of conversation-state logic the lean `WhatsappModule` owns — lives on
+`WhatsAppPort` itself, implemented in `WhatsappService` using only
+`prisma` + its own `sendMessage`, both of which it already has. The
+CLIENT's actual reply (`awaiting_reassignment` case) is still handled in
+`WhatsappGigConversationService`, same as every other conversation state
+— `offerReassignment` only sets up the state and sends the prompt.
+
+**A real found bug, fixed while here:** `GigsService.listGigs`'s public
+browse (`GET /gigs`, unauthenticated — no caller identity to check
+"is this you") was including gigs restricted to one professional. Anyone
+browsing would see a job nobody but the invited professional could
+actually claim — `holdStake` would reject them with `ForbiddenException`.
+Now excluded from that branch explicitly (`clientId`-scoped "my gigs"
+still shows them, correctly, to their owner). WhatsApp-posted gigs
+otherwise need nothing special to show up in the app/mobile browse
+screens (`BrowseMarketScreen` already calls the same `GET /gigs?
+status=open`) — same `Gig` rows, same `GigsService.createGig`, no
+separate code path by posting channel.
+
+**24h-window fallback: a Meta-approved template message, the only real
+fix for "reach someone who hasn't messaged recently."** `WhatsAppPort`
+gained `isSessionOpen` (the same check `sendMessage` already did
+internally, now exposed so a caller can choose the right path BEFORE
+attempting either) and `sendTemplate` (Graph API `type: "template"` call).
+`EscrowService.sendInvite` now: free-form text if the window's open (as
+before) → else a template if `WHATSAPP_INVITE_TEMPLATE_NAME` is
+configured → else honestly tells the client via `offerReassignment`
+rather than the invite just disappearing.
+
+**This cannot be fully "fixed" by code — approval is external, manual,
+and not guaranteed.** A WhatsApp message template must be created and
+submitted in Meta's WhatsApp Manager (category **UTILITY** — this
+notifies about an existing job, not marketing) and can take anywhere from
+hours to several days for Meta to review, sometimes rejected outright
+requiring a resubmission. Exact body to submit (`server/.env.example` has
+the same copy): *"You've been invited to a job on Sorted: {{1}}. Location:
+{{2}}. Pay: {{3}}. Reply YES to accept or NO to decline."* — 3 variables,
+in that order. Once approved, set `WHATSAPP_INVITE_TEMPLATE_NAME` (the
+name given at submission) and `WHATSAPP_INVITE_TEMPLATE_LANG` (must match
+the submitted language exactly, e.g. `en_US` not `en`) and redeploy.
+Until then, the system behaves exactly as Phase 3 did — honestly degraded,
+not broken.
+
+**Explicitly still deferred — not this change:**
+- The reassignment offer to the CLIENT is itself sent via `sendMessage`
+  (free-form only) — if the CLIENT'S OWN 24h window happens to be closed
+  when a decline/failure fires, that message can silently fail too, same
+  limitation one level up. A second template for this direction would
+  close it; not built (diminishing returns without real usage data on how
+  often this actually happens).
+- Retrying an unreachable invite automatically once the professional
+  eventually messages the bot — today the client has to notice and text
+  the number again themselves; no scheduled/triggered retry exists.
+
+**Schema:** `WhatsAppSession.reassignGigId` (nullable). Migration:
+`20260910160000_whatsapp_reassignment`.
 
 ---
 

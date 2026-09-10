@@ -56,6 +56,8 @@ export class WhatsappGigConversationService {
         return this.handleInviteePhone(phone, trimmed, session!);
       case 'awaiting_confirmation':
         return this.handleConfirmation(user, phone, trimmed, session!);
+      case 'awaiting_reassignment':
+        return this.handleReassignment(phone, trimmed, session!);
       case 'idle':
       default:
         return this.startDraft(phone, trimmed);
@@ -281,8 +283,8 @@ export class WhatsappGigConversationService {
 
     const amountNaira = Number(draftBountyKobo) / 100;
     // The invited professional (if any) is only messaged once EscrowService
-    // confirms funding — see EscrowService.notifyInvitedProfessional — so
-    // there's nothing more to tell the client here about that leg yet.
+    // confirms funding — see EscrowService.sendInvite — so there's nothing
+    // more to tell the client here about that leg yet.
     if (escrowRecord.holdingAccount?.checkoutUrl) {
       await this.whatsapp.sendMessage(
         phone,
@@ -297,6 +299,61 @@ export class WhatsappGigConversationService {
     }
   }
 
+  /**
+   * The follow-up when a direct invite didn't pan out — a decline
+   * (WhatsappInviteService) or an unreachable professional
+   * (EscrowService.sendInvite) both land the CLIENT here via
+   * WhatsAppPort.offerReassignment. `session.reassignGigId` names an
+   * EXISTING, already-posted-and-funded gig — nothing here creates a new
+   * one, unlike the rest of this class.
+   */
+  private async handleReassignment(
+    phone: string,
+    reply: string,
+    session: { reassignGigId: string | null },
+  ): Promise<void> {
+    const gigId = session.reassignGigId;
+    if (!gigId) {
+      await this.reset(phone);
+      return;
+    }
+
+    if (/^(open|search|anyone)$/i.test(reply)) {
+      await this.gigs.setRestrictedProfessional(gigId, null);
+      await this.reset(phone);
+      await this.whatsapp.sendMessage(phone, 'Opened up — any matching professional can now claim this job.');
+      return;
+    }
+
+    const invitee = await this.identity.findUserByPhone(reply);
+    if (!invitee) {
+      await this.whatsapp.sendMessage(
+        phone,
+        "I couldn't find a Sorted account with that number. Try another number, or reply OPEN to open the job to any matching professional.",
+      );
+      return;
+    }
+    if (!invitee.roles.includes('professional')) {
+      await this.whatsapp.sendMessage(
+        phone,
+        "That number's on Sorted but not set up as a professional yet. Try another number, or reply OPEN.",
+      );
+      return;
+    }
+
+    await this.gigs.setRestrictedProfessional(gigId, invitee.id);
+    const sent = await this.escrow.sendInvite(gigId);
+
+    if (sent) {
+      await this.reset(phone);
+      await this.whatsapp.sendMessage(phone, `Invite sent to ${invitee.name ?? 'them'}.`);
+    }
+    // sent === false: EscrowService.sendInvite has already put this phone
+    // back into awaiting_reassignment and messaged the client itself (see
+    // its own doc comment) — nothing more to do here, and sending a
+    // second "couldn't reach them" message would just be a duplicate.
+  }
+
   private async reset(phone: string): Promise<void> {
     await this.prisma.whatsAppSession.update({
       where: { phone },
@@ -308,6 +365,7 @@ export class WhatsappGigConversationService {
         draftBountyKobo: null,
         draftInviteeProfessionalId: null,
         draftInviteeName: null,
+        reassignGigId: null,
       },
     });
   }
