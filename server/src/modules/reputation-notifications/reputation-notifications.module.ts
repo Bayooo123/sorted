@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { ReputationService } from './reputation.service';
 import { NotificationsService } from './notifications.service';
 import { NOTIFICATIONS_PORT } from './notifications.interface';
@@ -14,6 +15,7 @@ import { NOTIFICATIONS_PORT } from './notifications.interface';
  * implementation — swapping providers later doesn't touch Identity.
  */
 @Module({
+  imports: [WhatsappModule],
   providers: [
     ReputationService,
     NotificationsService,

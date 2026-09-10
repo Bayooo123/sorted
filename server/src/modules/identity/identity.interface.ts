@@ -162,6 +162,14 @@ export interface IdentityPort {
   getPayoutDestination(userId: string): Promise<PayoutDestination | null>;
   assertRole(userId: string, role: Role): Promise<void>;
   /**
+   * Accepts local (0-prefixed) or E.164 form, same normalization as
+   * login/forgot-password. Returns null rather than throwing when no
+   * account matches — used by WhatsappWebhookModule to decide whether an
+   * inbound message is from a registered user, where "not registered" is
+   * an expected, common outcome, not an error.
+   */
+  findUserByPhone(phone: string): Promise<IdentityUser | null>;
+  /**
    * Registration step 2 (after phone+OTP creates the bare account).
    * Validates the roles/category rule documented on CompleteRoleProfileInput
    * and rejects the call if a required category list is missing or empty —

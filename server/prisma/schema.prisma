@@ -434,3 +434,19 @@ model LedgerEntry {
 
   // No updatedAt field on purpose: this row is never updated after insert.
 }
+
+// ---------------------------------------------------------------------------
+// WhatsApp (product decision, not in HANDOFF.md — see PLAN.md "WhatsApp
+// integration"). Owned entirely by the whatsapp module: tracks the Meta
+// Cloud API 24h free-form messaging window per phone number. Deliberately
+// has no FK to User — this table only ever stores a phone string, so the
+// lean WhatsappModule (imported by Notifications, which Identity depends
+// on) never needs to import IdentityModule and risk a cycle.
+// ---------------------------------------------------------------------------
+
+model WhatsAppSession {
+  id            String   @id @default(cuid())
+  phone         String   @unique // E.164, same shape as User.phone
+  lastInboundAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+}

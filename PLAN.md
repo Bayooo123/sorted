@@ -1079,6 +1079,120 @@ release payment" or "Raise a dispute" with a reason).
 
 ---
 
+## WhatsApp integration, Phase 1 (product decision, not in HANDOFF.md) — IMPLEMENTED
+
+**Goal:** a third front-end to Sorted, WhatsApp-native — "hi" starts
+registration, and the same thread eventually becomes a full USSD-style
+ordering flow (post a job, get matched, pay, release). Phase 1 is
+deliberately small: the webhook, the greeting, and the post-signup message
+— everything else (conversation state, gig posting via chat, matching,
+payment confirmation over WhatsApp) is unscoped follow-on work.
+
+**A real circular-dependency trap shaped this more than anything else.**
+`IdentityModule` already imports `ReputationNotificationsModule` (for
+`notify()`). Adding WhatsApp naively — one module, sending capability +
+inbound webhook + a lookup into Identity to check "is this phone
+registered" — creates Identity → Notifications → Whatsapp → Identity, a
+cycle. Fixed by splitting into two modules:
+- **`WhatsappModule`** (lean): `sendMessage`/`recordInboundMessage` only,
+  zero Identity dependency, safe for `ReputationNotificationsModule` to
+  import. Owns the new `WhatsAppSession` table itself (just `phone` +
+  `lastInboundAt` — no FK to `User`, so no Identity dependency is needed
+  even for that).
+- **`WhatsappWebhookModule`**: imports both `IdentityModule` (to look up
+  registered users by phone) and `WhatsappModule` (to reply). Imported
+  only by `AppModule` — nothing else may import it, since that's exactly
+  what would reintroduce the cycle. Verified by actually booting the app
+  (`ts-node src/main.ts`) and confirming every module — including both new
+  ones — initializes and every route maps before any DB call happens;
+  Nest throws immediately on a real circular dependency, so a clean boot
+  through `RouterExplorer` is a real test, not just `tsc` passing.
+
+**The 24h session window is enforced inside `WhatsappService.sendMessage`,
+not by callers.** Meta only allows free-form text to a phone that messaged
+us within the last 24 hours; outside that, a message needs a pre-approved
+template (multi-day external review in Meta's dashboard — not built yet).
+`sendMessage` checks `WhatsAppSession.lastInboundAt` itself and silently
+no-ops (logged, not thrown) if the window's closed, so a caller (like
+`NotificationsService`) never has to know or care — same "best-effort,
+never fail the real action" pattern as the existing welcome email.
+
+**Wired into the existing `NotificationsPort` seam, not a parallel path:**
+`NotifyTarget.phone` already existed on the interface but `IdentityService.
+signup()` never populated it — now it does, and `NotificationsService`'s
+`user_signed_up` case sends both the existing welcome email AND (best-
+effort) a WhatsApp message asking "what would you like to get done today?"
+This only actually sends when the signup happened within 24h of that
+phone's last inbound message to the bot — true for the intended flow
+(text the bot first → get the signup link → sign up), silently skipped
+(falls back to email-only, already working) for anyone who found the site
+directly without ever messaging first.
+
+**Inbound handling (`WhatsappWebhookController`), lessons carried over
+from a prior WhatsApp integration (Reforma, a different product on the
+same Meta Business Manager — deliberately a SEPARATE phone number, not a
+shared one, since mixing two unrelated products' messages on one number
+is confusing for both audiences and was never seriously considered):**
+- GET verification handshake (echo `hub.challenge` raw, via `@Res()` —
+  NestJS's default JSON-wrapping would break Meta's exact-string check).
+- POST always returns 200 immediately; real processing happens after, via
+  `waitUntil` (`@vercel/functions` — the actual primitive Next.js's
+  `after()` sits on top of, confirmed by reading `wait-until.js` directly:
+  it's a no-op outside a Vercel Function context, so local dev via
+  `main.ts` is unaffected either way).
+  Reforma's build used Next.js's `after()`, not portable here since
+  `sorted-api` is NestJS.
+- Exhaustive message-type switch — every Meta message type (`image`,
+  `document`, `interactive`, `button`, `reaction`, etc.) gets an explicit
+  "I can only read text right now" reply. No silent-drop default case —
+  that looks identical to the bot being broken.
+- HMAC-SHA256 signature verification (`WHATSAPP_APP_SECRET`,
+  `x-hub-signature-256`) reusing the raw-body capture already wired up
+  globally for Paystack's webhook (`main.ts`/`api/index.ts`'s bodyParser
+  `verify` callback) — soft-allow when unset, same pattern as Paystack's
+  IP-allowlist, since it can't be required until initial Meta setup is done.
+- Phone matching turned out to be nearly free: Meta sends the sender as
+  `234803...` (no `+`), and `User.phone` is already strict E.164
+  (`normalizeNigerianPhone`, enforced at signup/profile-update) — so
+  matching is just prepending `+`, not the dual-candidate-plus-last-10-
+  digit fallback a system with inconsistently-entered phone data would
+  need. New `IdentityPort.findUserByPhone` exposes this lookup.
+
+**Schema:** `WhatsAppSession { phone (unique), lastInboundAt }`. Migration:
+`20260910130000_whatsapp_session`.
+
+**Env (`server/.env.example`):** `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` — real values live only in
+the gitignored `server/.env` locally / Vercel's `sorted-api` env vars in
+production. Webhook URL to register in Meta's dashboard:
+`https://sorted-api.vercel.app/webhooks/whatsapp`.
+
+**Explicitly deferred — not this change:**
+- Everything past the greeting: no conversation state machine, no gig
+  posting/matching/payment over WhatsApp yet. `handleText` ignores the
+  actual message content in Phase 1 — every text from an unregistered
+  number gets the same signup-link reply, every text from a registered
+  one gets the same "coming soon" reply.
+- Outbound-initiated template messages (for notifying someone who hasn't
+  messaged in >24h — "a professional accepted your job" being the clearest
+  future case) — needs Meta template approval, an external multi-day
+  process not started as part of this change.
+- Whether the eventual ordering flow should be LLM-agent-driven (as
+  Reforma is) or menu/state-machine-driven — flagged as a real decision,
+  not resolved here. Recommendation on record: keep money-adjacent steps
+  (price agreement, payment confirmation, state transitions) strictly
+  deterministic, matching this backend's existing discipline everywhere
+  else (compare-and-swap releases, idempotent ledger entries) — an LLM
+  agent improvising over what a client agreed to pay is the wrong place
+  to introduce nondeterminism. A lighter LLM layer for open-ended "describe
+  what you want done" free-text capture is fine, as long as anything it
+  produces is recapped and explicitly confirmed before any state change.
+- "Request a professional you already use" (direct-invite to one named
+  professional, vs. today's open-to-all-matching-professionals claim) —
+  new capability, not built.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -126,8 +126,8 @@ export class IdentityService implements IdentityPort {
     // Fire-and-log, not fire-and-fail: a Resend outage is real, but it
     // must never turn an otherwise-successful signup into a 500 — the
     // account already exists in the DB by this point.
-    this.notifications.notify({ userId: user.id, email }, { kind: 'user_signed_up', name }).catch((err) => {
-      this.logger.warn(`Welcome email failed for user ${user.id}: ${err instanceof Error ? err.message : err}`);
+    this.notifications.notify({ userId: user.id, email, phone }, { kind: 'user_signed_up', name }).catch((err) => {
+      this.logger.warn(`Welcome notification failed for user ${user.id}: ${err instanceof Error ? err.message : err}`);
     });
 
     const accessToken = await this.jwt.signAsync({ sub: user.id });
@@ -367,6 +367,15 @@ export class IdentityService implements IdentityPort {
 
   verifyIdentity(_userId: string, _input: unknown): Promise<KycStatus> {
     throw new NotImplementedException('IdentityService.verifyIdentity — slice 9 (KYC gate)');
+  }
+
+  async findUserByPhone(phone: string): Promise<IdentityUser | null> {
+    const trimmed = phone.trim();
+    const user = await this.prisma.user.findFirst({
+      where: { OR: [{ phone: trimmed }, { phone: normalizeNigerianPhone(trimmed) }] },
+    });
+    if (!user) return null;
+    return this.getUser(user.id);
   }
 
   async getPayoutDestination(userId: string): Promise<PayoutDestination | null> {

@@ -10,6 +10,7 @@ import { VerificationModule } from './modules/verification/verification.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { ReputationNotificationsModule } from './modules/reputation-notifications/reputation-notifications.module';
+import { WhatsappWebhookModule } from './modules/whatsapp/whatsapp-webhook.module';
 
 /**
  * Composition root. The nine modules below correspond 1:1 to HANDOFF.md §3.
@@ -30,6 +31,7 @@ import { ReputationNotificationsModule } from './modules/reputation-notification
     DisputesModule,
     LedgerModule,
     ReputationNotificationsModule,
+    WhatsappWebhookModule,
   ],
 })
 export class AppModule {}

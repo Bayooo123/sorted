@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotImplementedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
 import { NotificationEvent, NotificationsPort, NotifyTarget } from './notifications.interface';
 
 /**
@@ -20,14 +21,29 @@ import { NotificationEvent, NotificationsPort, NotifyTarget } from './notificati
 export class NotificationsService implements NotificationsPort {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
+  ) {}
 
   async notify(target: NotifyTarget, event: NotificationEvent): Promise<void> {
     switch (event.kind) {
-      case 'user_signed_up':
-        if (!target.email) return; // no email on this account yet — nothing to send
-        await this.sendWelcomeEmail(target.email, event.name);
+      case 'user_signed_up': {
+        const firstName = event.name.trim().split(/\s+/)[0] || event.name;
+        if (target.email) {
+          await this.sendWelcomeEmail(target.email, event.name);
+        }
+        if (target.phone) {
+          // Best-effort — sendMessage no-ops outside the 24h session
+          // window (see whatsapp.service.ts) rather than sending nothing
+          // silently different from "we tried and it failed."
+          await this.whatsapp.sendMessage(
+            target.phone,
+            `Thanks for joining Sorted, ${firstName}! What would you like to get done today?`,
+          );
+        }
         return;
+      }
       case 'password_reset_requested':
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendPasswordResetEmail(target.email, event.code);
