@@ -383,9 +383,33 @@ export class WhatsappGigConversationService {
       return;
     }
 
-    await this.ratings.rateGig(gigId, user.id, stars);
+    const rating = await this.ratings.rateGig(gigId, user.id, stars);
     await this.reset(phone);
     await this.whatsapp.sendMessage(phone, 'Thanks for the feedback!');
+
+    // Positioning decision (PLAN.md "Track Record positioning"): the
+    // record being built is the professional's, and the moment it just
+    // grew is the moment it should be said out loud to them — not left as
+    // a line in onboarding copy nobody re-reads. Best-effort, same
+    // reasoning as every other WhatsApp notification here: this must
+    // never fail the rating that already saved successfully above.
+    await this.notifyProfessionalOfTrackRecord(rating.rateeId).catch((err) => {
+      this.logger.warn(`Track Record notification failed for professional ${rating.rateeId}: ${err instanceof Error ? err.message : err}`);
+    });
+  }
+
+  private async notifyProfessionalOfTrackRecord(professionalId: string): Promise<void> {
+    const professional = await this.identity.getUser(professionalId);
+    if (!professional.phone) return;
+
+    const summary = await this.ratings.getProfessionalRatingSummary(professionalId);
+    const avg = summary.average ? summary.average.toFixed(1) : '—';
+    const jobWord = summary.count === 1 ? 'job' : 'jobs';
+
+    await this.whatsapp.sendMessage(
+      professional.phone,
+      `That's ${summary.count} ${jobWord} on your Sorted Track Record now — ★${avg} avg. Keep it going: professionals who build a real record here get first pick of new jobs, and it's the kind of proof that opens doors most people never get handed for free.`,
+    );
   }
 
   private async reset(phone: string): Promise<void> {

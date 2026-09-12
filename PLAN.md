@@ -1556,6 +1556,64 @@ neither it nor `GigsModule`/`AuthModule` chains back to
 
 ---
 
+## Track Record positioning — IMPLEMENTED
+
+**Decision:** every piece of Sorted's messaging — "escrow-protected,"
+"vetted professionals," "trusted marketplace" — is the identical pitch
+every Nigerian services marketplace makes (VConnect said this a decade
+ago). It's reassurance, not a reason to talk about Sorted unprompted.
+What's actually different was already built (the `Rating` aggregate
+above) but only ever mentioned once, in a supporting line of the Phase 1
+WhatsApp welcome message: completed jobs here become a real, verifiable
+work history — not marketed anywhere as that. Repositioned around
+**"Track Record"** as the named thing being built, with escrow
+demoted to the mechanism that makes the record trustworthy, not the
+headline. No new schema, no new feature — the `Rating` data already
+existed; this is entirely about naming it and saying it out loud at the
+moments it lands.
+
+**Where this landed:**
+- `WhatsappGigConversationService.handleRating` now tells the
+  PROFESSIONAL, not just the client, right after a rating is recorded —
+  their job count and average, framed as their Track Record growing
+  ("professionals who build a real record here get first pick of new
+  jobs..."). This is the one genuinely new behavior: previously only the
+  client got a "thanks for the feedback" and the professional heard
+  nothing when their own record grew.
+- Welcome email (`notifications.service.ts`): the differentiation
+  paragraph now leads with "every job you complete here becomes part of
+  a real track record," escrow stated as what makes that record
+  trustworthy, not the opening claim.
+- Landing page `#for-professionals` section (`index.html`): headline
+  changed from a generic capability list ("Built for your trade,
+  whichever one it is") to lead with the Track Record claim; "Build a
+  Track Record" promoted to the first bullet, ahead of CAC registration
+  help / cheaper materials / no-chasing-payment (all kept, just no
+  longer the opening pitch).
+
+**Explicitly not overpromised — a real risk named on purpose:** Sorted
+has no lending/credit partnership today. Every rewrite above says the
+record "opens doors" / "is proof you can point to" — never "gets you a
+loan." That distinction is deliberate: the positioning bets on a
+trajectory Sorted is credibly building toward (which the upcoming SME
+research instrument is partly there to validate — does access to capital
+actually matter to this audience), not a guarantee the product can't
+back yet. If a real credit/lending partner materializes, this copy
+should be revisited to make the claim concrete rather than aspirational.
+
+**Explicitly deferred:**
+- A front-end "Track Record" display (a stat card on a professional's
+  profile screen, a shareable/screenshottable version) — today it only
+  exists as a sentence in a WhatsApp message and the pre-existing
+  `GET /professionals/:id/rating` endpoint. Making it a named, visible
+  object in the app itself (not just spoken about) is the natural next
+  step once there's a screen to put it on.
+- The client-side "record" angle (a client's own reliability/no-show
+  history) — this pass is entirely professional-facing, matching where
+  the credit-identity narrative actually lands.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
