@@ -38,7 +38,7 @@ export class WhatsappGigConversationService {
     const trimmed = text.trim();
     if (/^(cancel|stop|start over)$/i.test(trimmed)) {
       await this.reset(phone);
-      await this.whatsapp.sendMessage(phone, "Cancelled — no problem. Tell me what you need done whenever you're ready.");
+      await this.whatsapp.sendMessage(phone, 'Cancelled — no problem. Text "jobs" to see available work, or tell me what you need done to post a job of your own.');
       return;
     }
 
@@ -62,10 +62,133 @@ export class WhatsappGigConversationService {
         return this.handleReassignment(phone, trimmed, session!);
       case 'awaiting_rating':
         return this.handleRating(user, phone, trimmed, session!);
+      case 'awaiting_gig_selection':
+        return this.handleGigSelection(user, phone, trimmed, session!);
       case 'idle':
       default:
-        return this.startDraft(phone, trimmed);
+        return this.handleIdle(user, phone, trimmed);
     }
+  }
+
+  /**
+   * Idle-state routing (product decision, not in PLAN.md until now — see
+   * "Browse available gigs"). Previously every idle message was assumed
+   * to be the start of a NEW gig description — correct for a client, but
+   * wrong for the professional-only accounts being onboarded first: they
+   * have nothing to post, so that default silently misfired every time
+   * ("dry clean five shirts" read as if THEY wanted a dry cleaner).
+   * A professional-only account (no client role) now defaults to seeing
+   * what's available instead. Anyone else can still ask for it explicitly
+   * with a keyword, without changing what a plain idle message means for
+   * a client.
+   */
+  private async handleIdle(user: IdentityUser, phone: string, text: string): Promise<void> {
+    const isBrowseKeyword = /^(jobs|gigs|available|browse|see jobs|view jobs)$/i.test(text);
+    if (isBrowseKeyword || (!user.roles.includes('client') && user.roles.includes('professional'))) {
+      return this.showAvailableGigs(user, phone);
+    }
+    return this.startDraft(phone, text);
+  }
+
+  /**
+   * "View existing gigs" — pull-based counterpart to Phase 4's broadcast
+   * push. Streamlined to the professional's OWN registered trade
+   * (`serviceOfferingSubmarketIds`, the same picks made at role-profile
+   * completion) rather than every open gig on the platform — a dry
+   * cleaner has no use for a plumbing job in the list. Excludes gigs
+   * restricted to a different named professional (Phase 3), same
+   * reasoning as the public browse fix: nothing here is claimable by
+   * anyone else.
+   */
+  private async showAvailableGigs(user: IdentityUser, phone: string): Promise<void> {
+    if (!user.roles.includes('professional')) {
+      await this.whatsapp.sendMessage(
+        phone,
+        "You'll need a professional profile to browse jobs — set one up at https://sorted.com.ng, then message me again.",
+      );
+      return;
+    }
+    if (user.serviceOfferingSubmarketIds.length === 0) {
+      await this.whatsapp.sendMessage(
+        phone,
+        "You haven't set which trade you do yet — add that at https://sorted.com.ng and jobs matching you will show up here.",
+      );
+      return;
+    }
+
+    const gigs = await this.prisma.gig.findMany({
+      where: {
+        submarketId: { in: user.serviceOfferingSubmarketIds },
+        status: 'open',
+        restrictedToProfessionalId: null,
+      },
+      include: { submarket: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    if (gigs.length === 0) {
+      await this.whatsapp.sendMessage(phone, "No open jobs matching your trade right now — I'll message you the moment one comes in.");
+      return;
+    }
+
+    const lines = gigs.map((gig, i) => {
+      const amountNaira = Number(gig.bountyKobo) / 100;
+      return `${i + 1}. ${gig.description}\n   🏷️ ${gig.submarket.label}  📍 ${gig.locationText}  💰 ₦${amountNaira.toLocaleString('en-NG')}`;
+    });
+
+    await this.prisma.whatsAppSession.update({
+      where: { phone },
+      data: { conversationState: 'awaiting_gig_selection', browseGigIds: gigs.map((g) => g.id).join(',') },
+    });
+
+    await this.whatsapp.sendMessage(
+      phone,
+      `Open jobs matching your trade:\n\n${lines.join('\n\n')}\n\nReply with a number to claim one, or CANCEL to stop.`,
+    );
+  }
+
+  private async handleGigSelection(
+    user: IdentityUser,
+    phone: string,
+    reply: string,
+    session: { browseGigIds: string | null },
+  ): Promise<void> {
+    const ids = session.browseGigIds?.split(',').filter(Boolean) ?? [];
+    const index = Number.parseInt(reply, 10);
+    const gigId = Number.isInteger(index) ? ids[index - 1] : undefined;
+
+    if (!gigId) {
+      await this.whatsapp.sendMessage(phone, `Please reply with just the number, 1 to ${ids.length}, or CANCEL to stop.`);
+      return;
+    }
+
+    let gig;
+    try {
+      await this.escrow.holdStake(gigId, user.id);
+      gig = await this.gigs.getGig(gigId);
+    } catch (err) {
+      this.logger.warn(`Browse-claim failed for gig ${gigId}, professional ${user.id}: ${err instanceof Error ? err.message : err}`);
+      await this.whatsapp.sendMessage(phone, "Sorry — that job's already been taken (or is no longer available). Text \"jobs\" to see what's still open.");
+      await this.resetToIdle(phone);
+      return;
+    }
+
+    await this.resetToIdle(phone);
+    await this.whatsapp.sendMessage(
+      phone,
+      `You got it! "${gig.title}" is yours now — open the Sorted app to see full details and submit your work when it's done.`,
+    );
+
+    const client = await this.identity.getUser(gig.clientId);
+    if (client.phone) {
+      const firstName = user.name?.trim().split(/\s+/)[0] ?? 'A professional';
+      await this.whatsapp.sendMessage(client.phone, `🎉 ${firstName} claimed your job! They'll be in touch.`);
+    }
+  }
+
+  private async resetToIdle(phone: string): Promise<void> {
+    await this.prisma.whatsAppSession.update({ where: { phone }, data: { conversationState: 'idle', browseGigIds: null } });
   }
 
   private async startDraft(phone: string, description: string): Promise<void> {
@@ -425,6 +548,7 @@ export class WhatsappGigConversationService {
         draftInviteeName: null,
         reassignGigId: null,
         pendingRatingGigId: null,
+        browseGigIds: null,
       },
     });
   }

@@ -1614,6 +1614,72 @@ should be revisited to make the claim concrete rather than aspirational.
 
 ---
 
+## Browse available gigs — IMPLEMENTED
+
+**Goal:** a real bug in production, not a feature gap — the idle-state
+default assumed EVERY registered sender's message was the start of a new
+gig description (Phase 2's `startDraft`). Correct for a client; wrong for
+the professional-only accounts being onboarded first, who have nothing to
+post. A professional texting "I want to dry clean five shirts" (meaning
+"that's the kind of job I do") got read as if THEY wanted a dry cleaner —
+the exact confusion reported once production actually caught up to this
+code (see the merge-to-`main` note below).
+
+**The fix is pull-based, not just a routing tweak.** A professional-only
+account (`roles` includes `'professional'`, not `'client'`) hitting idle
+now defaults to `showAvailableGigs` instead of `startDraft` — a numbered
+list of open, unrestricted gigs matching their OWN registered trade
+(`serviceOfferingSubmarketIds`, the same picks made at role-profile
+completion), each showing description, category, location, and price.
+Replying with a number claims it for real, through the same `EscrowService.
+holdStake` path the app's claim button and Phase 4's broadcast both use —
+not a WhatsApp-only shortcut. Anyone (client or hybrid account too) can
+ask for the same list explicitly with a keyword ("jobs" / "gigs" /
+"available" / "browse"), without changing what a plain idle message means
+for someone who actually is there to post.
+
+**"Streamlined to their profession" is a hard filter, not a suggestion.**
+`Gig.submarketId in (serviceOfferingSubmarketIds)` — a dry cleaner never
+sees a plumbing job in this list. Same `restrictedToProfessionalId: null`
+exclusion as the public-browse fix (Phase 3.1) — nothing shown here is
+claimable by someone else anyway.
+
+**State is per-phone, not shared like a broadcast.** New
+`WhatsAppSession.browseGigIds` (comma-separated gig ids, this phone's own
+ordered list) is deliberately NOT the same mechanism as
+`pendingBroadcastGigId` (Phase 4), where many phones legitimately share
+one gig id during a race — browsing is one person paging through a list
+that means nothing to anyone else's session.
+
+**Explicitly deferred:**
+- Pagination past 10 results, or any sort/filter beyond "matches my
+  trade" (nearest first, highest-paying first, etc.).
+- Location-based filtering within a trade (a dry cleaner in Yaba seeing a
+  dry-cleaning job in Ikeja) — everything matching the trade shows,
+  regardless of distance, same as Phase 4's broadcast.
+- A hybrid account's own default (client + professional) still assumes
+  posting on idle, same as before — they reach this list only via the
+  keyword, not automatically. Revisit if hybrid accounts turn out to be
+  common among early users rather than the professional-only norm this
+  was scoped for.
+
+**Also fixed while here — this is genuinely why the bug was invisible
+until now:** the last several phases (Phase 2 through Track Record
+positioning) had only ever been deployed as PREVIEW builds on
+`claude/product-understanding-nw3yaw`; nothing had been merged into
+`main`, the only branch Vercel serves to production. Production was
+frozen on the Phase 1 commit the entire time — confirmed directly via
+Vercel's deployment history, not assumed. Fast-forwarded `main` to the
+branch tip (`aa3df14`, a clean 0-ahead/6-behind fast-forward, no merge
+conflict) so every phase built this session actually reaches the live
+WhatsApp number. Worth re-checking after future phases rather than
+assuming it stays in sync automatically.
+
+**Schema:** `WhatsAppSession.browseGigIds` (nullable). Migration:
+`20260912000000_whatsapp_browse_gigs`.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

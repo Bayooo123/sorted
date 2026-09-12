@@ -526,4 +526,13 @@ model WhatsAppSession {
   // Plain string, not a relation to Rating — same "stay a leaf table"
   // reasoning as every other pending* field here.
   pendingRatingGigId String?
+
+  // "Browse available gigs" (PLAN.md) — set on a PROFESSIONAL's own
+  // session (conversationState = "awaiting_gig_selection") right after
+  // showAvailableGigs sends them a numbered list, so their next numeric
+  // reply maps back to a real gig id. Comma-separated, not a relation —
+  // same leaf-table reasoning as every other field here; this list is
+  // this one phone's own browsing state, never shared across phones
+  // (unlike pendingBroadcastGigId, where many phones share one gig id).
+  browseGigIds String?
 }
