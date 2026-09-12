@@ -64,6 +64,8 @@ export class WhatsappGigConversationService {
         return this.handleRating(user, phone, trimmed, session!);
       case 'awaiting_gig_selection':
         return this.handleGigSelection(user, phone, trimmed, session!);
+      case 'awaiting_post_description':
+        return this.startDraft(phone, trimmed);
       case 'idle':
       default:
         return this.handleIdle(user, phone, trimmed);
@@ -74,17 +76,35 @@ export class WhatsappGigConversationService {
    * Idle-state routing (product decision, not in PLAN.md until now — see
    * "Browse available gigs"). Previously every idle message was assumed
    * to be the start of a NEW gig description — correct for a client, but
-   * wrong for the professional-only accounts being onboarded first: they
-   * have nothing to post, so that default silently misfired every time
-   * ("dry clean five shirts" read as if THEY wanted a dry cleaner).
-   * A professional-only account (no client role) now defaults to seeing
-   * what's available instead. Anyone else can still ask for it explicitly
-   * with a keyword, without changing what a plain idle message means for
-   * a client.
+   * wrong for anyone with a professional profile, hybrid accounts
+   * included: "dry clean five shirts" from a dry cleaner means "that's my
+   * trade," not "I want one." Applies to ANY account with the
+   * professional role, not just professional-only ones — a hybrid
+   * account is still, first, someone looking for work here. A pure
+   * client (no professional role at all) is the only case where the old
+   * assume-a-description default still makes sense, since they have
+   * nothing to browse for. Anyone can still ask for the list explicitly
+   * with a keyword regardless of role — and, since routing every
+   * professional's idle message to browse means a hybrid account can no
+   * longer post by just describing a job, "post" is the explicit escape
+   * hatch back into that flow (asks for the description on the NEXT
+   * message, rather than misreading "post" itself as one).
    */
   private async handleIdle(user: IdentityUser, phone: string, text: string): Promise<void> {
     const isBrowseKeyword = /^(jobs|gigs|available|browse|see jobs|view jobs)$/i.test(text);
-    if (isBrowseKeyword || (!user.roles.includes('client') && user.roles.includes('professional'))) {
+    const isPostKeyword = /^(post|post a job|post job|i want to post)$/i.test(text);
+
+    if (isPostKeyword) {
+      await this.prisma.whatsAppSession.upsert({
+        where: { phone },
+        create: { phone, conversationState: 'awaiting_post_description' },
+        update: { conversationState: 'awaiting_post_description' },
+      });
+      await this.whatsapp.sendMessage(phone, 'Sure — tell me what you need done.');
+      return;
+    }
+
+    if (isBrowseKeyword || user.roles.includes('professional')) {
       return this.showAvailableGigs(user, phone);
     }
     return this.startDraft(phone, text);

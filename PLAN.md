@@ -1625,18 +1625,26 @@ post. A professional texting "I want to dry clean five shirts" (meaning
 the exact confusion reported once production actually caught up to this
 code (see the merge-to-`main` note below).
 
-**The fix is pull-based, not just a routing tweak.** A professional-only
-account (`roles` includes `'professional'`, not `'client'`) hitting idle
-now defaults to `showAvailableGigs` instead of `startDraft` — a numbered
-list of open, unrestricted gigs matching their OWN registered trade
-(`serviceOfferingSubmarketIds`, the same picks made at role-profile
-completion), each showing description, category, location, and price.
-Replying with a number claims it for real, through the same `EscrowService.
-holdStake` path the app's claim button and Phase 4's broadcast both use —
-not a WhatsApp-only shortcut. Anyone (client or hybrid account too) can
-ask for the same list explicitly with a keyword ("jobs" / "gigs" /
-"available" / "browse"), without changing what a plain idle message means
-for someone who actually is there to post.
+**The fix is pull-based, not just a routing tweak.** ANY account with the
+`'professional'` role — hybrid accounts included, not just
+professional-only ones — hitting idle now defaults to `showAvailableGigs`
+instead of `startDraft` — a numbered list of open, unrestricted gigs
+matching their OWN registered trade (`serviceOfferingSubmarketIds`, the
+same picks made at role-profile completion), each showing description,
+category, location, and price. Replying with a number claims it for real,
+through the same `EscrowService.holdStake` path the app's claim button
+and Phase 4's broadcast both use — not a WhatsApp-only shortcut. A pure
+client (no professional role at all) is the only case where the original
+assume-a-description default still applies, since they have nothing to
+browse for. Anyone can also ask for the list explicitly with a keyword
+("jobs" / "gigs" / "available" / "browse") regardless of role.
+
+**Closing the gap that opened:** routing every professional's idle
+message to browse means a hybrid account can no longer post a gig just
+by describing it — the description would be read as an idle message and
+sent to browse instead. `"post"` (`awaiting_post_description` state) is
+the explicit way back into that flow: it asks for the description on the
+NEXT message rather than treating "post" itself as one.
 
 **"Streamlined to their profession" is a hard filter, not a suggestion.**
 `Gig.submarketId in (serviceOfferingSubmarketIds)` — a dry cleaner never
@@ -1657,11 +1665,11 @@ that means nothing to anyone else's session.
 - Location-based filtering within a trade (a dry cleaner in Yaba seeing a
   dry-cleaning job in Ikeja) — everything matching the trade shows,
   regardless of distance, same as Phase 4's broadcast.
-- A hybrid account's own default (client + professional) still assumes
-  posting on idle, same as before — they reach this list only via the
-  keyword, not automatically. Revisit if hybrid accounts turn out to be
-  common among early users rather than the professional-only norm this
-  was scoped for.
+- No menu/confirmation step when routing a hybrid account to browse
+  instead of posting — if this turns out to surprise hybrid users in
+  practice (rather than professionals being the near-universal early
+  case this was generalized for), a short "see jobs or post one?"
+  branching question is the natural next iteration.
 
 **Also fixed while here — this is genuinely why the bug was invisible
 until now:** the last several phases (Phase 2 through Track Record
