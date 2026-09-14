@@ -19,6 +19,7 @@ INSERT INTO "Submarket" (id, key, label, "domainId") VALUES
   ('sub_plumbing', 'plumbing', 'Plumbing', 'dom_physical'),
   ('sub_electrical', 'electrical', 'Electrical', 'dom_physical'),
   ('sub_cleaning', 'cleaning', 'Cleaning', 'dom_physical'),
+  ('sub_laundry-dry-cleaning', 'laundry-dry-cleaning', 'Laundry & Dry Cleaning', 'dom_physical'),
   ('sub_carpentry', 'carpentry', 'Carpentry', 'dom_physical'),
   ('sub_painting', 'painting', 'Painting', 'dom_physical'),
   ('sub_appliance-repair', 'appliance-repair', 'Appliance Repair', 'dom_physical'),

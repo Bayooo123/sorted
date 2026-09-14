@@ -1758,6 +1758,25 @@ the wording once/if such a partnership actually exists.
 
 ---
 
+## Taxonomy gap: no dedicated Laundry/Dry Cleaning category
+
+Surfaced live: while posting Ifeanyi's real ironing job through the
+WhatsApp bot, the closest category was "Cleaning" — flagged as a known
+gap earlier this session (PLAN.md's taxonomy confirmation via the live
+`/taxonomy/submarkets` fetch already noted this). Added
+`sub_laundry-dry-cleaning` / key `laundry-dry-cleaning` / label "Laundry
+& Dry Cleaning" (domain: physical) to both `seed.ts` and `seed.sql`.
+
+This is a data row, not a schema migration — `listSubmarkets()` orders
+by label and numbers the list dynamically (`whatsapp-gig-conversation
+.service.ts`'s `numberedList`/`handleCategory`), so nothing else needed
+a code change. Handed the user a standalone
+`add_dry_cleaning_category.sql` (idempotent, `ON CONFLICT DO UPDATE`) to
+run directly in Neon — takes effect immediately, no deploy required,
+unlike the schema migrations above.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

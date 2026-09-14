@@ -19,6 +19,7 @@ const SUBMARKETS: { key: string; label: string; domainKey: string }[] = [
   { key: 'plumbing', label: 'Plumbing', domainKey: 'physical' },
   { key: 'electrical', label: 'Electrical', domainKey: 'physical' },
   { key: 'cleaning', label: 'Cleaning', domainKey: 'physical' },
+  { key: 'laundry-dry-cleaning', label: 'Laundry & Dry Cleaning', domainKey: 'physical' },
   { key: 'carpentry', label: 'Carpentry', domainKey: 'physical' },
   { key: 'painting', label: 'Painting', domainKey: 'physical' },
   { key: 'appliance-repair', label: 'Appliance Repair', domainKey: 'physical' },
