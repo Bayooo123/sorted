@@ -1688,6 +1688,44 @@ assuming it stays in sync automatically.
 
 ---
 
+## Production DB migration drift (My gigs / Browse returning 500)
+
+User reported "Internal Server Error" on both `/gigs/mine` and `/gigs`
+(Browse) on the live site. Root cause, confirmed via Vercel runtime logs
+(not guessed): `GigsService.listGigs()` — the shared method behind both
+endpoints — throws `PrismaClientKnownRequestError: The column
+Gig.submissionProofBase64 does not exist in the current database`.
+
+This is much further back than the `restrictedToProfessionalId` column I
+first suspected. The live Neon database has had **no migration applied
+since `20260901160000_escrow_holding_account_details`** (Sept 1) — every
+migration from `20260908120000_gig_submission_proof` through
+`20260912000000_whatsapp_browse_gigs` (8 migrations total, covering the
+submission-proof field, the entire WhatsApp session/conversation/invite/
+broadcast/browse feature set, and Ratings) was generated this session but
+never actually executed against production. The code has been deployed
+correctly (see the deploy-gap fix above) but the schema it expects was
+never created.
+
+Fix: verified all 8 pending migrations are purely additive (new nullable
+columns / new tables, no drops) via `grep` for destructive statements —
+none found — so combined them into one script wrapped in a single
+transaction, plus the matching `_prisma_migrations` rows (real sha256
+checksums of each migration.sql, so Prisma's own history table matches
+reality and a future `prisma migrate deploy` won't conflict). Handed to
+the user as `catch_up_migrations.sql` to run once in Neon's SQL editor —
+same reason as prior migrations this session: this sandboxed environment
+cannot reach the live Neon database directly (blocked egress), so this
+is a self-serve step only the user can execute.
+
+**Lesson for future phases:** every migration generated in this session
+needs an explicit confirmation from the user that it was actually run
+against Neon before its dependent code is considered "live" — the deploy
+gap fix earlier proved the code reaches prod; it does not prove the DB
+schema does.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
