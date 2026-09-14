@@ -7,6 +7,7 @@ import { EscrowService } from '../escrow/escrow.service';
 import { RatingsService } from '../ratings/ratings.service';
 import { kobo } from '../../common/money';
 import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
+import { WhatsappCategoryClassifierService } from './whatsapp-category-classifier.service';
 
 /**
  * WhatsApp integration Phase 2 (PLAN.md) — a registered client can post a
@@ -14,7 +15,9 @@ import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
  * sequence ("USSD-style", per the original product brief) rather than
  * free-text NLP extraction: taxonomy/location/price are hard requirements
  * of GigsService.createGig, and a wrong NLP guess on a money field is a
- * worse failure mode than one extra question.
+ * worse failure mode than one extra question. The category step is the
+ * one exception (see "AI category classification" in PLAN.md) — a wrong
+ * guess there just means one CATEGORY reply to fix, not a bad payout.
  *
  * State lives on WhatsAppSession (one row per phone, already used for the
  * 24h session window) rather than a separate table — this conversation is
@@ -31,12 +34,14 @@ export class WhatsappGigConversationService {
     private readonly gigs: GigsService,
     private readonly escrow: EscrowService,
     private readonly ratings: RatingsService,
+    private readonly classifier: WhatsappCategoryClassifierService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
 
   private readonly browseKeywordRegex = /^(jobs|gigs|available|browse|see jobs|view jobs)$/i;
   private readonly postKeywordRegex = /^(post|post a job|post job|i want to post)$/i;
   private readonly menuKeywordRegex = /^(menu|help|commands|\?)$/i;
+  private readonly categoryKeywordRegex = /^(category|change category|wrong category)$/i;
 
   async handle(user: IdentityUser, phone: string, text: string): Promise<void> {
     const trimmed = text.trim();
@@ -46,17 +51,24 @@ export class WhatsappGigConversationService {
       return;
     }
 
+    const session = await this.prisma.whatsAppSession.findUnique({ where: { phone } });
+    const state = session?.conversationState ?? 'idle';
+
     // Global escape hatches — recognized in ANY state, not just idle, so
     // someone mid-draft (or mid any other flow) isn't stuck answering the
     // current question just to see the job list or start a fresh post.
     // MENU/HELP is informational only and leaves the current flow alone;
     // JOBS and POST interrupt it the same way CANCEL does (see PLAN.md
     // "Global WhatsApp commands"), since this state machine has no
-    // resume-a-paused-draft mechanism to preserve it instead.
+    // resume-a-paused-draft mechanism to preserve it instead. CATEGORY is
+    // narrower: it only fires when a draft description already exists
+    // (see "AI category classification"), and deliberately does NOT wipe
+    // the rest of the draft — fixing a wrong AI guess shouldn't cost the
+    // location/price already collected.
     if (this.menuKeywordRegex.test(trimmed)) {
       await this.whatsapp.sendMessage(
         phone,
-        'Commands:\nJOBS — see open work\nPOST — start a new job post\nCANCEL — stop what you\'re doing\n\nOtherwise, just answer my last message.',
+        'Commands:\nJOBS — see open work\nPOST — start a new job post\nCATEGORY — pick a different category for the job you\'re posting\nCANCEL — stop what you\'re doing\n\nOtherwise, just answer my last message.',
       );
       return;
     }
@@ -70,9 +82,12 @@ export class WhatsappGigConversationService {
       await this.whatsapp.sendMessage(phone, 'Sure — tell me what you need done.');
       return;
     }
-
-    const session = await this.prisma.whatsAppSession.findUnique({ where: { phone } });
-    const state = session?.conversationState ?? 'idle';
+    if (this.categoryKeywordRegex.test(trimmed) && session?.draftDescription) {
+      const submarkets = await this.listSubmarkets();
+      await this.prisma.whatsAppSession.update({ where: { phone }, data: { conversationState: 'awaiting_category' } });
+      await this.whatsapp.sendMessage(phone, `What kind of job is this?\n\n${this.numberedList(submarkets)}\n\nReply with the number.`);
+      return;
+    }
 
     switch (state) {
       case 'awaiting_category':
@@ -231,6 +246,13 @@ export class WhatsappGigConversationService {
     await this.prisma.whatsAppSession.update({ where: { phone }, data: { conversationState: 'idle', browseGigIds: null } });
   }
 
+  /**
+   * PLAN.md "AI category classification" — tries Claude first so most
+   * users never see the ~20-item menu at all; only falls back to it when
+   * unconfigured (no ANTHROPIC_API_KEY), ambiguous, or erroring. A wrong
+   * guess costs one CATEGORY reply (global keyword above), never a
+   * corrupted gig — nothing here skips the location/price steps.
+   */
   private async startDraft(phone: string, description: string): Promise<void> {
     if (description.length < 3) {
       await this.whatsapp.sendMessage(phone, "Tell me a bit more about what you need done — e.g. \"fix a leaking kitchen tap\".");
@@ -238,18 +260,28 @@ export class WhatsappGigConversationService {
     }
 
     const submarkets = await this.listSubmarkets();
+    const guessed = await this.classifier.classify(description, submarkets);
+
     await this.prisma.whatsAppSession.update({
       where: { phone },
       data: {
-        conversationState: 'awaiting_category',
+        conversationState: guessed ? 'awaiting_location' : 'awaiting_category',
         draftDescription: description,
-        draftSubmarketId: null,
+        draftSubmarketId: guessed?.id ?? null,
         draftLocationText: null,
         draftBountyKobo: null,
         draftInviteeProfessionalId: null,
         draftInviteeName: null,
       },
     });
+
+    if (guessed) {
+      await this.whatsapp.sendMessage(
+        phone,
+        `Got it — filed under *${guessed.label}*. Not right? Reply CATEGORY to pick a different one.\n\nWhere should this be done? (e.g. "Abule Oja, Yaba" or a full address)`,
+      );
+      return;
+    }
 
     await this.whatsapp.sendMessage(phone, `Got it. What kind of job is this?\n\n${this.numberedList(submarkets)}\n\nReply with the number.`);
   }

@@ -8,6 +8,7 @@ import { WhatsappWebhookController } from './whatsapp-webhook.controller';
 import { WhatsappGigConversationService } from './whatsapp-gig-conversation.service';
 import { WhatsappInviteService } from './whatsapp-invite.service';
 import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
+import { WhatsappCategoryClassifierService } from './whatsapp-category-classifier.service';
 
 /**
  * Separate from WhatsappModule on purpose — see whatsapp.interface.ts's
@@ -21,6 +22,6 @@ import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
 @Module({
   imports: [IdentityModule, WhatsappModule, GigsModule, EscrowModule, RatingsModule],
   controllers: [WhatsappWebhookController],
-  providers: [WhatsappGigConversationService, WhatsappInviteService, WhatsappBroadcastService],
+  providers: [WhatsappGigConversationService, WhatsappInviteService, WhatsappBroadcastService, WhatsappCategoryClassifierService],
 })
 export class WhatsappWebhookModule {}

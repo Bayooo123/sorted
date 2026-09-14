@@ -1811,6 +1811,51 @@ practice.
 
 ---
 
+## AI category classification — skip the menu when Claude is confident
+
+Direct follow-up to the tradeoff above: the user asked for the bot to
+"always discern what the user wants and point him to the appropriate
+category" instead of making everyone scroll a ~20-item numbered menu.
+This is the one place in the WhatsApp flow that now uses an actual LLM
+call rather than a keyword/menu match — everywhere else in this module
+stays deterministic on purpose (see this file's top doc comment: a
+wrong NLP guess on a money/location field is worse than one extra
+question). Category is different: a wrong guess costs one CATEGORY
+reply, never a bad payout, so the cost/benefit flips.
+
+New `WhatsappCategoryClassifierService` (`@anthropic-ai/sdk` +
+`zod`, both newly added to `server/package.json`): given the free-text
+description and the live submarket list, asks Claude Opus 5 for
+exactly one category key or `"none"`, via `messages.parse` +
+`zodOutputFormat` (structured output, not string-parsed) so the result
+is always one of the real keys or a clean "no match" — never a
+hallucinated category. `output_config.effort: "low"` — this is a single
+short classification, not agentic work. Fully optional: no
+`ANTHROPIC_API_KEY` (or a classification error) returns `null` and
+`startDraft` falls straight back to the unchanged numbered-menu path —
+this is strictly additive, nothing breaks if it's never configured.
+
+`startDraft` now calls the classifier right after capturing the
+description; on a confident match it sets `draftSubmarketId` directly
+and skips straight to the location question, telling the user which
+category it picked. New global `CATEGORY` keyword (alongside
+JOBS/POST/MENU) lets them override a wrong guess — deliberately does
+NOT reset the rest of the draft (only fires when `draftDescription` is
+already set), since fixing the category shouldn't cost location/price
+already collected.
+
+**Cost note for the user:** this calls Opus 5 (the skill's non-negotiable
+default absent an explicit ask) on every single gig post now, which is
+a simple classification task run at potentially high volume. Worth
+asking to switch to a cheaper model (Sonnet or Haiku) if this becomes a
+meaningful cost line — that's a one-line change in
+`whatsapp-category-classifier.service.ts`, not a redesign.
+
+Also added `ANTHROPIC_API_KEY` to `server/.env.example`, documented as
+optional.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
