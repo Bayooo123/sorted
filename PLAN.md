@@ -1726,6 +1726,38 @@ schema does.
 
 ---
 
+## "Congrats on your first gig" — professional completion message
+
+User asked for a WhatsApp message to the professional once their gig is
+claimed, funded, and released: a congratulations, plus an incentive to
+keep transacting ("access to more customers, healthcare and pension").
+
+Added `EscrowService.notifyProfessionalOfCompletion`, fired alongside the
+existing client-facing `promptForRating` at the end of
+`releaseToProfessional` — same best-effort-outside-the-transaction
+treatment (a failed message must never fail a payout that already
+happened), same reuse of `whatsapp.sendMessage` (no new WhatsAppPort
+method needed, since this doesn't set any conversation state or expect a
+reply — unlike `offerReassignment`/`promptForRating`).
+
+"First gig" is computed live (`Claim.count` where the professional's gig
+is `released`), not a stored flag — stays correct for professionals whose
+history predates this feature. First release gets "you just got your
+first gig done"; every one after gets a shorter "another gig done"
+variant, both followed by the same forward-looking line.
+
+**Deliberately softened the healthcare/pension wording.** Asked for
+verbatim would read as "we guarantee ... healthcare and pension" — but no
+healthcare or pension partner exists yet (same category of risk flagged
+for Track Record: don't imply a guarantee that isn't backed by anything
+real). Shipped as "we're building toward healthcare and pension access
+for professionals with a real track record" instead — same incentive,
+without promising something that could be pointed to later as false.
+Flagging this explicitly rather than silently changing the ask; revisit
+the wording once/if such a partnership actually exists.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -441,6 +441,9 @@ export class EscrowService implements EscrowPort {
     await this.promptForRating(gigId, claim.professionalId, gig.clientId).catch((err) => {
       this.logger.warn(`Rating prompt failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
     });
+    await this.notifyProfessionalOfCompletion(gigId, claim.professionalId).catch((err) => {
+      this.logger.warn(`Completion notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+    });
 
     return this.toView(record);
   }
@@ -451,6 +454,29 @@ export class EscrowService implements EscrowPort {
     const professional = await this.identity.getUser(professionalId);
     const firstName = professional.name?.trim().split(/\s+/)[0] ?? 'The professional';
     await this.whatsapp.promptForRating(client.phone, gigId, firstName);
+  }
+
+  /**
+   * PLAN.md "Congrats on your first gig" — fires once per real release
+   * (guarded by the same CAS as the payout above). "First gig" is counted
+   * from released gigs, not a stored flag, so it stays correct even if a
+   * professional's history predates this feature.
+   */
+  private async notifyProfessionalOfCompletion(gigId: string, professionalId: string): Promise<void> {
+    const professional = await this.identity.getUser(professionalId);
+    if (!professional.phone) return;
+    const firstName = professional.name?.trim().split(/\s+/)[0] ?? 'there';
+    const releasedCount = await this.prisma.claim.count({
+      where: { professionalId, gig: { status: 'released' } },
+    });
+    const opener =
+      releasedCount <= 1
+        ? `🎉 Congrats ${firstName} — you just got your first gig done on Sorted!`
+        : `🎉 Nice work, ${firstName} — another gig done on Sorted!`;
+    await this.whatsapp.sendMessage(
+      professional.phone,
+      `${opener} You've been paid out for it.\n\nKeep transacting with us: the more jobs you complete here, the more customers we send your way — and as Sorted grows, we're building toward healthcare and pension access for professionals with a real track record on the platform.`,
+    );
   }
 
   async refundClient(gigId: string): Promise<EscrowRecordView> {
