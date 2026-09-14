@@ -34,11 +34,40 @@ export class WhatsappGigConversationService {
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
 
+  private readonly browseKeywordRegex = /^(jobs|gigs|available|browse|see jobs|view jobs)$/i;
+  private readonly postKeywordRegex = /^(post|post a job|post job|i want to post)$/i;
+  private readonly menuKeywordRegex = /^(menu|help|commands|\?)$/i;
+
   async handle(user: IdentityUser, phone: string, text: string): Promise<void> {
     const trimmed = text.trim();
     if (/^(cancel|stop|start over)$/i.test(trimmed)) {
       await this.reset(phone);
       await this.whatsapp.sendMessage(phone, 'Cancelled — no problem. Text "jobs" to see available work, or tell me what you need done to post a job of your own.');
+      return;
+    }
+
+    // Global escape hatches — recognized in ANY state, not just idle, so
+    // someone mid-draft (or mid any other flow) isn't stuck answering the
+    // current question just to see the job list or start a fresh post.
+    // MENU/HELP is informational only and leaves the current flow alone;
+    // JOBS and POST interrupt it the same way CANCEL does (see PLAN.md
+    // "Global WhatsApp commands"), since this state machine has no
+    // resume-a-paused-draft mechanism to preserve it instead.
+    if (this.menuKeywordRegex.test(trimmed)) {
+      await this.whatsapp.sendMessage(
+        phone,
+        'Commands:\nJOBS — see open work\nPOST — start a new job post\nCANCEL — stop what you\'re doing\n\nOtherwise, just answer my last message.',
+      );
+      return;
+    }
+    if (this.browseKeywordRegex.test(trimmed)) {
+      await this.reset(phone);
+      return this.showAvailableGigs(user, phone);
+    }
+    if (this.postKeywordRegex.test(trimmed)) {
+      await this.reset(phone);
+      await this.prisma.whatsAppSession.update({ where: { phone }, data: { conversationState: 'awaiting_post_description' } });
+      await this.whatsapp.sendMessage(phone, 'Sure — tell me what you need done.');
       return;
     }
 
@@ -89,22 +118,13 @@ export class WhatsappGigConversationService {
    * longer post by just describing a job, "post" is the explicit escape
    * hatch back into that flow (asks for the description on the NEXT
    * message, rather than misreading "post" itself as one).
+   *
+   * JOBS/POST/MENU keywords are handled upstream in `handle()` now (see
+   * "Global WhatsApp commands"), so by the time control reaches here the
+   * text is neither — only the role-based default is left to decide.
    */
   private async handleIdle(user: IdentityUser, phone: string, text: string): Promise<void> {
-    const isBrowseKeyword = /^(jobs|gigs|available|browse|see jobs|view jobs)$/i.test(text);
-    const isPostKeyword = /^(post|post a job|post job|i want to post)$/i.test(text);
-
-    if (isPostKeyword) {
-      await this.prisma.whatsAppSession.upsert({
-        where: { phone },
-        create: { phone, conversationState: 'awaiting_post_description' },
-        update: { conversationState: 'awaiting_post_description' },
-      });
-      await this.whatsapp.sendMessage(phone, 'Sure — tell me what you need done.');
-      return;
-    }
-
-    if (isBrowseKeyword || user.roles.includes('professional')) {
+    if (user.roles.includes('professional')) {
       return this.showAvailableGigs(user, phone);
     }
     return this.startDraft(phone, text);

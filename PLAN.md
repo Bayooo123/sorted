@@ -1777,6 +1777,40 @@ unlike the schema migrations above.
 
 ---
 
+## Global WhatsApp commands (JOBS/POST/MENU work mid-flow)
+
+User hit this live: mid-draft (answering the price question), they typed
+something else entirely and got the state's generic rejection ("Sorry, I
+didn't get that — reply with just the amount in naira..."). The bot was
+strictly linear — every state's handler only understood answers to its
+own question, with `CANCEL`/`STOP`/`START OVER` as the sole exception
+(already checked before the state switch in `handle()`).
+
+Fix, not a full NLU rewrite (that trade-off was surfaced to the user
+first): extended the same pre-switch check to a small fixed set of
+escape commands — `JOBS`/`GIGS`/`BROWSE`/etc. and `POST` now interrupt
+whatever's in progress and jump to browsing or a fresh post, exactly
+like `CANCEL` already did (this state machine has no "pause and resume
+a draft" mechanism, so interrupting is the only option — same tradeoff
+`CANCEL` already made). Added `MENU`/`HELP`/`?` as a non-interrupting
+informational command — it lists the three commands without touching
+session state, so someone can check what's available and then still
+answer the pending question.
+
+Simplified `handleIdle` afterward: its own JOBS/POST keyword checks were
+now dead code (never reached — `handle()` intercepts them first), so
+removed them; it's back to just the role-based browse-vs-draft default
+described in "Browse available gigs" above.
+
+**Tradeoff, stated to the user before building:** this recognizes only
+these exact command words, not arbitrary phrasing ("actually, show me
+open jobs instead") — a real NLU/LLM intent layer would catch that, at
+the cost of latency, spend, and a new failure mode (misreading a real
+answer as a command). Revisit if fixed keywords prove too narrow in
+practice.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
