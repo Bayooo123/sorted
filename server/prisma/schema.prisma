@@ -34,15 +34,15 @@ enum KycStatus {
 }
 
 model User {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   // Password-based auth (product decision, not in HANDOFF.md — replaced
   // phone/email + OTP; see PLAN.md "Password-based auth"). Both phone and
   // email stay nullable at the DB level for the same reason as before
   // (avoids another destructive NOT NULL migration on rows created under
   // the old OTP flow) but both are required at signup — enforced in
   // IdentityService/SignupDto, not the schema.
-  phone               String?  @unique
-  email               String?  @unique
+  phone               String?   @unique
+  email               String?   @unique
   name                String?
   passwordHash        String?
   state               String? // Nigerian state — see common/nigerian-states.ts
@@ -54,16 +54,25 @@ model User {
   payoutBankCode      String?
   payoutAccountNumber String?
   payoutAccountName   String?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime  @default(now())
 
-  gigsAsClient     Gig[]      @relation("ClientGigs")
-  gigsInvitedTo    Gig[]      @relation("GigRestrictedTo")
+  // PLAN.md "KWIK delivery integration" — a physical pickup/drop-off point
+  // for professionals whose work needs a courier leg (e.g. a dry cleaner's
+  // shop), distinct from Gig.locationText (the CLIENT's location). Nullable:
+  // only professionals in a delivery-eligible trade need to set this, and
+  // dispatch is skipped (not forced) until they do — see DeliveryService.
+  professionalAddressText String?
+  professionalAddressLat  Float?
+  professionalAddressLng  Float?
+
+  gigsAsClient    Gig[]         @relation("ClientGigs")
+  gigsInvitedTo   Gig[]         @relation("GigRestrictedTo")
   claims          Claim[]
-  disputesRaised  Dispute[]  @relation("DisputeRaisedBy")
-  disputesRuled   Dispute[]  @relation("DisputeNeutral")
+  disputesRaised  Dispute[]     @relation("DisputeRaisedBy")
+  disputesRuled   Dispute[]     @relation("DisputeNeutral")
   gigTemplates    GigTemplate[]
-  ratingsGiven     Rating[]   @relation("RatingsGiven")
-  ratingsReceived  Rating[]   @relation("RatingsReceived")
+  ratingsGiven    Rating[]      @relation("RatingsGiven")
+  ratingsReceived Rating[]      @relation("RatingsReceived")
 
   // Registration decision (not in the original HANDOFF.md — agreed in a
   // later product session, see PLAN.md "Registration: account type"):
@@ -71,7 +80,7 @@ model User {
   // set, the matching profile below is required — enforced in
   // IdentityService.completeRoleProfile, not by the schema.
   serviceOfferings  ProfessionalServiceOffering[] // required when roleFlags includes "professional"
-  seekingCategories ClientSeekingCategory[]  // required when roleFlags includes "client"
+  seekingCategories ClientSeekingCategory[] // required when roleFlags includes "client"
 
   passwordResetTokens PasswordResetToken[]
   kycRequests         KycRequest[]
@@ -91,15 +100,15 @@ enum KycRequestStatus {
 }
 
 model KycRequest {
-  id             String            @id @default(cuid())
+  id             String           @id @default(cuid())
   userId         String
-  user           User              @relation(fields: [userId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
   documentBase64 String // data URI — photo/ID uploaded for manual review
   note           String?
-  status         KycRequestStatus  @default(pending)
+  status         KycRequestStatus @default(pending)
   reviewNote     String?
   reviewedAt     DateTime?
-  createdAt      DateTime          @default(now())
+  createdAt      DateTime         @default(now())
 
   @@index([userId])
 }
@@ -171,9 +180,9 @@ model Submarket {
   domainId String?
   domain   Domain? @relation(fields: [domainId], references: [id])
 
-  gigs                     Gig[]
-  offeredByProfessionals         ProfessionalServiceOffering[]
-  soughtByClients           ClientSeekingCategory[]
+  gigs                   Gig[]
+  offeredByProfessionals ProfessionalServiceOffering[]
+  soughtByClients        ClientSeekingCategory[]
 }
 
 // Registration: which categories a professional says they offer services in.
@@ -240,8 +249,8 @@ enum GigStatus {
 
 model GigTemplate {
   id         String   @id @default(cuid())
-  clientId    String
-  client      User     @relation(fields: [clientId], references: [id])
+  clientId   String
+  client     User     @relation(fields: [clientId], references: [id])
   spec       Json
   recurrence Json? // SEAM (§3.2 RECURRENCE): unused in v1 — generate instances from this later
   createdAt  DateTime @default(now())
@@ -250,22 +259,22 @@ model GigTemplate {
 }
 
 model Gig {
-  id          String   @id @default(cuid())
-  clientId     String
-  client       User     @relation("ClientGigs", fields: [clientId], references: [id])
-  source      GigSource @default(self_posted)
-  templateId  String? // SEAM (§3.2 RECURRENCE): nullable, always null in v1
-  template    GigTemplate? @relation(fields: [templateId], references: [id])
+  id         String       @id @default(cuid())
+  clientId   String
+  client     User         @relation("ClientGigs", fields: [clientId], references: [id])
+  source     GigSource    @default(self_posted)
+  templateId String? // SEAM (§3.2 RECURRENCE): nullable, always null in v1
+  template   GigTemplate? @relation(fields: [templateId], references: [id])
 
   title       String
   description String
 
   domainId     String
-  domain       Domain       @relation(fields: [domainId], references: [id])
+  domain       Domain        @relation(fields: [domainId], references: [id])
   submarketId  String
-  submarket    Submarket    @relation(fields: [submarketId], references: [id])
-  clientTypeId  String
-  clientType    ClientTypeRef @relation(fields: [clientTypeId], references: [id])
+  submarket    Submarket     @relation(fields: [submarketId], references: [id])
+  clientTypeId String
+  clientType   ClientTypeRef @relation(fields: [clientTypeId], references: [id])
 
   locationText   String
   locationGeoLat Float?
@@ -302,18 +311,57 @@ model Gig {
   disputes      Dispute[]
   ledgerEntries LedgerEntry[]
   rating        Rating?
+  deliveryTasks DeliveryTask[]
+}
+
+// PLAN.md "KWIK delivery integration" — one row per courier leg dispatched
+// through KWIK for a gig in a delivery-eligible submarket (e.g. Laundry &
+// Dry Cleaning). Two legs per gig at most in v1: pickup (client ->
+// professional) and return (professional -> client) — see DeliveryService.
+enum DeliveryLeg {
+  pickup_to_professional
+  return_to_client
+}
+
+enum DeliveryTaskStatus {
+  upcoming
+  started
+  arrived
+  ended
+  failed
+  unassigned
+  accepted
+  declined
+  cancelled
+  deleted
+}
+
+model DeliveryTask {
+  id            String             @id @default(cuid())
+  gigId         String
+  gig           Gig                @relation(fields: [gigId], references: [id])
+  leg           DeliveryLeg
+  provider      String             @default("kwik") // SEAM: only KWIK in v1, but kept a plain string in case a second courier is added later
+  providerJobId String? // KWIK's job_id — null if dispatch failed/was skipped (see DeliveryService: best-effort, never blocks the gig)
+  status        DeliveryTaskStatus @default(upcoming)
+  trackingLink  String?
+  failureReason String? // set when dispatch was skipped or KWIK returned an error — never silently dropped
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([gigId])
 }
 
 model Criterion {
-  id                    String  @id @default(cuid())
-  gigId                 String
-  gig                   Gig     @relation(fields: [gigId], references: [id])
-  orderIndex            Int
-  text                  String
-  locked                Boolean @default(false) // ★ true at publish, immutable thereafter — server-enforced
-  verificationStrategy  String  @default("client_signoff") // SEAM (§3.6): key into VerificationStrategy registry, settable per criterion
-  proofUrl              String?
-  met                   Boolean?
+  id                   String   @id @default(cuid())
+  gigId                String
+  gig                  Gig      @relation(fields: [gigId], references: [id])
+  orderIndex           Int
+  text                 String
+  locked               Boolean  @default(false) // ★ true at publish, immutable thereafter — server-enforced
+  verificationStrategy String   @default("client_signoff") // SEAM (§3.6): key into VerificationStrategy registry, settable per criterion
+  proofUrl             String?
+  met                  Boolean?
 }
 
 // ---------------------------------------------------------------------------
@@ -328,14 +376,14 @@ enum ClaimStatus {
 }
 
 model Claim {
-  id        String      @id @default(cuid())
-  gigId     String
-  gig       Gig         @relation(fields: [gigId], references: [id])
-  professionalId  String
-  professional    User        @relation(fields: [professionalId], references: [id])
-  staked    Boolean     @default(false)
-  status    ClaimStatus @default(pending)
-  claimedAt DateTime    @default(now())
+  id             String      @id @default(cuid())
+  gigId          String
+  gig            Gig         @relation(fields: [gigId], references: [id])
+  professionalId String
+  professional   User        @relation(fields: [professionalId], references: [id])
+  staked         Boolean     @default(false)
+  status         ClaimStatus @default(pending)
+  claimedAt      DateTime    @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -353,11 +401,11 @@ enum EscrowState {
 }
 
 model EscrowRecord {
-  id                 String      @id @default(cuid())
-  gigId              String      @unique
-  gig                Gig         @relation(fields: [gigId], references: [id])
-  provider           String      @default("manual_pilot") // SEAM (§3.4): PaymentsProvider key
-  holdingAccountRef  String?
+  id                    String  @id @default(cuid())
+  gigId                 String  @unique
+  gig                   Gig     @relation(fields: [gigId], references: [id])
+  provider              String  @default("manual_pilot") // SEAM (§3.4): PaymentsProvider key
+  holdingAccountRef     String?
   // Whatever the provider returned to show the client at funding time —
   // { accountNumber?, bankName?, checkoutUrl? } — captured once at
   // creation (see PaystackProvider.createHoldingAccount) so a re-fetch of
@@ -368,18 +416,18 @@ model EscrowRecord {
   // things — see PLAN.md "Paystack integration".
   holdingAccountDetails Json?
 
-  bountyKobo         BigInt // ★
-  stakeKobo          BigInt      @default(0) // ★
-  stakeHeld          Boolean     @default(false)
+  bountyKobo BigInt // ★
+  stakeKobo  BigInt  @default(0) // ★
+  stakeHeld  Boolean @default(false)
 
-  platformFeeBps     Int // ★ config PER GIG (1000=10%, 500=launch rate) — never a constant
-  feeKobo            BigInt? // ★
-  professionalPayoutKobo   BigInt? // ★
+  platformFeeBps         Int // ★ config PER GIG (1000=10%, 500=launch rate) — never a constant
+  feeKobo                BigInt? // ★
+  professionalPayoutKobo BigInt? // ★
 
-  state              EscrowState @default(awaiting_funding)
-  disbursementRef    String? // idempotency key for disbursement — double-release protection
+  state           EscrowState @default(awaiting_funding)
+  disbursementRef String? // idempotency key for disbursement — double-release protection
 
-  stateChangedAt     DateTime    @default(now())
+  stateChangedAt DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -454,15 +502,15 @@ model LedgerEntry {
 // ---------------------------------------------------------------------------
 
 model Rating {
-  id      String @id @default(cuid())
-  gigId   String @unique // one rating per gig — enforces "released transaction only," not a general review
-  gig     Gig    @relation(fields: [gigId], references: [id])
-  raterId String
-  rater   User   @relation("RatingsGiven", fields: [raterId], references: [id])
-  rateeId String
-  ratee   User   @relation("RatingsReceived", fields: [rateeId], references: [id])
-  stars   Int // 1-5, enforced in RatingsService — no DB check constraint (Prisma doesn't express one directly)
-  comment String?
+  id        String   @id @default(cuid())
+  gigId     String   @unique // one rating per gig — enforces "released transaction only," not a general review
+  gig       Gig      @relation(fields: [gigId], references: [id])
+  raterId   String
+  rater     User     @relation("RatingsGiven", fields: [raterId], references: [id])
+  rateeId   String
+  ratee     User     @relation("RatingsReceived", fields: [rateeId], references: [id])
+  stars     Int // 1-5, enforced in RatingsService — no DB check constraint (Prisma doesn't express one directly)
+  comment   String?
   createdAt DateTime @default(now())
 }
 
@@ -486,11 +534,11 @@ model WhatsAppSession {
   // idle -> awaiting_category -> awaiting_location -> awaiting_price ->
   // awaiting_confirmation -> idle. Draft fields hold whatever's been
   // collected so far; cleared back to null on post or cancel.
-  conversationState String   @default("idle")
-  draftDescription  String?
-  draftSubmarketId  String?
-  draftLocationText String?
-  draftBountyKobo   BigInt?
+  conversationState          String  @default("idle")
+  draftDescription           String?
+  draftSubmarketId           String?
+  draftLocationText          String?
+  draftBountyKobo            BigInt?
   // "Invite someone I know" branch of the same draft (Phase 3) — set only
   // when the client picked a specific professional instead of open search.
   draftInviteeProfessionalId String?

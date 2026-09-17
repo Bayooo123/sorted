@@ -65,6 +65,8 @@ export interface GigRecord {
   domain: string; // taxonomy key
   submarket: string; // taxonomy key
   locationText: string;
+  locationGeoLat: number | null;
+  locationGeoLng: number | null;
   materialsMode: 'bounty_covers' | 'professional_supplies';
   status: GigStatus;
   bountyKobo: Kobo;

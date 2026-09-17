@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { Kobo, applyBps, kobo } from '../../common/money';
 import { PrismaTx } from '../../common/prisma-tx';
 import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
+import { DeliveryService } from '../delivery/delivery.service';
 import { EscrowPort, EscrowRecordView, EscrowState } from './escrow.interface';
 
 /**
@@ -44,6 +45,7 @@ export class EscrowService implements EscrowPort {
     @Inject(LEDGER_PORT) private readonly ledger: LedgerPort,
     @Inject(MATCHING_STRATEGY) private readonly matching: MatchingStrategy,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
+    private readonly delivery: DeliveryService,
   ) {}
 
   async fundGig(gigId: string): Promise<EscrowRecordView> {
@@ -322,6 +324,14 @@ export class EscrowService implements EscrowPort {
       await this.gigs.transitionStatus(gigId, 'in_progress', tx);
 
       return updated;
+    });
+
+    // Best-effort, outside the transaction — same reasoning as every other
+    // WhatsApp/notification hook in this file: a courier dispatch failing
+    // must never undo a claim that already succeeded. No-ops for any
+    // submarket other than Laundry & Dry Cleaning — see DeliveryService.
+    await this.delivery.dispatchPickupLeg(gigId, gig.clientId, professionalId).catch((err) => {
+      this.logger.warn(`Pickup dispatch failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
     });
 
     return this.toView(record);

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
@@ -6,6 +6,7 @@ import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interf
 import { kobo } from '../../common/money';
 import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { PrismaTx } from '../../common/prisma-tx';
+import { DeliveryService } from '../delivery/delivery.service';
 import {
   CreateGigInput,
   GigListFilter,
@@ -45,10 +46,13 @@ type GigWithRelations = Prisma.GigGetPayload<{ include: typeof GIG_INCLUDE }>;
 
 @Injectable()
 export class GigsService implements GigsPort {
+  private readonly logger = new Logger(GigsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     @Inject(MATCHING_STRATEGY) private readonly matchingStrategy: MatchingStrategy,
+    private readonly delivery: DeliveryService,
   ) {}
 
   async createGig(input: CreateGigInput): Promise<GigRecord> {
@@ -246,13 +250,23 @@ export class GigsService implements GigsPort {
     // Proof/note land in the same transaction as the status flip — a gig
     // should never be visible as 'submitted' with no proof attached (e.g.
     // a crash between the two writes).
-    return this.prisma.$transaction(async (tx) => {
+    const record = await this.prisma.$transaction(async (tx) => {
       await tx.gig.update({
         where: { id: gigId },
         data: { submissionProofBase64: proofBase64, submissionNote: note ?? null },
       });
       return this.transitionStatus(gigId, 'submitted', tx);
     });
+
+    // Best-effort, outside the transaction — same discipline as every other
+    // notification/dispatch hook in this codebase: a courier failure must
+    // never undo a submission that already succeeded. No-ops for any
+    // submarket other than Laundry & Dry Cleaning — see DeliveryService.
+    await this.delivery.dispatchReturnLeg(gigId, record.clientId, professionalId).catch((err) => {
+      this.logger.warn(`Return dispatch failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+    });
+
+    return record;
   }
 
   private assertTransitionAllowed(from: GigStatus, to: GigStatus): void {
@@ -272,6 +286,8 @@ export class GigsService implements GigsPort {
       domain: gig.domain.key,
       submarket: gig.submarket.key,
       locationText: gig.locationText,
+      locationGeoLat: gig.locationGeoLat,
+      locationGeoLng: gig.locationGeoLng,
       materialsMode: gig.materialsMode as GigRecord['materialsMode'],
       status: gig.status as GigStatus,
       bountyKobo: kobo(Number(gig.bountyKobo)),

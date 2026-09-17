@@ -6,6 +6,7 @@ import { IdentityModule } from '../identity/identity.module';
 import { MatchingModule } from '../matching/matching.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { AuthModule } from '../../common/auth/auth.module';
+import { DeliveryModule } from '../delivery/delivery.module';
 import { EscrowService } from './escrow.service';
 import { EscrowController } from './escrow.controller';
 import { PaystackWebhookController } from './paystack-webhook.controller';
@@ -14,7 +15,7 @@ import { PaystackWebhookController } from './paystack-webhook.controller';
 // it has zero imports of its own, so Escrow -> Whatsapp adds no cycle, same
 // reasoning as Notifications -> Whatsapp and WhatsappWebhookModule -> Escrow.
 @Module({
-  imports: [PaymentsModule, LedgerModule, GigsModule, IdentityModule, MatchingModule, WhatsappModule, AuthModule],
+  imports: [PaymentsModule, LedgerModule, GigsModule, IdentityModule, MatchingModule, WhatsappModule, AuthModule, DeliveryModule],
   controllers: [EscrowController, PaystackWebhookController],
   providers: [EscrowService],
   exports: [EscrowService],

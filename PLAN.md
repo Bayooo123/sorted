@@ -1856,6 +1856,84 @@ optional.
 
 ---
 
+## KWIK delivery integration — courier dispatch for Laundry & Dry Cleaning
+
+User's request: "integrate it for delivery by drycleaners," after pasting
+KWIK's Apiary API documentation (pickup/delivery task creation, pricing,
+job-status lookup, corporate billing). Scoped down from the full KWIK
+surface to exactly what a dry-cleaning gig needs: two courier legs —
+pickup (client → professional's shop, dispatched when a claim is
+accepted) and return (professional's shop → client, dispatched when the
+professional submits proof of completed work).
+
+**New `DeliveryModule`** (`server/src/modules/delivery/`), a clean leaf
+module — same shape as `WhatsappModule`/`PaymentsModule`, no dependency
+on Gigs/Escrow/Identity, so both `GigsModule` and `EscrowModule` can
+import it without a cycle:
+- `delivery.interface.ts` — `DeliveryProviderPort` (`createTask`,
+  `getTaskStatus`), returns `null` rather than throwing on any failure —
+  courier dispatch is best-effort by design, matching every other
+  notification hook in this codebase (a failed courier call must never
+  undo a real claim or submission).
+- `kwik-delivery.service.ts` — the KWIK adapter. **Built directly from
+  the pasted docs, untested against KWIK's real API** (no sandbox or
+  credentials available in this environment). Two endpoints
+  (`/send_payment_for_task`, `/get_bill_breakdown`, `/getVehicle`,
+  `/getLoaderList`) have a literal path reference in the source docs;
+  two more (task creation, job-status lookup) do not — those are
+  best-guess placeholders (`/create_task`, `/fetch_job_status`),
+  overridable via `KWIK_PATH_*` env vars without a code change. Loaders,
+  insurance, and COD are hardcoded off — none apply to a garment
+  delivery — and vehicle selection is a single configured
+  `KWIK_VEHICLE_ID` rather than a live `/getVehicle` call, to keep the
+  first cut tractable.
+- `delivery.service.ts` — resolves gig/client/professional data via
+  Prisma directly (not through GigsService/IdentityService, to stay a
+  leaf), decides eligibility (`submarket.key === 'laundry-dry-cleaning'`
+  only), and always writes a `DeliveryTask` row — including a
+  `failureReason` when dispatch couldn't happen — so a missing delivery
+  shows up in the data instead of vanishing silently.
+
+**Schema:** `User.professionalAddressText/Lat/Lng` (new — a professional's
+physical shop location didn't exist anywhere before this; needed
+regardless of workflow shape, since even a single-leg delivery has to
+know where the professional's shop is). `GigRecord` also now exposes
+`locationGeoLat/Lng`, which existed as DB columns but were never surfaced
+through `GigsService.toGigRecord` — a real gap this closed. New
+`DeliveryTask` model (gigId, leg, provider, providerJobId, status,
+trackingLink, failureReason). Migration:
+`20260917150000_kwik_delivery`.
+
+**Wired into the existing lifecycle**, not new endpoints:
+`EscrowService.holdStake` (claim accepted → pickup leg) and
+`GigsService.submitForReview` (proof submitted → return leg), both as
+one-line best-effort calls after the real transaction commits — same
+pattern as `notifyProfessionalOfCompletion`/`promptForRating`.
+
+**Real gaps, stated plainly rather than papered over:**
+1. **No confirmed KWIK base URL or full endpoint paths.** The pasted
+   docs give field tables, not a host or (for two endpoints) any literal
+   path. `KWIK_API_BASE_URL` and `KWIK_PATH_*` must come from KWIK's
+   dashboard/support before this can make a single real call.
+2. **Geocoding gap.** `Gig.locationGeoLat/Lng` is only ever populated
+   when a client picks a location via a map UI — the WhatsApp posting
+   flow (`handleLocation`) takes free text and never geocodes it. Until
+   that's solved (or WhatsApp gig posts require a shared-location
+   message instead of typed text), most WhatsApp-originated dry-cleaning
+   gigs will fail the "client location has coordinates" check and just
+   log a skip — never silently claim a delivery was dispatched.
+3. **No UI/WhatsApp flow yet for a professional to SET their shop
+   address.** The field exists; nothing populates it. Until it's set,
+   dispatch skips with a clear `failureReason`.
+4. **Real KWIK vendor credentials** (`KWIK_DOMAIN_NAME`,
+   `KWIK_ACCESS_TOKEN`, `KWIK_VENDOR_ID`, a fetched `KWIK_VEHICLE_ID`)
+   are unset — dispatch no-ops until they're configured.
+
+None of these block the code from existing correctly today; they block
+it from actually dispatching a real courier until resolved.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
