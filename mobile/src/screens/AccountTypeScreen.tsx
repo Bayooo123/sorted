@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Banner, Body, Button, Heading, Screen, Subtext } from '../components/ui';
+import { Banner, Body, Button, Heading, Screen, Subtext, TextField } from '../components/ui';
 import { completeRoleProfile, listSubmarkets } from '../api/identity';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -36,6 +36,20 @@ export default function AccountTypeScreen() {
   const [loading, setLoading] = useState(false);
   const { refreshUser } = useAuth();
 
+  // PLAN.md "Individual vs business accounts" — only relevant once
+  // "professional" is one of the selected roles (a business account is a
+  // registered service provider, e.g. a dry cleaner; a client-only
+  // account has no company to register). This same flow is reused as the
+  // conversion path for an already-registered account — see
+  // ConvertToBusinessScreen (Settings), which calls completeRoleProfile
+  // the same way with the user's existing roles/submarkets preserved.
+  const [isBusiness, setIsBusiness] = useState(false);
+  const [companyRegistrationNumber, setCompanyRegistrationNumber] = useState('');
+  const [directorNamesText, setDirectorNamesText] = useState('');
+  const [businessEmail, setBusinessEmail] = useState('');
+  const [businessPhone, setBusinessPhone] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+
   useEffect(() => {
     listSubmarkets()
       .then(setSubmarkets)
@@ -45,8 +59,20 @@ export default function AccountTypeScreen() {
   const roles = ROLES_BY_TYPE[accountType];
   const needsOffering = roles.includes('professional');
   const needsSeeking = roles.includes('client');
+  const directorNames = directorNamesText
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const businessFieldsComplete =
+    !needsOffering ||
+    !isBusiness ||
+    (companyRegistrationNumber.trim().length > 0 &&
+      directorNames.length > 0 &&
+      businessEmail.trim().length > 0 &&
+      businessPhone.trim().length > 0 &&
+      businessAddress.trim().length > 0);
   const canSubmit =
-    (!needsOffering || offering.size > 0) && (!needsSeeking || seeking.size > 0);
+    (!needsOffering || offering.size > 0) && (!needsSeeking || seeking.size > 0) && businessFieldsComplete;
 
   function toggle(set: Set<string>, setSet: (s: Set<string>) => void, id: string) {
     const next = new Set(set);
@@ -64,6 +90,17 @@ export default function AccountTypeScreen() {
         roles,
         serviceOfferingSubmarketIds: needsOffering ? Array.from(offering) : undefined,
         seekingCategorySubmarketIds: needsSeeking ? Array.from(seeking) : undefined,
+        accountType: needsOffering && isBusiness ? 'business' : undefined,
+        businessProfile:
+          needsOffering && isBusiness
+            ? {
+                companyRegistrationNumber: companyRegistrationNumber.trim(),
+                directorNames,
+                businessEmail: businessEmail.trim(),
+                businessPhone: businessPhone.trim(),
+                businessAddress: businessAddress.trim(),
+              }
+            : undefined,
       });
       await refreshUser();
       // RootNavigator switches to Main once roles is non-empty.
@@ -105,6 +142,62 @@ export default function AccountTypeScreen() {
               onToggle={(id) => toggle(offering, setOffering, id)}
               styles={styles}
             />
+          </View>
+        ) : null}
+
+        {needsOffering ? (
+          <View style={styles.section}>
+            <Body style={styles.sectionTitle}>Are you registering as an individual or a business?</Body>
+            <Subtext style={{ marginBottom: spacing.sm }}>
+              Business is for a registered company (e.g. a dry-cleaning shop) — individual is for a sole operator.
+            </Subtext>
+            <View style={styles.typeRow}>
+              {([false, true] as const).map((business) => (
+                <Pressable
+                  key={String(business)}
+                  onPress={() => setIsBusiness(business)}
+                  style={[styles.typeCard, isBusiness === business && styles.typeCardActive]}
+                >
+                  <Text style={[styles.typeLabel, isBusiness === business && styles.typeLabelActive]}>
+                    {business ? 'Business' : 'Individual'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {isBusiness ? (
+              <View style={{ marginTop: spacing.md }}>
+                <TextField
+                  label="Company registration number"
+                  value={companyRegistrationNumber}
+                  onChangeText={setCompanyRegistrationNumber}
+                  autoCapitalize="characters"
+                />
+                <TextField
+                  label="Director name(s) — comma-separated if more than one"
+                  value={directorNamesText}
+                  onChangeText={setDirectorNamesText}
+                />
+                <TextField
+                  label="Business contact email"
+                  value={businessEmail}
+                  onChangeText={setBusinessEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <TextField
+                  label="Business contact phone"
+                  value={businessPhone}
+                  onChangeText={setBusinessPhone}
+                  keyboardType="phone-pad"
+                />
+                <TextField
+                  label="Business address"
+                  value={businessAddress}
+                  onChangeText={setBusinessAddress}
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
 

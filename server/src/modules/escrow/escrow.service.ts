@@ -7,7 +7,7 @@ import { GigsService } from '../gigs/gigs.service';
 import { IdentityService } from '../identity/identity.service';
 import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interface';
 import { ConfigService } from '@nestjs/config';
-import { Kobo, applyBps, kobo } from '../../common/money';
+import { Kobo, addKobo, applyBps, kobo } from '../../common/money';
 import { PrismaTx } from '../../common/prisma-tx';
 import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
 import { DeliveryService } from '../delivery/delivery.service';
@@ -68,8 +68,17 @@ export class EscrowService implements EscrowPort {
     const client = await this.identity.getUser(gig.clientId);
     if (!client.email) throw new BadRequestException('Client has no email on file — required to fund a gig');
 
-    const holdingAccount = await this.payments.createHoldingAccount(gigId, kobo(Number(gig.bountyKobo)), client.email);
+    // COMMISSION MODEL — see escrow.interface.ts's doc comment: the fee is
+    // added on top of the bounty, not deducted from it. The client's
+    // holding account is opened for bountyKobo + feeKobo; feeKobo is frozen
+    // here (not recomputed at release) so a mid-flight config change can't
+    // silently retarget an already-quoted charge.
+    const bountyKobo = kobo(Number(gig.bountyKobo));
     const platformFeeBps = Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
+    const feeKobo = applyBps(bountyKobo, platformFeeBps);
+    const totalChargeKobo = addKobo(bountyKobo, feeKobo);
+
+    const holdingAccount = await this.payments.createHoldingAccount(gigId, totalChargeKobo, client.email);
 
     const record = await this.prisma.escrowRecord.create({
       data: {
@@ -84,6 +93,7 @@ export class EscrowService implements EscrowPort {
         },
         bountyKobo: gig.bountyKobo,
         platformFeeBps,
+        feeKobo: BigInt(feeKobo),
         state: 'awaiting_funding',
       },
     });
@@ -114,11 +124,14 @@ export class EscrowService implements EscrowPort {
 
       await this.gigs.transitionStatus(gigId, 'open', tx);
 
+      // Surcharge model: the actual inbound transfer is bounty + fee, not
+      // just the bounty — see escrow.interface.ts's COMMISSION MODEL note.
+      const totalChargeKobo = kobo(Number(record.bountyKobo) + Number(record.feeKobo ?? 0));
       await this.ledger.record(
         {
           gigId,
           type: 'fund',
-          amountKobo: kobo(Number(record.bountyKobo)),
+          amountKobo: totalChargeKobo,
           direction: 'in',
           providerRef,
           eventId: `fund:${gigId}`,
@@ -375,8 +388,13 @@ export class EscrowService implements EscrowPort {
       return this.toView(current);
     }
 
-    const feeKobo = applyBps(gig.bountyKobo, existing.platformFeeBps);
-    const professionalPayoutKobo = kobo(gig.bountyKobo - feeKobo);
+    // Surcharge model: fee was already collected upfront at funding time
+    // (see fundGig) — the professional is paid the full bounty, nothing
+    // deducted here. Prefer the fee frozen on the record at funding; fall
+    // back to recomputing only for an escrow record created before this
+    // mechanism existed (feeKobo was null pre-surcharge).
+    const feeKobo = existing.feeKobo != null ? kobo(Number(existing.feeKobo)) : applyBps(gig.bountyKobo, existing.platformFeeBps);
+    const professionalPayoutKobo = gig.bountyKobo;
     const idempotencyKey = `release:${gigId}`;
 
     let disbursementRef: string;
@@ -527,6 +545,10 @@ export class EscrowService implements EscrowPort {
       throw new BadRequestException(`Refund failed: ${err instanceof Error ? err.message : err}`);
     }
 
+    // Surcharge model: refund the FULL amount actually charged (bounty +
+    // fee) — a gig that never completed earns Sorted no commission either.
+    const refundKobo = kobo(Number(existing.bountyKobo) + Number(existing.feeKobo ?? 0));
+
     const record = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.escrowRecord.update({
         where: { gigId },
@@ -537,7 +559,7 @@ export class EscrowService implements EscrowPort {
         {
           gigId,
           type: 'refund',
-          amountKobo: kobo(Number(existing.bountyKobo)),
+          amountKobo: refundKobo,
           direction: 'out',
           providerRef: refundRef,
           eventId: `refund:${gigId}`,
@@ -609,8 +631,9 @@ export class EscrowService implements EscrowPort {
       return this.toView(current);
     }
 
-    const feeKobo = applyBps(gig.bountyKobo, existing.platformFeeBps);
-    const professionalPayoutKobo = kobo(gig.bountyKobo - feeKobo);
+    // Same surcharge-model reasoning as releaseToProfessional above.
+    const feeKobo = existing.feeKobo != null ? kobo(Number(existing.feeKobo)) : applyBps(gig.bountyKobo, existing.platformFeeBps);
+    const professionalPayoutKobo = gig.bountyKobo;
 
     let disbursementRef: string;
     try {
@@ -672,12 +695,18 @@ export class EscrowService implements EscrowPort {
   }
 
   private toView(record: EscrowRecord): EscrowRecordView {
+    const bountyKobo = kobo(Number(record.bountyKobo));
+    // Pre-surcharge records (feeKobo null) fall back to computing it from
+    // platformFeeBps so old escrow rows still render sane totals.
+    const feeKobo = record.feeKobo != null ? kobo(Number(record.feeKobo)) : applyBps(bountyKobo, record.platformFeeBps);
     return {
       gigId: record.gigId,
       state: record.state as EscrowState,
-      bountyKobo: kobo(Number(record.bountyKobo)),
+      bountyKobo,
       stakeKobo: kobo(Number(record.stakeKobo)),
       platformFeeBps: record.platformFeeBps,
+      feeKobo,
+      totalChargeKobo: addKobo(bountyKobo, feeKobo),
       holdingAccount: record.holdingAccountDetails as EscrowRecordView['holdingAccount'],
     };
   }

@@ -33,6 +33,15 @@ enum KycStatus {
   rejected
 }
 
+// PLAN.md "Individual vs business accounts" — a professional (service
+// provider) can register as a registered business rather than an
+// individual (e.g. a dry-cleaning shop with multiple staff/directors, not
+// a sole operator). Drives whether User.businessProfile is required.
+enum AccountType {
+  individual
+  business
+}
+
 model User {
   id                  String    @id @default(cuid())
   // Password-based auth (product decision, not in HANDOFF.md — replaced
@@ -64,6 +73,16 @@ model User {
   professionalAddressText String?
   professionalAddressLat  Float?
   professionalAddressLng  Float?
+
+  // PLAN.md "Individual vs business accounts": defaults to individual for
+  // every existing and new account. Switching to 'business' is enforced
+  // (in IdentityService.completeRoleProfile, not here) to require the
+  // 'professional' role and a populated BusinessProfile — a client-only
+  // account has no reason to register a company. Existing accounts convert
+  // by calling that same endpoint again with accountType: 'business', not
+  // through a separate signup.
+  accountType     AccountType      @default(individual)
+  businessProfile BusinessProfile?
 
   gigsAsClient    Gig[]         @relation("ClientGigs")
   gigsInvitedTo   Gig[]         @relation("GigRestrictedTo")
@@ -111,6 +130,25 @@ model KycRequest {
   createdAt      DateTime         @default(now())
 
   @@index([userId])
+}
+
+// PLAN.md "Individual vs business accounts" — populated only when
+// User.accountType = 'business'. 1:1 with User (userId unique), so
+// converting is an upsert, not a new row every time the info is edited.
+// directorNames is a list, not a single string: CAMA-registered
+// companies can have more than one director, and the ask was explicitly
+// "names of director(s)", not one name.
+model BusinessProfile {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  user                      User     @relation(fields: [userId], references: [id])
+  companyRegistrationNumber String
+  directorNames             String[]
+  businessEmail             String
+  businessPhone             String
+  businessAddress           String
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }
 
 // Emailed 6-digit password-reset codes — see PLAN.md "Forgot password".

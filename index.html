@@ -1543,6 +1543,31 @@
         <p class="cat-sub">Pick at least one — required.</p>
         <div class="chip-wrap" id="auth-offering-chips"></div>
       </div>
+      <div class="cat-section" id="auth-business-section">
+        <p class="cat-label">Are you registering as an individual or a business?</p>
+        <p class="cat-sub">Business is for a registered company (e.g. a dry-cleaning shop) — individual is for a sole operator.</p>
+        <div class="type-row" id="auth-business-type-row">
+          <button class="type-card" data-business="false" type="button">Individual</button>
+          <button class="type-card" data-business="true" type="button">Business</button>
+        </div>
+        <div id="auth-business-fields" hidden>
+          <div class="field-row">
+            <input type="text" id="auth-biz-reg-number" placeholder="Company registration number" aria-label="Company registration number" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="auth-biz-directors" placeholder="Director name(s) — comma-separated if more than one" aria-label="Director name(s)" />
+          </div>
+          <div class="field-row">
+            <input type="email" id="auth-biz-email" placeholder="Business contact email" aria-label="Business contact email" />
+          </div>
+          <div class="field-row">
+            <input type="tel" id="auth-biz-phone" placeholder="Business contact phone" aria-label="Business contact phone" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="auth-biz-address" placeholder="Business address" aria-label="Business address" />
+          </div>
+        </div>
+      </div>
       <div class="cat-section" id="auth-seeking-section">
         <p class="cat-label">What are you most likely to post gigs for?</p>
         <p class="cat-sub">Pick at least one — required.</p>
@@ -1652,6 +1677,34 @@
       <div class="profile-kyc" id="profile-kyc-section" hidden>
         <p class="field-label">Verification</p>
         <div id="profile-kyc-status"></div>
+      </div>
+
+      <div class="profile-kyc" id="profile-business-section" hidden>
+        <p class="field-label">Business account</p>
+        <div id="profile-business-view">
+          <p class="cat-sub" id="profile-business-summary"></p>
+          <button class="btn btn-block" id="profile-business-edit-btn" type="button">Convert to business account</button>
+        </div>
+        <div id="profile-business-form" hidden>
+          <div class="field-row">
+            <input type="text" id="profile-biz-reg-number" placeholder="Company registration number" aria-label="Company registration number" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="profile-biz-directors" placeholder="Director name(s) — comma-separated if more than one" aria-label="Director name(s)" />
+          </div>
+          <div class="field-row">
+            <input type="email" id="profile-biz-email" placeholder="Business contact email" aria-label="Business contact email" />
+          </div>
+          <div class="field-row">
+            <input type="tel" id="profile-biz-phone" placeholder="Business contact phone" aria-label="Business contact phone" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="profile-biz-address" placeholder="Business address" aria-label="Business address" />
+          </div>
+          <p class="modal-error" id="profile-business-error"></p>
+          <button class="btn btn-block" id="profile-business-cancel-btn" type="button">Cancel</button>
+          <button class="btn btn-block" id="profile-business-save-btn" type="button">Save</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1805,6 +1858,7 @@
       accountType: 'hybrid',
       offering: {},
       seeking: {},
+      isBusiness: false,
     };
 
     function showStep(name) {
@@ -2073,6 +2127,14 @@
     var seekingSection = document.getElementById('auth-seeking-section');
     var offeringChips = document.getElementById('auth-offering-chips');
     var seekingChips = document.getElementById('auth-seeking-chips');
+    var businessSection = document.getElementById('auth-business-section');
+    var businessTypeRow = document.getElementById('auth-business-type-row');
+    var businessFields = document.getElementById('auth-business-fields');
+    var bizRegNumber = document.getElementById('auth-biz-reg-number');
+    var bizDirectors = document.getElementById('auth-biz-directors');
+    var bizEmail = document.getElementById('auth-biz-email');
+    var bizPhone = document.getElementById('auth-biz-phone');
+    var bizAddress = document.getElementById('auth-biz-address');
     var typeError = document.getElementById('auth-type-error');
     var typeSubmit = document.getElementById('auth-type-submit');
 
@@ -2124,11 +2186,27 @@
       var roles = ROLES_BY_TYPE[type];
       offeringSection.hidden = roles.indexOf('professional') === -1;
       seekingSection.hidden = roles.indexOf('client') === -1;
+      businessSection.hidden = roles.indexOf('professional') === -1;
     }
 
     Array.prototype.forEach.call(typeRow.children, function (btn) {
       btn.addEventListener('click', function () {
         setAccountType(btn.getAttribute('data-type'));
+      });
+    });
+
+    function setIsBusiness(isBusiness) {
+      state.isBusiness = isBusiness;
+      Array.prototype.forEach.call(businessTypeRow.children, function (btn) {
+        btn.classList.toggle('type-card-active', (btn.getAttribute('data-business') === 'true') === isBusiness);
+      });
+      businessFields.hidden = !isBusiness;
+    }
+    setIsBusiness(false);
+
+    Array.prototype.forEach.call(businessTypeRow.children, function (btn) {
+      btn.addEventListener('click', function () {
+        setIsBusiness(btn.getAttribute('data-business') === 'true');
       });
     });
 
@@ -2145,18 +2223,37 @@
         typeError.textContent = 'Pick at least one category you’re posting gigs for.';
         return;
       }
+      var wantsBusiness = roles.indexOf('professional') !== -1 && state.isBusiness;
+      var directorNames = bizDirectors.value.split(',').map(function (n) { return n.trim(); }).filter(Boolean);
+      if (wantsBusiness && (!bizRegNumber.value.trim() || directorNames.length === 0 || !bizEmail.value.trim() || !bizPhone.value.trim() || !bizAddress.value.trim())) {
+        typeError.textContent = 'All business fields are required.';
+        return;
+      }
+
       typeError.textContent = '';
       typeSubmit.disabled = true;
       typeSubmit.textContent = 'Finishing…';
 
+      var roleProfileBody = {
+        roles: roles,
+        serviceOfferingSubmarketIds: offeringIds,
+        seekingCategorySubmarketIds: seekingIds,
+      };
+      if (wantsBusiness) {
+        roleProfileBody.accountType = 'business';
+        roleProfileBody.businessProfile = {
+          companyRegistrationNumber: bizRegNumber.value.trim(),
+          directorNames: directorNames,
+          businessEmail: bizEmail.value.trim(),
+          businessPhone: bizPhone.value.trim(),
+          businessAddress: bizAddress.value.trim(),
+        };
+      }
+
       api('/me/role-profile', {
         method: 'POST',
         auth: true,
-        body: {
-          roles: roles,
-          serviceOfferingSubmarketIds: offeringIds,
-          seekingCategorySubmarketIds: seekingIds,
-        },
+        body: roleProfileBody,
       })
         .then(function (updatedUser) {
           closeModal();
@@ -2318,7 +2415,8 @@
 
       function renderInstructions(result) {
         body.innerHTML = '';
-        var feeKobo = Math.round((result.bountyKobo * result.platformFeeBps) / 10000);
+        var feeKobo = result.feeKobo != null ? result.feeKobo : Math.round((result.bountyKobo * result.platformFeeBps) / 10000);
+        var totalChargeKobo = result.totalChargeKobo != null ? result.totalChargeKobo : result.bountyKobo + feeKobo;
         var holding = result.holdingAccount || {};
         var payHtml = holding.checkoutUrl
           ? '<button type="button" class="btn btn-block funding-pay-btn">Pay now with Paystack</button>' +
@@ -2331,15 +2429,15 @@
             '<p class="gig-card-note" style="margin-top:8px;padding-top:8px;">Sorted is running a manual funding pilot — there is no automated payment rail on this account yet. Send the transfer, and funding is confirmed by hand once it is seen.</p>';
         var box = document.createElement('div');
         box.innerHTML =
-          '<p class="funding-row"><span>Bounty</span><span class="v-bounty"></span></p>' +
-          '<p class="funding-row funding-row-muted"><span>Platform fee (deducted at release)</span><span class="v-fee"></span></p>' +
+          '<p class="funding-row"><span>Bounty (professional gets all of this)</span><span class="v-bounty"></span></p>' +
+          '<p class="funding-row funding-row-muted"><span>Platform fee (added on top)</span><span class="v-fee"></span></p>' +
           '<p class="funding-row funding-row-bold"><span>Send exactly</span><span class="v-total"></span></p>' +
           payHtml +
           '<span class="status-pill" data-tone="neutral"></span>' +
           '<p class="gig-card-note funding-status-note" style="margin-top:8px;padding-top:8px;"></p>';
         box.querySelector('.v-bounty').textContent = formatNaira(result.bountyKobo);
         box.querySelector('.v-fee').textContent = formatNaira(feeKobo);
-        box.querySelector('.v-total').textContent = formatNaira(result.bountyKobo);
+        box.querySelector('.v-total').textContent = formatNaira(totalChargeKobo);
         if (holding.checkoutUrl) {
           box.querySelector('.funding-pay-btn').addEventListener('click', function () {
             window.open(holding.checkoutUrl, '_blank', 'noopener');
@@ -2456,7 +2554,113 @@
       profileError.textContent = '';
       renderAvatar(user);
       renderKycSection();
+      renderBusinessSection();
     }
+
+    // ---- business account (PLAN.md "Individual vs business accounts") ----
+    // Conversion path for an ALREADY-registered account — the account-type
+    // modal step only covers the choice at initial signup. Reuses
+    // /me/role-profile with the account's existing roles/submarket picks
+    // preserved, same as the mobile app's ProfileScreen equivalent.
+    var businessSectionEl = document.getElementById('profile-business-section');
+    var businessViewEl = document.getElementById('profile-business-view');
+    var businessFormEl = document.getElementById('profile-business-form');
+    var businessSummaryEl = document.getElementById('profile-business-summary');
+    var businessErrorEl = document.getElementById('profile-business-error');
+    var bizEditBtn = document.getElementById('profile-business-edit-btn');
+    var bizCancelBtn = document.getElementById('profile-business-cancel-btn');
+    var bizSaveBtn = document.getElementById('profile-business-save-btn');
+    var profileBizRegNumber = document.getElementById('profile-biz-reg-number');
+    var profileBizDirectors = document.getElementById('profile-biz-directors');
+    var profileBizEmail = document.getElementById('profile-biz-email');
+    var profileBizPhone = document.getElementById('profile-biz-phone');
+    var profileBizAddress = document.getElementById('profile-biz-address');
+
+    function renderBusinessSection() {
+      var user = shellState.user;
+      var isProfessional = (user.roles || []).indexOf('professional') !== -1;
+      businessSectionEl.hidden = !isProfessional;
+      if (!isProfessional) return;
+
+      businessFormEl.hidden = true;
+      businessViewEl.hidden = false;
+      businessErrorEl.textContent = '';
+
+      if (user.accountType === 'business' && user.businessProfile) {
+        businessSummaryEl.textContent =
+          'Business — Reg. ' + user.businessProfile.companyRegistrationNumber +
+          ' · Director(s): ' + user.businessProfile.directorNames.join(', ') +
+          ' · ' + user.businessProfile.businessEmail + ' · ' + user.businessProfile.businessPhone +
+          ' · ' + user.businessProfile.businessAddress;
+        bizEditBtn.textContent = 'Edit business details';
+        profileBizRegNumber.value = user.businessProfile.companyRegistrationNumber;
+        profileBizDirectors.value = user.businessProfile.directorNames.join(', ');
+        profileBizEmail.value = user.businessProfile.businessEmail;
+        profileBizPhone.value = user.businessProfile.businessPhone;
+        profileBizAddress.value = user.businessProfile.businessAddress;
+      } else {
+        businessSummaryEl.textContent =
+          'Registered as an individual. If you run a registered business (e.g. a dry-cleaning shop), convert here.';
+        bizEditBtn.textContent = 'Convert to business account';
+        profileBizRegNumber.value = '';
+        profileBizDirectors.value = '';
+        profileBizEmail.value = '';
+        profileBizPhone.value = '';
+        profileBizAddress.value = '';
+      }
+    }
+
+    bizEditBtn.addEventListener('click', function () {
+      businessViewEl.hidden = true;
+      businessFormEl.hidden = false;
+      businessErrorEl.textContent = '';
+    });
+
+    bizCancelBtn.addEventListener('click', function () {
+      businessFormEl.hidden = true;
+      businessViewEl.hidden = false;
+    });
+
+    bizSaveBtn.addEventListener('click', function () {
+      var directorNames = profileBizDirectors.value.split(',').map(function (n) { return n.trim(); }).filter(Boolean);
+      if (!profileBizRegNumber.value.trim() || directorNames.length === 0 || !profileBizEmail.value.trim() || !profileBizPhone.value.trim() || !profileBizAddress.value.trim()) {
+        businessErrorEl.textContent = 'All business fields are required.';
+        return;
+      }
+      businessErrorEl.textContent = '';
+      bizSaveBtn.disabled = true;
+      bizSaveBtn.textContent = 'Saving…';
+
+      var user = shellState.user;
+      api('/me/role-profile', {
+        method: 'POST',
+        auth: true,
+        body: {
+          roles: user.roles,
+          serviceOfferingSubmarketIds: user.serviceOfferingSubmarketIds,
+          seekingCategorySubmarketIds: user.seekingCategorySubmarketIds,
+          accountType: 'business',
+          businessProfile: {
+            companyRegistrationNumber: profileBizRegNumber.value.trim(),
+            directorNames: directorNames,
+            businessEmail: profileBizEmail.value.trim(),
+            businessPhone: profileBizPhone.value.trim(),
+            businessAddress: profileBizAddress.value.trim(),
+          },
+        },
+      })
+        .then(function (updatedUser) {
+          shellState.user = updatedUser;
+          renderBusinessSection();
+        })
+        .catch(function (err) {
+          businessErrorEl.textContent = err.message;
+        })
+        .finally(function () {
+          bizSaveBtn.disabled = false;
+          bizSaveBtn.textContent = 'Save';
+        });
+    });
 
     // ---- profile photo (any role) ----
     var avatarPreview = document.getElementById('profile-avatar-preview');

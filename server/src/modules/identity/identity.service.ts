@@ -16,8 +16,10 @@ import { NIGERIAN_STATES } from '../../common/nigerian-states';
 import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
+  AccountType,
   ApplyForKycInput,
   AuthResult,
+  BusinessProfileInput,
   CompleteRoleProfileInput,
   ForgotPasswordInput,
   IdentityPort,
@@ -84,6 +86,41 @@ function normalizeNigerianPhone(input: string): string {
   if (trimmed.startsWith('+')) return trimmed;
   if (trimmed.startsWith('0')) return `+234${trimmed.slice(1)}`;
   return `+${trimmed}`;
+}
+
+/**
+ * PLAN.md "Individual vs business accounts" — every field here is
+ * required (not "fill in later"), same discipline as
+ * CompleteRoleProfileInput's own category-picks rule: an incomplete
+ * business profile isn't a business profile.
+ */
+function normalizeBusinessProfile(input: BusinessProfileInput): BusinessProfileInput {
+  const companyRegistrationNumber = input.companyRegistrationNumber?.trim();
+  if (!companyRegistrationNumber) {
+    throw new BadRequestException('businessProfile.companyRegistrationNumber is required for a business account');
+  }
+
+  const directorNames = (input.directorNames ?? []).map((n) => n?.trim()).filter((n): n is string => !!n);
+  if (directorNames.length === 0) {
+    throw new BadRequestException('businessProfile.directorNames must include at least one director');
+  }
+
+  const businessEmail = input.businessEmail?.trim().toLowerCase();
+  if (!businessEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(businessEmail)) {
+    throw new BadRequestException('businessProfile.businessEmail must be a valid email address');
+  }
+
+  const businessPhone = normalizeNigerianPhone(input.businessPhone ?? '');
+  if (!/^\+[1-9]\d{7,14}$/.test(businessPhone)) {
+    throw new BadRequestException('businessProfile.businessPhone must be a valid Nigerian or E.164-style number');
+  }
+
+  const businessAddress = input.businessAddress?.trim();
+  if (!businessAddress) {
+    throw new BadRequestException('businessProfile.businessAddress is required for a business account');
+  }
+
+  return { companyRegistrationNumber, directorNames, businessEmail, businessPhone, businessAddress };
 }
 
 @Injectable()
@@ -347,7 +384,7 @@ export class IdentityService implements IdentityPort {
   async getUser(userId: string): Promise<IdentityUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { serviceOfferings: true, seekingCategories: true },
+      include: { serviceOfferings: true, seekingCategories: true, businessProfile: true },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -360,6 +397,17 @@ export class IdentityService implements IdentityPort {
       avatarBase64: user.avatarBase64,
       roles: user.roleFlags as Role[],
       kycStatus: user.kycStatus as KycStatus,
+      accountType: user.accountType as AccountType,
+      businessProfile: user.businessProfile
+        ? {
+            companyRegistrationNumber: user.businessProfile.companyRegistrationNumber,
+            directorNames: user.businessProfile.directorNames,
+            businessEmail: user.businessProfile.businessEmail,
+            businessPhone: user.businessProfile.businessPhone,
+            businessAddress: user.businessProfile.businessAddress,
+            updatedAt: user.businessProfile.updatedAt,
+          }
+        : null,
       serviceOfferingSubmarketIds: user.serviceOfferings.map((o) => o.submarketId),
       seekingCategorySubmarketIds: user.seekingCategories.map((c) => c.submarketId),
     };
@@ -448,8 +496,42 @@ export class IdentityService implements IdentityPort {
       }
     }
 
+    // PLAN.md "Individual vs business accounts" — omitting accountType
+    // leaves it as whatever the account already had, so a plain
+    // submarket-picks edit can never silently downgrade/reset business
+    // status. Passing 'business' here is ALSO how an existing individual
+    // account converts — there's no separate conversion endpoint.
+    let accountType: AccountType | undefined;
+    let normalizedBusinessProfile: BusinessProfileInput | undefined;
+    if (input.accountType !== undefined) {
+      if (input.accountType !== 'individual' && input.accountType !== 'business') {
+        throw new BadRequestException('accountType must be "individual" or "business"');
+      }
+      accountType = input.accountType;
+      if (accountType === 'business') {
+        if (!wantsProfessional) {
+          throw new BadRequestException('A business account requires the "professional" role — individual clients don\'t register a company');
+        }
+        if (!input.businessProfile) {
+          throw new BadRequestException('businessProfile is required when accountType is "business"');
+        }
+        normalizedBusinessProfile = normalizeBusinessProfile(input.businessProfile);
+      }
+    }
+
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { roleFlags: roles } });
+      await tx.user.update({
+        where: { id: userId },
+        data: { roleFlags: roles, ...(accountType !== undefined ? { accountType } : {}) },
+      });
+
+      if (accountType === 'business' && normalizedBusinessProfile) {
+        await tx.businessProfile.upsert({
+          where: { userId },
+          create: { userId, ...normalizedBusinessProfile },
+          update: { ...normalizedBusinessProfile },
+        });
+      }
 
       // Replace-in-full rather than diff — simpler, and this call is rare
       // (registration, or a deliberate profile edit) so the extra writes

@@ -89,7 +89,8 @@ export default function FundEscrowScreen({
     }
   }, [gigId, stopPolling]);
 
-  const feeKobo = result ? Math.round((result.bountyKobo * result.platformFeeBps) / 10_000) : 0;
+  const feeKobo = result?.feeKobo ?? 0;
+  const totalChargeKobo = result?.totalChargeKobo ?? 0;
   const confirmed = escrow?.state === 'funded' || (escrow && escrow.state !== 'awaiting_funding');
   const checkoutUrl = result?.holdingAccount?.checkoutUrl;
   const isManualPilot = !!result?.holdingAccount && !checkoutUrl;
@@ -122,10 +123,10 @@ export default function FundEscrowScreen({
       ) : (
         <>
           <Card>
-            <Row label="Bounty" value={formatNaira(result.bountyKobo)} />
-            <Row label="Platform fee (deducted at release)" value={formatNaira(feeKobo)} muted />
+            <Row label="Bounty (professional gets all of this)" value={formatNaira(result.bountyKobo)} />
+            <Row label="Platform fee (added on top)" value={formatNaira(feeKobo)} muted />
             <View style={styles.divider} />
-            <Row label="Send exactly" value={formatNaira(result.bountyKobo)} bold />
+            <Row label="Send exactly" value={formatNaira(totalChargeKobo)} bold />
           </Card>
 
           <View style={{ height: spacing.lg }} />

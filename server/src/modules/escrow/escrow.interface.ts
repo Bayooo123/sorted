@@ -9,6 +9,18 @@
  *
  * fee is platform_fee_bps CONFIG PER GIG (1000=10%, 500=launch rate), not a
  * constant — see EscrowRecord.platform_fee_bps in prisma/schema.prisma.
+ *
+ * COMMISSION MODEL (PLAN.md "Commission — interim surcharge mechanism"):
+ * added on top, not deducted. The client is charged bountyKobo + feeKobo at
+ * funding time (totalChargeKobo); the professional is paid the FULL
+ * bountyKobo at release, with nothing taken out. Sorted's commission is
+ * collected upfront as part of the client's transfer into the holding
+ * account, not skimmed from the professional's payout. This is an explicit
+ * SEAM, not a permanent design: it exists only because there's no Nomba (or
+ * equivalent) virtual account per gig yet to split the transfer at the
+ * rail level — once that lands, this whole add-a-surcharge dance goes away
+ * and the rail does the split natively. Nothing downstream (WhatsApp copy,
+ * FundEscrowScreen, ledger entries) should assume this mechanism is final.
  */
 import { Kobo } from '../../common/money';
 import { PrismaTx } from '../../common/prisma-tx';
@@ -28,6 +40,10 @@ export interface EscrowRecordView {
   bountyKobo: Kobo;
   stakeKobo: Kobo;
   platformFeeBps: number;
+  /** Sorted's commission in kobo, frozen at funding time — see this file's COMMISSION MODEL note. */
+  feeKobo: Kobo;
+  /** bountyKobo + feeKobo — what the client actually pays into the holding account. */
+  totalChargeKobo: Kobo;
   /** Present once fundGig has been called — what the client sees to actually pay. Shape depends on the active PaymentsProvider (see payments.interface.ts's HoldingAccount). */
   holdingAccount?: {
     provider: string;
@@ -62,7 +78,7 @@ export interface EscrowPort {
    * only, not collected).
    */
   holdStake(gigId: string, professionalId: string): Promise<EscrowRecordView>;
-  /** SIGN-OFF happy path: disburse professional 90% + Sorted fee, return stake. */
+  /** SIGN-OFF happy path: disburse professional the FULL bounty — Sorted's fee was already collected as a surcharge at funding time, see COMMISSION MODEL note above. */
   releaseToProfessional(gigId: string): Promise<EscrowRecordView>;
   /** Client-side refund (client bad-faith withholding is a penalty, not this). */
   refundClient(gigId: string): Promise<EscrowRecordView>;

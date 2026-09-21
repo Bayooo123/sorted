@@ -1,6 +1,8 @@
 import { api } from './client';
 import {
+  AccountType,
   AuthResult,
+  BusinessProfile,
   ClientTypeRef,
   Domain,
   IdentityUser,
@@ -73,10 +75,17 @@ export function getMyKycRequest() {
   return api.get<KycRequestView | null>('me/kyc');
 }
 
+/** companyRegistrationNumber/directorNames/businessEmail/businessPhone/businessAddress — all required together. */
+export type BusinessProfileInput = Omit<BusinessProfile, 'updatedAt'>;
+
 export interface CompleteRoleProfileInput {
   roles: Role[];
   serviceOfferingSubmarketIds?: string[];
   seekingCategorySubmarketIds?: string[];
+  /** Omit to leave the account's current accountType unchanged. Also how an existing account converts — call this again with 'business'. */
+  accountType?: AccountType;
+  /** Required when accountType is 'business'. */
+  businessProfile?: BusinessProfileInput;
 }
 
 export function completeRoleProfile(input: CompleteRoleProfileInput) {

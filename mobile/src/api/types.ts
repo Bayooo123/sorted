@@ -9,6 +9,17 @@
 
 export type Role = 'client' | 'professional';
 export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+/** A professional (service provider, e.g. a dry cleaner) can register as a business instead of an individual — 'business' requires the 'professional' role plus a BusinessProfile. */
+export type AccountType = 'individual' | 'business';
+
+export interface BusinessProfile {
+  companyRegistrationNumber: string;
+  directorNames: string[];
+  businessEmail: string;
+  businessPhone: string;
+  businessAddress: string;
+  updatedAt: string;
+}
 
 export interface IdentityUser {
   id: string;
@@ -20,6 +31,9 @@ export interface IdentityUser {
   avatarBase64: string | null;
   roles: Role[];
   kycStatus: KycStatus;
+  accountType: AccountType;
+  /** Present only when accountType is 'business'. */
+  businessProfile: BusinessProfile | null;
   serviceOfferingSubmarketIds: string[];
   seekingCategorySubmarketIds: string[];
 }
@@ -144,6 +158,10 @@ export interface EscrowRecordView {
   bountyKobo: number;
   stakeKobo: number;
   platformFeeBps: number;
+  /** Sorted's commission in kobo — added on top of the bounty, not deducted from it (interim mechanism until Nomba virtual accounts land). */
+  feeKobo: number;
+  /** bountyKobo + feeKobo — what the client actually has to pay into the holding account. */
+  totalChargeKobo: number;
   /**
    * Present once fundGig has been called — what the client sees to
    * actually pay. Shape depends on the active PaymentsProvider

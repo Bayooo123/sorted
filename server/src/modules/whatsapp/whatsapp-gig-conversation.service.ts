@@ -480,20 +480,27 @@ export class WhatsappGigConversationService {
 
     await this.reset(phone);
 
-    const amountNaira = Number(draftBountyKobo) / 100;
+    // Surcharge model (EscrowService.fundGig / escrow.interface.ts's
+    // COMMISSION MODEL note): the client pays bounty + platform fee, added
+    // on top — escrowRecord.totalChargeKobo is what actually has to land in
+    // the holding account, not the bare bounty.
+    const totalNaira = Number(escrowRecord.totalChargeKobo) / 100;
+    const bountyNaira = Number(draftBountyKobo) / 100;
+    const feeNaira = Number(escrowRecord.feeKobo) / 100;
+    const breakdown = `(₦${bountyNaira.toLocaleString('en-NG')} bounty + ₦${feeNaira.toLocaleString('en-NG')} platform fee)`;
     // The invited professional (if any) is only messaged once EscrowService
     // confirms funding — see EscrowService.sendInvite — so there's nothing
     // more to tell the client here about that leg yet.
     if (escrowRecord.holdingAccount?.checkoutUrl) {
       await this.whatsapp.sendMessage(
         phone,
-        `Job posted! To make it live, pay ₦${amountNaira.toLocaleString('en-NG')} here:\n${escrowRecord.holdingAccount.checkoutUrl}\n\nOnce payment is confirmed, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
+        `Job posted! To make it live, pay ₦${totalNaira.toLocaleString('en-NG')} ${breakdown} here:\n${escrowRecord.holdingAccount.checkoutUrl}\n\nOnce payment is confirmed, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
       );
     } else {
       const { accountNumber, bankName } = escrowRecord.holdingAccount ?? {};
       await this.whatsapp.sendMessage(
         phone,
-        `Job posted! To make it live, transfer ₦${amountNaira.toLocaleString('en-NG')} to:\n${bankName ?? 'Sorted'} — ${accountNumber ?? '(see sorted.com.ng)'}\n\nOnce we confirm receipt, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
+        `Job posted! To make it live, transfer ₦${totalNaira.toLocaleString('en-NG')} ${breakdown} to:\n${bankName ?? 'Sorted'} — ${accountNumber ?? '(see sorted.com.ng)'}\n\nOnce we confirm receipt, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
       );
     }
   }

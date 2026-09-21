@@ -1934,6 +1934,120 @@ it from actually dispatching a real courier until resolved.
 
 ---
 
+## Commission system — interim surcharge mechanism — IMPLEMENTED
+
+Explicit product decision: Sorted's 10% commission is **added on top** of
+the bounty, not deducted from it. The client is charged `bounty + fee` at
+funding time; the professional is paid the **full** bounty at release,
+with nothing taken out of their payout.
+
+**Why this over the deduction model:** `EscrowRecord.platformFeeBps` was
+already wired as a deduction — `professionalPayoutKobo = bounty - fee` —
+from the original manual-pilot build. That's a materially different
+economic outcome from what was asked for here: a professional who's been
+quoted (and has quoted the client) a bounty of ₦10,000 should receive
+₦10,000, not ₦9,000. So the client's side of the transaction changed
+instead: the holding account now opens for `bounty + fee`, not `bounty`.
+
+**Explicitly an interim mechanism**, matching this codebase's own SEAM
+convention (see `PaymentsProvider`, `MatchingStrategy`, `DeliveryProviderPort`):
+there's no Nomba (or equivalent) virtual account per gig yet to split an
+inbound transfer at the rail level, so the surcharge is bolted on in
+application code as a stand-in. Once virtual accounts land, the rail
+does the split natively and this whole surcharge dance is deleted, not
+extended — every touch point below says so in a comment, and nothing
+downstream should treat `feeKobo`/`totalChargeKobo` as permanent API
+shape.
+
+**Mechanics (`EscrowService`):**
+- `fundGig`: computes `feeKobo = applyBps(bountyKobo, platformFeeBps)` and
+  `totalChargeKobo = bountyKobo + feeKobo`; opens the holding account
+  (Paystack checkout or manual-pilot transfer) for `totalChargeKobo`.
+  `feeKobo` is frozen on the `EscrowRecord` at this point — release no
+  longer recomputes it from `platformFeeBps`, so a mid-flight config
+  change can't retarget an amount the client already saw quoted.
+- `confirmFunding`: the `fund` ledger entry now records the actual money
+  that moved (`bounty + fee`), not just the bounty.
+- `releaseToProfessional` / `resolveFrozen('for_professional')`: disburse
+  the full bounty — no deduction. The `fee` ledger entry still exists
+  (for reporting/audit), it just no longer comes out of the professional's
+  wire.
+- `refundClient`: refunds the **full** amount actually charged
+  (`bounty + fee`) — a gig that never completed shouldn't leave Sorted
+  holding a commission on nothing delivered.
+- `EscrowRecordView` gained `feeKobo` and `totalChargeKobo` so every
+  consumer can show a real breakdown instead of recomputing bps client-side.
+
+**Schema:** no migration needed — `EscrowRecord.feeKobo` already existed
+(nullable, previously only set at release); it's now set at `fundGig` time
+instead. Old pre-surcharge rows (`feeKobo` null) fall back to computing it
+from `platformFeeBps` everywhere it's read, so nothing already in the DB
+renders wrong.
+
+**Copy updated everywhere the client sees an amount to pay:**
+`WhatsappGigConversationService`'s "pay ₦X here" message, `FundEscrowScreen`
+(mobile), and the matching funding card in `index.html` (web) all now show
+the bounty, the fee "added on top", and the true total to send — instead
+of quietly showing the bounty as if that were the full charge.
+
+---
+
+## Individual vs business accounts — IMPLEMENTED
+
+Product ask: a professional (service provider — e.g. a dry cleaner) can
+register as a business rather than an individual, providing company
+registration number, director name(s), a business contact email/phone,
+and a business address. Existing individual accounts must be able to
+convert later, not just choose at signup.
+
+**Schema:** `User.accountType` (`AccountType` enum: `individual` |
+`business`, default `individual`) + new 1:1 `BusinessProfile` model
+(`companyRegistrationNumber`, `directorNames String[]`, `businessEmail`,
+`businessPhone`, `businessAddress`). Migration:
+`20260921120000_business_accounts`.
+
+**One endpoint does both signup-time choice AND later conversion** —
+`POST /me/role-profile` (`IdentityService.completeRoleProfile`), not a
+new route. That endpoint already re-runs at any point after registration
+to edit roles/submarket picks (replace-in-full, not diffed); it now also
+accepts `accountType` + `businessProfile`. Omitting `accountType`
+leaves the account's current type untouched, so a plain submarket-picks
+edit can never silently reset business status. Passing
+`accountType: 'business'` on an already-existing account IS the
+conversion — no separate "convert" endpoint exists or is needed.
+
+**Validation (`IdentityService`):** `business` requires the
+`'professional'` role (a client-only account has no company to
+register) and a fully-populated `businessProfile` — every field
+required, no partial saves, same "no fill in later" discipline as the
+existing serviceOfferingSubmarketIds/seekingCategorySubmarketIds rule.
+`businessPhone` goes through the same Nigerian-phone normalization as
+`UpdateProfileInput.phone`; `businessEmail` gets a basic format check.
+`directorNames` accepts one or more (CAMA-registered companies can have
+multiple directors) — trimmed, empties dropped, at least one required.
+
+**Mobile (`AccountTypeScreen`, `ProfileScreen`):**
+- `AccountTypeScreen` (initial registration): once "professional" is
+  selected, an Individual/Business toggle appears; Business reveals the
+  five required fields inline, gating "Finish setup" the same way the
+  submarket picks already do.
+- `ProfileScreen` (existing accounts — the conversion path): a
+  professional's Profile screen gets a new "Business account" card,
+  showing current status and details if already a business, or a
+  "Convert to business account" button that opens the same five-field
+  form inline (same edit-in-place pattern as the existing Account/KYC
+  cards) and resubmits via `completeRoleProfile` with the account's
+  current roles/submarket picks preserved.
+
+**Web (`index.html`)** mirrors both mobile screens: the signup
+account-type modal step gets the same Individual/Business toggle +
+fields, and the Profile tab gets the same "Business account" view/edit
+section (a plain view with an "Edit"/"Convert to business account"
+button that reveals the same five fields) — same `completeRoleProfile`
+call, same validation, same conversion-by-recall pattern.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext, TextField } from '../components/ui';
 import { useAuth } from '../auth/AuthContext';
-import { applyForKyc, getMyKycRequest, updateAvatar, updateProfile } from '../api/identity';
+import { applyForKyc, completeRoleProfile, getMyKycRequest, updateAvatar, updateProfile } from '../api/identity';
 import { ApiError } from '../api/client';
 import { KycRequestView } from '../api/types';
 import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
@@ -39,6 +39,20 @@ export default function ProfileScreen() {
   const [kycNote, setKycNote] = useState('');
   const [kycError, setKycError] = useState<string | null>(null);
   const [kycSubmitting, setKycSubmitting] = useState(false);
+
+  // PLAN.md "Individual vs business accounts" — the conversion path for an
+  // ALREADY-registered account (AccountTypeScreen only covers the choice at
+  // initial signup). Reuses completeRoleProfile with the account's existing
+  // roles/submarket picks unchanged, adding accountType + businessProfile —
+  // same endpoint, same replace-in-full contract, just called again later.
+  const [convertingBusiness, setConvertingBusiness] = useState(false);
+  const [bizRegNumber, setBizRegNumber] = useState('');
+  const [bizDirectorNames, setBizDirectorNames] = useState('');
+  const [bizEmail, setBizEmail] = useState('');
+  const [bizPhone, setBizPhone] = useState('');
+  const [bizAddress, setBizAddress] = useState('');
+  const [bizError, setBizError] = useState<string | null>(null);
+  const [bizSaving, setBizSaving] = useState(false);
 
   useEffect(() => {
     if (!user || !user.roles.includes('professional')) return;
@@ -131,6 +145,49 @@ export default function ProfileScreen() {
     }
   }
 
+  function startConvertingBusiness() {
+    if (user!.businessProfile) {
+      setBizRegNumber(user!.businessProfile.companyRegistrationNumber);
+      setBizDirectorNames(user!.businessProfile.directorNames.join(', '));
+      setBizEmail(user!.businessProfile.businessEmail);
+      setBizPhone(user!.businessProfile.businessPhone);
+      setBizAddress(user!.businessProfile.businessAddress);
+    }
+    setBizError(null);
+    setConvertingBusiness(true);
+  }
+
+  async function handleSaveBusinessProfile() {
+    const directorNames = bizDirectorNames.split(',').map((n) => n.trim()).filter(Boolean);
+    if (!bizRegNumber.trim() || directorNames.length === 0 || !bizEmail.trim() || !bizPhone.trim() || !bizAddress.trim()) {
+      setBizError('All business fields are required.');
+      return;
+    }
+    setBizError(null);
+    setBizSaving(true);
+    try {
+      await completeRoleProfile({
+        roles: user!.roles,
+        serviceOfferingSubmarketIds: user!.serviceOfferingSubmarketIds,
+        seekingCategorySubmarketIds: user!.seekingCategorySubmarketIds,
+        accountType: 'business',
+        businessProfile: {
+          companyRegistrationNumber: bizRegNumber.trim(),
+          directorNames,
+          businessEmail: bizEmail.trim(),
+          businessPhone: bizPhone.trim(),
+          businessAddress: bizAddress.trim(),
+        },
+      });
+      await refreshUser();
+      setConvertingBusiness(false);
+    } catch (err) {
+      setBizError(err instanceof ApiError ? err.message : 'Something went wrong — try again');
+    } finally {
+      setBizSaving(false);
+    }
+  }
+
   const avatarInitial = (user.name || user.email || user.phone || '?').trim().charAt(0).toUpperCase();
 
   return (
@@ -154,6 +211,7 @@ export default function ProfileScreen() {
         {user.roles.map((r) => (
           <Pill key={r} label={r === 'professional' ? 'Professional' : 'Client'} tone="active" />
         ))}
+        {user.accountType === 'business' ? <Pill label="Business" tone="active" /> : null}
         <Pill label={`KYC: ${user.kycStatus}`} tone={user.kycStatus === 'verified' ? 'active' : 'neutral'} />
       </View>
 
@@ -271,6 +329,52 @@ export default function ProfileScreen() {
                 loading={kycSubmitting}
                 disabled={!kycDocumentBase64}
               />
+            </>
+          )}
+        </Card>
+      ) : null}
+
+      {isProfessional ? (
+        <Card style={{ marginBottom: spacing.md }}>
+          <Text style={styles.cardTitle}>Business account</Text>
+
+          {convertingBusiness ? (
+            <>
+              <TextField label="Company registration number" value={bizRegNumber} onChangeText={setBizRegNumber} autoCapitalize="characters" />
+              <TextField label="Director name(s) — comma-separated if more than one" value={bizDirectorNames} onChangeText={setBizDirectorNames} />
+              <TextField label="Business contact email" value={bizEmail} onChangeText={setBizEmail} keyboardType="email-address" autoCapitalize="none" />
+              <TextField label="Business contact phone" value={bizPhone} onChangeText={setBizPhone} keyboardType="phone-pad" />
+              <TextField label="Business address" value={bizAddress} onChangeText={setBizAddress} />
+
+              {bizError ? <Banner tone="warning">{bizError}</Banner> : null}
+
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <View style={{ flex: 1 }}>
+                  <Button title="Cancel" variant="secondary" onPress={() => setConvertingBusiness(false)} disabled={bizSaving} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Save" onPress={handleSaveBusinessProfile} loading={bizSaving} />
+                </View>
+              </View>
+            </>
+          ) : user.accountType === 'business' && user.businessProfile ? (
+            <>
+              <Pill label="Business" tone="active" />
+              <StatRow label="Reg. number" value={user.businessProfile.companyRegistrationNumber} />
+              <StatRow label="Director(s)" value={user.businessProfile.directorNames.join(', ')} />
+              <StatRow label="Business email" value={user.businessProfile.businessEmail} />
+              <StatRow label="Business phone" value={user.businessProfile.businessPhone} />
+              <StatRow label="Business address" value={user.businessProfile.businessAddress} />
+              <Body onPress={startConvertingBusiness} style={styles.editLink}>
+                Edit business details
+              </Body>
+            </>
+          ) : (
+            <>
+              <Body style={{ marginBottom: spacing.md }}>
+                Registered as an individual. If you run a registered business (e.g. a dry-cleaning shop), convert here — you'll need your company registration number, director name(s), and business contact details.
+              </Body>
+              <Button title="Convert to business account" variant="secondary" onPress={startConvertingBusiness} />
             </>
           )}
         </Card>

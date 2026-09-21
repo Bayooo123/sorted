@@ -13,6 +13,28 @@
 export type Role = 'client' | 'professional';
 export type KycStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
+/**
+ * PLAN.md "Individual vs business accounts" — a professional (service
+ * provider, e.g. a dry cleaner) can register the account as a business
+ * rather than an individual. 'business' requires the 'professional' role
+ * and a populated BusinessProfileInput — enforced in
+ * IdentityService.completeRoleProfile, not the schema.
+ */
+export type AccountType = 'individual' | 'business';
+
+export interface BusinessProfileInput {
+  companyRegistrationNumber: string;
+  /** One or more — CAMA-registered companies can have multiple directors. */
+  directorNames: string[];
+  businessEmail: string;
+  businessPhone: string;
+  businessAddress: string;
+}
+
+export interface BusinessProfileView extends BusinessProfileInput {
+  updatedAt: Date;
+}
+
 export interface IdentityUser {
   id: string;
   phone: string | null;
@@ -23,6 +45,9 @@ export interface IdentityUser {
   avatarBase64: string | null;
   roles: Role[];
   kycStatus: KycStatus;
+  accountType: AccountType;
+  /** Present only when accountType is 'business'. */
+  businessProfile: BusinessProfileView | null;
   /** Populated when roles includes 'professional'. Submarket IDs — see CompleteRoleProfileInput. */
   serviceOfferingSubmarketIds: string[];
   /** Populated when roles includes 'client'. Submarket IDs — see CompleteRoleProfileInput. */
@@ -55,6 +80,17 @@ export interface CompleteRoleProfileInput {
   roles: Role[];
   serviceOfferingSubmarketIds?: string[];
   seekingCategorySubmarketIds?: string[];
+  /**
+   * Omit to leave the account's current accountType unchanged (an edit to
+   * submarket picks shouldn't silently reset business status). Pass
+   * 'business' — with businessProfile — either at initial registration or
+   * later, on an already-existing account, to convert it: this same
+   * endpoint is the conversion path, there is no separate one. Requires
+   * roles to include 'professional'; rejected otherwise.
+   */
+  accountType?: AccountType;
+  /** Required when accountType is 'business' (initial or conversion call). Ignored otherwise. */
+  businessProfile?: BusinessProfileInput;
 }
 
 /**
