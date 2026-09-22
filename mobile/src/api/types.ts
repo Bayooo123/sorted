@@ -26,6 +26,8 @@ export interface IdentityUser {
   phone: string | null;
   email: string | null;
   name: string | null;
+  /** Public-facing name shown in the professional directory (e.g. a shop name) — falls back to name wherever displayed. */
+  displayName: string | null;
   state: string | null;
   /** Data URI (e.g. "data:image/jpeg;base64,..."), any role. */
   avatarBase64: string | null;
@@ -107,6 +109,17 @@ export interface CreateGigInput {
   bountyKobo: number;
   criteria: string[];
   templateId?: string;
+  /** Invites this professional directly — set from the directory's "Hire" action. */
+  restrictedToProfessionalId?: string;
+}
+
+/** PLAN.md "Professional directory" — a client-facing listing of professionals offering a category, distinct from Browse (which lists gigs). */
+export interface ProfessionalDirectoryEntry {
+  id: string;
+  displayName: string;
+  avatarBase64: string | null;
+  kycStatus: KycStatus;
+  accountType: AccountType;
 }
 
 export interface GigCriterionView {

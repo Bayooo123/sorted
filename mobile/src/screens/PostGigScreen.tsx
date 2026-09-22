@@ -21,9 +21,13 @@ const MIN_BOUNTY_NAIRA = 3000; // max(bps×bounty, ₦300) fee floor implies a s
  */
 export default function PostGigScreen({
   navigation,
+  route,
 }: NativeStackScreenProps<GigStackParamList, 'PostGig'>) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const hireProfessionalId = route.params?.hireProfessionalId;
+  const hireProfessionalName = route.params?.hireProfessionalName;
+  const hireSubmarketKey = route.params?.hireSubmarketKey;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [locationText, setLocationText] = useState('');
@@ -47,13 +51,22 @@ export default function PostGigScreen({
         setDomains(d);
         setSubmarkets(s);
         setClientTypes(c);
-        if (d[0]) setDomainKey(d[0].key);
         if (c[0]) setClientTypeKey(c[0].key);
+
+        // Arrived via Directory's "Hire" action — prefill the category and
+        // derive its domain, instead of defaulting to the first domain.
+        const hireSubmarket = hireSubmarketKey ? s.find((sm) => sm.key === hireSubmarketKey) : undefined;
+        if (hireSubmarket) {
+          setSubmarketKey(hireSubmarket.key);
+          if (hireSubmarket.domain) setDomainKey(hireSubmarket.domain.key);
+        } else if (d[0]) {
+          setDomainKey(d[0].key);
+        }
       })
       .catch(() => {
         setError('Could not load categories — check your connection and try again.');
       });
-  }, []);
+  }, [hireSubmarketKey]);
 
   const visibleSubmarkets = useMemo(
     () => submarkets.filter((s) => !domainKey || s.domain?.key === domainKey),
@@ -100,6 +113,7 @@ export default function PostGigScreen({
         materialsMode,
         bountyKobo,
         criteria: validCriteria,
+        restrictedToProfessionalId: hireProfessionalId,
       });
       // publishGig locks criteria (server-enforced, immutable thereafter)
       // and moves draft -> escrow_pending in one call, per HANDOFF.md §5
@@ -119,6 +133,12 @@ export default function PostGigScreen({
       <ScrollView showsVerticalScrollIndicator={false}>
         <Heading>Post a gig</Heading>
         <Subtext>Criteria lock once you publish — you can't edit them after.</Subtext>
+
+        {hireProfessionalId ? (
+          <Banner tone="info">
+            Inviting {hireProfessionalName ?? 'this professional'} directly — only they can claim this gig once it's funded.
+          </Banner>
+        ) : null}
 
         <TextField label="Title" value={title} onChangeText={setTitle} placeholder="Fix leaking kitchen pipe" />
         <TextField

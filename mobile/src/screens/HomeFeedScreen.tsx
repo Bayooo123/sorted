@@ -96,8 +96,9 @@ export default function HomeFeedScreen({
         />
       )}
 
-      <View style={{ marginTop: spacing.lg }}>
+      <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
         <Button title="Post a gig" onPress={() => navigation.navigate('PostGig')} />
+        <Button title="Find a professional" variant="secondary" onPress={() => navigation.navigate('Directory')} />
       </View>
     </Screen>
   );

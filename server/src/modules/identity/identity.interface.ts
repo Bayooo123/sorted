@@ -40,6 +40,8 @@ export interface IdentityUser {
   phone: string | null;
   email: string | null;
   name: string | null;
+  /** Public-facing name shown in the professional directory (e.g. a shop name) — falls back to `name` wherever displayed. See PLAN.md "Professional directory". */
+  displayName: string | null;
   state: string | null;
   /** Data URI (e.g. "data:image/jpeg;base64,..."), any role. See PLAN.md "Profile photo + KYC apply flow". */
   avatarBase64: string | null;
@@ -134,6 +136,8 @@ export interface UpdateProfileInput {
   name?: string;
   phone?: string;
   state?: string;
+  /** Empty string clears it back to falling through to `name`. See IdentityUser.displayName. */
+  displayName?: string;
 }
 
 /** identifier is an email or a phone number — same lookup as LoginInput. See PLAN.md "Forgot password". */
@@ -189,6 +193,23 @@ export interface ApplyForKycInput {
 export interface ReviewKycInput {
   decision: 'approved' | 'rejected';
   reviewNote?: string;
+}
+
+/**
+ * PLAN.md "Professional directory" — a client-facing listing of
+ * professionals offering a given category, distinct from Gigs' Browse
+ * (which lists open jobs, not people). Deliberately thin: no phone/email
+ * (contact happens through the gig-invite flow, not direct off-platform
+ * contact — see GigsPort.createGig's restrictedToProfessionalId), no
+ * location (category-only filtering for v1, per PLAN.md's writeup).
+ */
+export interface ProfessionalDirectoryEntry {
+  id: string;
+  /** displayName if set, else name, else a generic fallback — never null, this is what's rendered. */
+  displayName: string;
+  avatarBase64: string | null;
+  kycStatus: KycStatus;
+  accountType: AccountType;
 }
 
 /** The only surface other modules may call into Identity through. */

@@ -1588,6 +1588,7 @@
     <div class="auth-tabs shell-tabs" id="shell-tabs">
       <button class="auth-tab auth-tab-active" data-tab="mine" type="button">My gigs</button>
       <button class="auth-tab" data-tab="browse" type="button">Browse</button>
+      <button class="auth-tab" data-tab="directory" type="button">Find pros</button>
       <button class="auth-tab" data-tab="post" type="button">Post a gig</button>
       <button class="auth-tab" data-tab="profile" type="button">Profile</button>
     </div>
@@ -1600,8 +1601,16 @@
       <div id="shell-browse-list"></div>
     </div>
 
+    <div class="shell-panel" data-panel="directory" hidden>
+      <p class="modal-sub">Browse professionals by category, then hire straight into an escrow-protected gig.</p>
+      <div class="chip-wrap" id="directory-submarket-chips" style="margin-bottom:16px;"></div>
+      <p class="modal-error" id="directory-error"></p>
+      <div id="directory-list"></div>
+    </div>
+
     <div class="shell-panel" data-panel="post" hidden>
       <p class="modal-error" id="shell-post-error"></p>
+      <div id="post-hire-banner" hidden></div>
 
       <p class="field-label">Title</p>
       <div class="field-row">
@@ -1655,6 +1664,13 @@
       <p class="field-label">Name</p>
       <div class="field-row">
         <input type="text" id="profile-name" />
+      </div>
+
+      <div id="profile-displayname-section" hidden>
+        <p class="field-label">Shop / business name (shown in the professional directory)</p>
+        <div class="field-row">
+          <input type="text" id="profile-displayname" placeholder="Leave blank to show your name instead" />
+        </div>
       </div>
 
       <p class="field-label">Phone</p>
@@ -2300,6 +2316,10 @@
       postClientType: null,
       postMaterials: 'bounty_covers',
       postCriteria: [''],
+      directorySubmarket: null,
+      hireSubmarketKey: null,
+      hireProfessionalId: null,
+      hireProfessionalName: null,
     };
 
     function formatNaira(kobo) {
@@ -2336,6 +2356,7 @@
       });
       if (name === 'mine') loadMineList();
       else if (name === 'browse') loadBrowseList();
+      else if (name === 'directory') loadDirectory();
       else if (name === 'post') loadPostForm();
       else if (name === 'profile') renderProfile();
     }
@@ -2548,6 +2569,9 @@
       var user = shellState.user;
       document.getElementById('profile-email').textContent = user.email || '—';
       document.getElementById('profile-name').value = user.name || '';
+      var isProfessional = (user.roles || []).indexOf('professional') !== -1;
+      document.getElementById('profile-displayname-section').hidden = !isProfessional;
+      document.getElementById('profile-displayname').value = user.displayName || '';
       document.getElementById('profile-phone').value = user.phone || '';
       profileStateSelect.value = user.state || '';
       document.getElementById('profile-roles').textContent = (user.roles || []).join(', ') || '—';
@@ -2787,6 +2811,8 @@
 
     profileSave.addEventListener('click', function () {
       var name = document.getElementById('profile-name').value.trim();
+      var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
+      var displayName = document.getElementById('profile-displayname').value.trim();
       var phone = document.getElementById('profile-phone').value.trim();
       var stateName = profileStateSelect.value;
 
@@ -2799,6 +2825,7 @@
         auth: true,
         body: {
           name: name || undefined,
+          displayName: isProfessional ? displayName : undefined,
           phone: phone || undefined,
           state: stateName || undefined,
         },
@@ -2817,6 +2844,113 @@
         });
     });
 
+    // ---- professional directory (PLAN.md "Professional directory") ----
+    var directorySubmarketChips = document.getElementById('directory-submarket-chips');
+    var directoryError = document.getElementById('directory-error');
+    var directoryList = document.getElementById('directory-list');
+
+    function loadDirectory() {
+      directoryError.textContent = '';
+      if (shellState.submarkets.length > 0) {
+        if (!shellState.directorySubmarket) shellState.directorySubmarket = shellState.submarkets[0].key;
+        renderDirectorySubmarketChips();
+        renderDirectoryList();
+        return;
+      }
+      directoryList.innerHTML = '<p class="shell-empty">Loading…</p>';
+      api('/taxonomy/submarkets')
+        .then(function (submarkets) {
+          shellState.submarkets = submarkets;
+          if (submarkets[0]) shellState.directorySubmarket = submarkets[0].key;
+          renderDirectorySubmarketChips();
+          renderDirectoryList();
+        })
+        .catch(function (err) {
+          directoryList.innerHTML = '';
+          directoryError.textContent = err.message;
+        });
+    }
+
+    function renderDirectorySubmarketChips() {
+      directorySubmarketChips.innerHTML = '';
+      shellState.submarkets.forEach(function (s) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.textContent = s.label;
+        if (s.key === shellState.directorySubmarket) chip.classList.add('chip-active');
+        chip.addEventListener('click', function () {
+          shellState.directorySubmarket = s.key;
+          renderDirectorySubmarketChips();
+          renderDirectoryList();
+        });
+        directorySubmarketChips.appendChild(chip);
+      });
+    }
+
+    function renderDirectoryList() {
+      if (!shellState.directorySubmarket) return;
+      directoryList.innerHTML = '<p class="shell-empty">Loading…</p>';
+      directoryError.textContent = '';
+      api('/professionals?submarket=' + encodeURIComponent(shellState.directorySubmarket))
+        .then(function (professionals) {
+          directoryList.innerHTML = '';
+          if (professionals.length === 0) {
+            directoryList.innerHTML = '<p class="shell-empty">No professionals in this category yet.</p>';
+            return;
+          }
+          professionals.forEach(function (p) {
+            directoryList.appendChild(directoryCard(p));
+          });
+        })
+        .catch(function (err) {
+          directoryList.innerHTML = '';
+          directoryError.textContent = err.message;
+        });
+    }
+
+    function directoryCard(p) {
+      var card = document.createElement('div');
+      card.className = 'gig-card';
+
+      var head = document.createElement('div');
+      head.className = 'gig-card-head';
+      var title = document.createElement('span');
+      title.className = 'gig-card-title';
+      title.textContent = p.displayName;
+      head.appendChild(title);
+      if (p.kycStatus === 'verified') {
+        var pill = document.createElement('span');
+        pill.className = 'status-pill';
+        pill.setAttribute('data-tone', 'active');
+        pill.textContent = 'Verified';
+        head.appendChild(pill);
+      }
+      card.appendChild(head);
+
+      if (p.accountType === 'business') {
+        var meta = document.createElement('p');
+        meta.className = 'gig-card-meta';
+        meta.textContent = 'Business';
+        card.appendChild(meta);
+      }
+
+      var hireBtn = document.createElement('button');
+      hireBtn.type = 'button';
+      hireBtn.className = 'btn btn-block';
+      hireBtn.style.marginTop = '10px';
+      hireBtn.textContent = 'Hire';
+      hireBtn.addEventListener('click', function () {
+        shellState.hireProfessionalId = p.id;
+        shellState.hireProfessionalName = p.displayName;
+        shellState.hireSubmarketKey = shellState.directorySubmarket;
+        showShellTab('post');
+      });
+      card.appendChild(hireBtn);
+
+      return card;
+    }
+
     // ---- post-a-gig form ----
     var postDomainChips = document.getElementById('post-domain-chips');
     var postSubmarketChips = document.getElementById('post-submarket-chips');
@@ -2826,8 +2960,42 @@
     var postError = document.getElementById('shell-post-error');
     var postSubmit = document.getElementById('shell-post-submit');
 
+    function applyHirePrefill() {
+      if (!shellState.hireProfessionalId) return;
+      var sm = shellState.submarkets.find(function (s) { return s.key === shellState.hireSubmarketKey; });
+      if (sm) {
+        shellState.postSubmarket = sm.key;
+        if (sm.domain) shellState.postDomain = sm.domain.key;
+      }
+    }
+
+    function renderPostHireBanner() {
+      var el = document.getElementById('post-hire-banner');
+      if (!shellState.hireProfessionalId) {
+        el.hidden = true;
+        el.innerHTML = '';
+        return;
+      }
+      el.hidden = false;
+      el.innerHTML =
+        '<p style="background:var(--green-mint-bg);border:1px solid var(--green-bright);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-body);margin-bottom:16px;">' +
+        'Inviting <strong>' + escapeHtml(shellState.hireProfessionalName || 'this professional') + '</strong> directly — only they can claim this gig once it is funded. ' +
+        '<a href="#" id="post-hire-clear" style="color:var(--green-deep);">Remove</a></p>';
+      document.getElementById('post-hire-clear').addEventListener('click', function (e) {
+        e.preventDefault();
+        shellState.hireProfessionalId = null;
+        shellState.hireProfessionalName = null;
+        renderPostHireBanner();
+      });
+    }
+
     function loadPostForm() {
-      if (shellState.taxonomyLoaded) return;
+      if (shellState.taxonomyLoaded) {
+        applyHirePrefill();
+        renderPostChips();
+        renderPostHireBanner();
+        return;
+      }
       Promise.all([api('/taxonomy/domains'), api('/taxonomy/submarkets'), api('/taxonomy/client-types')])
         .then(function (results) {
           shellState.domains = results[0];
@@ -2836,8 +3004,10 @@
           shellState.taxonomyLoaded = true;
           if (results[0][0]) shellState.postDomain = results[0][0].key;
           if (results[2][0]) shellState.postClientType = results[2][0].key;
+          applyHirePrefill();
           renderPostChips();
           renderCriteriaRows();
+          renderPostHireBanner();
         })
         .catch(function (err) {
           postError.textContent = err.message;
@@ -2960,6 +3130,7 @@
           materialsMode: shellState.postMaterials,
           bountyKobo: bountyKobo,
           criteria: criteria,
+          restrictedToProfessionalId: shellState.hireProfessionalId || undefined,
         },
       })
         .then(function (draft) {
@@ -2972,6 +3143,8 @@
           document.getElementById('post-location').value = '';
           document.getElementById('post-bounty').value = '';
           shellState.postCriteria = [''];
+          shellState.hireProfessionalId = null;
+          shellState.hireProfessionalName = null;
           renderCriteriaRows();
           showShellTab('mine');
         })

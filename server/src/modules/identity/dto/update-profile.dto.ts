@@ -15,4 +15,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   state?: string;
+
+  /** Empty string clears it — see IdentityService.updateProfile. */
+  @IsOptional()
+  @IsString()
+  @Length(0, 200)
+  displayName?: string;
 }

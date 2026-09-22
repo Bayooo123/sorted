@@ -64,6 +64,15 @@ export class GigsService implements GigsPort {
     if (input.bountyKobo <= 0) {
       throw new BadRequestException('bountyKobo must be greater than zero');
     }
+    if (input.restrictedToProfessionalId) {
+      // getUser throws NotFoundException for a bogus id — deliberately not
+      // caught here, since "invite a professional who doesn't exist" is
+      // exactly as invalid as "invite a non-professional".
+      const invitee = await this.identity.getUser(input.restrictedToProfessionalId);
+      if (!invitee.roles.includes('professional')) {
+        throw new BadRequestException('restrictedToProfessionalId must reference an account with the professional role');
+      }
+    }
 
     const [domain, submarket, clientType] = await Promise.all([
       this.prisma.domain.findUnique({ where: { key: input.domain } }),

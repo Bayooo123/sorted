@@ -29,6 +29,7 @@ import {
   KycStatus,
   LoginInput,
   PayoutDestination,
+  ProfessionalDirectoryEntry,
   ResetPasswordInput,
   ReviewKycInput,
   Role,
@@ -267,12 +268,20 @@ export class IdentityService implements IdentityPort {
   }
 
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<IdentityUser> {
-    const data: { name?: string; phone?: string; state?: string } = {};
+    const data: { name?: string; phone?: string; state?: string; displayName?: string | null } = {};
 
     if (input.name !== undefined) {
       const name = input.name.trim();
       if (!name) throw new BadRequestException('name cannot be empty');
       data.name = name;
+    }
+
+    // Empty string clears it (falls back to `name` wherever displayed),
+    // unlike `name` above which can never be blanked — see
+    // UpdateProfileInput.displayName's doc comment.
+    if (input.displayName !== undefined) {
+      const displayName = input.displayName.trim();
+      data.displayName = displayName || null;
     }
 
     if (input.state !== undefined) {
@@ -393,6 +402,7 @@ export class IdentityService implements IdentityPort {
       phone: user.phone,
       email: user.email,
       name: user.name,
+      displayName: user.displayName,
       state: user.state,
       avatarBase64: user.avatarBase64,
       roles: user.roleFlags as Role[],
@@ -424,6 +434,33 @@ export class IdentityService implements IdentityPort {
     });
     if (!user) return null;
     return this.getUser(user.id);
+  }
+
+  /**
+   * PLAN.md "Professional directory" — public, unauthenticated (matches
+   * GigsController's public browse). Not on IdentityPort: this is an HTTP
+   * surface for clients browsing, not a cross-module call, same reasoning
+   * as signup/login living outside the port.
+   */
+  async listProfessionalsBySubmarket(submarketKey: string): Promise<ProfessionalDirectoryEntry[]> {
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: submarketKey } });
+    if (!submarket) throw new BadRequestException(`Unknown submarket "${submarketKey}"`);
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        roleFlags: { has: 'professional' },
+        serviceOfferings: { some: { submarketId: submarket.id } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      displayName: u.displayName?.trim() || u.name?.trim() || 'Professional',
+      avatarBase64: u.avatarBase64,
+      kycStatus: u.kycStatus as KycStatus,
+      accountType: u.accountType as AccountType,
+    }));
   }
 
   async getPayoutDestination(userId: string): Promise<PayoutDestination | null> {

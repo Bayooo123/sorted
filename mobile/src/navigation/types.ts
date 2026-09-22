@@ -12,7 +12,9 @@ export type MainTabParamList = {
 
 export type GigStackParamList = {
   HomeFeed: undefined;
-  PostGig: undefined;
+  Directory: undefined;
+  /** hireProfessionalId/Name/hireSubmarketKey set when arriving from Directory's "Hire" action — see PLAN.md "Professional directory". */
+  PostGig: { hireProfessionalId?: string; hireProfessionalName?: string; hireSubmarketKey?: string } | undefined;
   FundEscrow: { gigId: string };
   ReviewSignOff: { gigId: string };
 };

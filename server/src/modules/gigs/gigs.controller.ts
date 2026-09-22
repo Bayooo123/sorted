@@ -33,6 +33,7 @@ export class GigsController {
       bountyKobo: kobo(dto.bountyKobo),
       criteria: dto.criteria,
       templateId: dto.templateId,
+      restrictedToProfessionalId: dto.restrictedToProfessionalId,
     });
   }
 

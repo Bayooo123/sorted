@@ -8,6 +8,7 @@ import {
   IdentityUser,
   KycRequestView,
   PayoutDestination,
+  ProfessionalDirectoryEntry,
   Role,
   Submarket,
 } from './types';
@@ -50,6 +51,8 @@ export interface UpdateProfileInput {
   name?: string;
   phone?: string;
   state?: string;
+  /** Empty string clears it back to falling through to name. */
+  displayName?: string;
 }
 
 export function updateProfile(input: UpdateProfileInput) {
@@ -102,4 +105,9 @@ export function listSubmarkets() {
 
 export function listClientTypes() {
   return api.get<ClientTypeRef[]>('taxonomy/client-types', false);
+}
+
+/** Public — PLAN.md "Professional directory". */
+export function listProfessionals(submarketKey: string) {
+  return api.get<ProfessionalDirectoryEntry[]>(`professionals?submarket=${encodeURIComponent(submarketKey)}`, false);
 }

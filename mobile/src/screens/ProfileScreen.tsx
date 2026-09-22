@@ -25,6 +25,7 @@ export default function ProfileScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [state, setState] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export default function ProfileScreen() {
 
   function startEditing() {
     setName(user!.name ?? '');
+    setDisplayName(user!.displayName ?? '');
     setPhone(user!.phone ?? '');
     setState(user!.state ?? '');
     setError(null);
@@ -78,8 +80,9 @@ export default function ProfileScreen() {
     setError(null);
     setSaving(true);
     try {
-      const input: { name?: string; phone?: string; state?: string } = {};
+      const input: { name?: string; displayName?: string; phone?: string; state?: string } = {};
       if (name.trim()) input.name = name.trim();
+      if (isProfessional) input.displayName = displayName.trim();
       if (phone.trim()) input.phone = phone.trim();
       if (state) input.state = state;
 
@@ -247,6 +250,14 @@ export default function ProfileScreen() {
         {editing ? (
           <>
             <TextField label="Name" value={name} onChangeText={setName} />
+            {isProfessional ? (
+              <TextField
+                label="Shop / business name (shown in the professional directory)"
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder={name || 'Leave blank to show your name instead'}
+              />
+            ) : null}
             <TextField label="Phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
             <Text style={styles.stateLabel}>State</Text>
             <View style={styles.chipWrap}>
@@ -273,6 +284,7 @@ export default function ProfileScreen() {
           </>
         ) : (
           <>
+            {isProfessional ? <StatRow label="Shop / business name" value={user.displayName || '(shows your name)'} /> : null}
             <StatRow label="Phone" value={user.phone ?? '—'} />
             <StatRow label="Email" value={user.email ?? '—'} />
             <StatRow label="State" value={user.state ?? '—'} />

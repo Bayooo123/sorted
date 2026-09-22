@@ -2048,6 +2048,71 @@ call, same validation, same conversion-by-recall pattern.
 
 ---
 
+## Professional directory — IMPLEMENTED
+
+Triggered by a real support moment: a dry-cleaning professional tried to
+use "Post a gig" to advertise his own shop, got a raw 403 ("This action
+requires the 'client' role") after filling out the whole form, because
+Post a gig is for clients hiring, not professionals listing themselves —
+and there was genuinely nowhere else for him to be discoverable except
+passively, via gig-matching. This closes that gap.
+
+**Product decisions locked in before building:**
+1. **Contact routes through the existing gig-invite mechanic, never
+   direct off-platform contact.** "Hire" opens Post a gig pre-filled with
+   that professional invited (`restrictedToProfessionalId` — this
+   already existed for WhatsApp's invite flow, just never exposed on the
+   public HTTP `POST /gigs`, now is). Every job started from the
+   directory is still escrow-protected — the entire reason Sorted exists
+   isn't bypassed for a "faster" contact button.
+2. **New `User.displayName`** — professionals previously had no public
+   name distinct from their personal `name`; a directory listing "Samuel
+   Bello" instead of "Sammy's Dry Cleaners" defeats the point. Optional,
+   any role, falls back to `name` wherever rendered when unset. Migration:
+   `20260922100000_professional_display_name`.
+3. **Category-only filtering for v1** — matches how gig-matching already
+   filters (submarket, not geography); no location filter yet.
+4. **Both mobile and web** built together, not staged.
+
+**Server:**
+- `IdentityService.listProfessionalsBySubmarket` + public
+  `GET /professionals?submarket=<key>` (no guard, matches
+  `GigsController`'s public browse convention). Returns a thin
+  `ProfessionalDirectoryEntry` (id, displayName-or-fallback, avatar,
+  kycStatus, accountType) — deliberately no phone/email/address, since
+  contact never happens off the gig-invite path.
+- `UpdateProfileInput`/`IdentityService.updateProfile` gained
+  `displayName` (empty string clears it, same "explicit clear" pattern
+  the field already needed).
+- `CreateGigDto`/`GigsController.create` now accept
+  `restrictedToProfessionalId` on the public endpoint (previously only
+  reachable from the WhatsApp conversation flow internally).
+  `GigsService.createGig` validates it references a real account with
+  the `professional` role — a malformed/bogus id 400s instead of quietly
+  creating an uninvitable gig.
+
+**Mobile:** new `DirectoryScreen` (category chips + professional cards +
+"Hire") living in `GigStackParamList` alongside `PostGig` — reached from
+a "Find a professional" button on `HomeFeedScreen`. `PostGigScreen`
+accepts `hireProfessionalId`/`hireProfessionalName`/`hireSubmarketKey`
+route params, prefills the category, shows an "Inviting X" banner with a
+way to remove it, and sends `restrictedToProfessionalId` on submit.
+`ProfileScreen` gained a "Shop / business name" field (professional-only)
+in the existing Account edit card.
+
+**Web (`index.html`):** new "Find pros" tab mirroring the same flow —
+category chips, professional cards, "Hire" switches to the Post a gig
+tab with the category and an invite banner prefilled, `Remove` link
+clears it. Profile tab gained the matching "Shop / business name" field,
+shown only for professional accounts.
+
+**Deliberately not built:** location filtering, direct messaging/contact
+info, and any professional-initiated "boost/feature my listing" — none
+were asked for, and the last one in particular would need a monetization
+decision this session doesn't have grounds to make on its own.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

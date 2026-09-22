@@ -65,4 +65,9 @@ export class CreateGigDto {
   @IsOptional()
   @IsString()
   templateId?: string;
+
+  /** PLAN.md "Professional directory" — set via the directory's "Hire" action to invite a specific professional directly, same mechanic WhatsApp's invite flow already uses. Validated server-side (must be an existing professional) in GigsService.createGig. */
+  @IsOptional()
+  @IsString()
+  restrictedToProfessionalId?: string;
 }

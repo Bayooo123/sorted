@@ -53,6 +53,12 @@ model User {
   phone               String?   @unique
   email               String?   @unique
   name                String?
+  // PLAN.md "Professional directory" — a professional's public-facing
+  // name in the directory (e.g. "Sammy's Dry Cleaners" vs. their personal
+  // `name`, "Samuel Bello"). Optional, any role, falls back to `name` when
+  // unset wherever it's displayed — never enforced/required, since not
+  // every professional runs a named business.
+  displayName         String?
   passwordHash        String?
   state               String? // Nigerian state — see common/nigerian-states.ts
   avatarBase64        String? // data URI (e.g. "data:image/jpeg;base64,...") — profile photo, all roles. See PLAN.md "Profile photo + KYC apply flow".
