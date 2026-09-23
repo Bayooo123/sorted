@@ -104,11 +104,12 @@ export class WhatsappService implements WhatsAppPort {
     await this.sendMessage(clientPhone, `${professionalName} has been paid for the job — how did it go? Reply with a number from 1 (poor) to 5 (excellent).`);
   }
 
-  async recordInboundMessage(phone: string): Promise<void> {
+  async recordInboundMessage(phone: string, profileName?: string): Promise<void> {
+    const name = profileName?.trim() || undefined;
     await this.prisma.whatsAppSession.upsert({
       where: { phone },
-      create: { phone },
-      update: { lastInboundAt: new Date() },
+      create: { phone, waProfileName: name },
+      update: { lastInboundAt: new Date(), ...(name ? { waProfileName: name } : {}) },
     });
   }
 

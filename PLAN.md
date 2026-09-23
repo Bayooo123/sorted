@@ -2113,6 +2113,53 @@ decision this session doesn't have grounds to make on its own.
 
 ---
 
+## WhatsApp contacts dashboard — IMPLEMENTED
+
+Trigger: the plan is to put the Sorted WhatsApp bot's number on a flier
+as the contact number. Before that ships, the ask was simple — can an
+admin actually see everyone who messages the bot, registered or not.
+
+The underlying data already existed: `WhatsAppSession` upserts on every
+inbound message (`WhatsappWebhookController.handleMessage` ->
+`recordInboundMessage`), tracking phone + `lastInboundAt`. What was
+missing was (1) a human name attached to each row, and (2) anywhere to
+actually look at it.
+
+1. **`WhatsAppSession.waProfileName`** (new, nullable) — Meta's webhook
+   payload already includes `value.contacts[].profile.name` (the
+   sender's WhatsApp display name) alongside `value.messages[]`; it was
+   never read. Now extracted (matched by `wa_id`, not by array index —
+   Meta doesn't guarantee `contacts[i]` pairs with `messages[i]`) and
+   refreshed on every inbound message. Not a verified real name — it's
+   just what WhatsApp reports — but turns a bare phone-number list into
+   something a human can actually scan. Migration:
+   `20260923090000_whatsapp_profile_name`.
+2. **`GET /admin/whatsapp/contacts`** (new, `WhatsappAdminController`,
+   AdminGuard/`x-admin-key` — same disclosed-manual pattern as KYC
+   review). Lives in `WhatsappModule` rather than `WhatsappWebhookModule`
+   since it only needs the global `PrismaService` for a direct
+   cross-reference against `User.phone` — no `IdentityModule` import, so
+   it doesn't touch the circular-dependency reasoning that keeps
+   `WhatsappModule` lean (see `whatsapp.interface.ts`'s doc comment).
+   Returns each contact's phone, WhatsApp display name, current
+   conversation state, first-seen/last-message timestamps, and — if that
+   phone matches a registered account — their app name and roles, so an
+   admin can tell "signed-up user" from "flier lead who just texted in."
+   Capped at the 500 most recently active, newest first.
+3. **`whatsapp-admin.html`** (new, repo root) — same unlinked-static-page
+   pattern as `kyc-admin.html`: admin key entered fresh each visit,
+   never stored, `noindex, nofollow`. A single searchable table (by name
+   or phone) rather than KYC's per-item review cards, since this is a
+   read-only "who's out there" view, not an approve/reject workflow —
+   there was nothing to action.
+
+**Deliberately not built:** no reply-from-dashboard, no CSV export, no
+pagination beyond the 500-row cap, no outbound messaging from this page
+— none were asked for, and the ask was specifically "can we see," not
+"can we manage."
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -104,19 +104,24 @@ export class WhatsappWebhookController {
     const value = (payload as WhatsAppWebhookPayload)?.entry?.[0]?.changes?.[0]?.value;
     const messages = value?.messages;
     if (!Array.isArray(messages)) return; // delivery/read status callbacks land here too — nothing to act on yet
+    // Meta sends contacts[] alongside messages[], keyed by wa_id, not
+    // paired index-for-index with messages[] — build a lookup rather than
+    // assuming contacts[0] matches messages[0] (usually true for a single
+    // inbound message, but not guaranteed for a batched payload).
+    const profileNameByWaId = new Map((value?.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]));
     for (const message of messages) {
-      await this.handleMessage(message);
+      await this.handleMessage(message, profileNameByWaId.get(message.from));
     }
   }
 
-  private async handleMessage(message: WhatsAppInboundMessage): Promise<void> {
+  private async handleMessage(message: WhatsAppInboundMessage, profileName?: string): Promise<void> {
     // Meta sends the sender with no "+" and the full country code (e.g.
     // "2348031234567") — our own User.phone is always strict E.164
     // ("+2348031234567", enforced at signup/profile-update), so this is
     // the entire normalization needed on this side, unlike a system
     // matching against inconsistently-entered user input.
     const phone = `+${message.from}`;
-    await this.whatsapp.recordInboundMessage(phone);
+    await this.whatsapp.recordInboundMessage(phone, profileName);
 
     // Exhaustive on purpose — every message type Meta can send gets an
     // explicit branch, even though most just reply "not supported yet."
@@ -196,6 +201,7 @@ interface WhatsAppWebhookPayload {
     changes?: Array<{
       value?: {
         messages?: WhatsAppInboundMessage[];
+        contacts?: Array<{ wa_id: string; profile?: { name?: string } }>;
       };
     }>;
   }>;

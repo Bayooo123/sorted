@@ -26,8 +26,13 @@ export interface WhatsAppPort {
    * path instead of calling this blind.
    */
   sendMessage(phone: string, text: string): Promise<void>;
-  /** Called by WhatsappWebhookController for every inbound message, so sendMessage knows the 24h window is open. */
-  recordInboundMessage(phone: string): Promise<void>;
+  /**
+   * Called by WhatsappWebhookController for every inbound message, so
+   * sendMessage knows the 24h window is open. profileName (Meta's
+   * `contacts[0].profile.name`) is optional and refreshed whenever
+   * present — see WhatsAppSession.waProfileName's doc comment.
+   */
+  recordInboundMessage(phone: string, profileName?: string): Promise<void>;
   /** Same window check sendMessage does internally, exposed so a caller can decide sendMessage vs. sendTemplate BEFORE attempting either. */
   isSessionOpen(phone: string): Promise<boolean>;
   /**

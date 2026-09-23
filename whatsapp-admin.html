@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sorted — WhatsApp contacts</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root {
+    --green-primary:#027A61;
+    --green-deep:#007B5C;
+    --green-bright:#04C29C;
+    --green-mint-bg:#C8FFF6;
+    --bg-app:#F4FAF8;
+    --surface:#FFFFFF;
+    --border:#E0E6E4;
+    --text-primary:#0C1F1B;
+    --text-body:#3A4A47;
+    --text-muted:#7E8F8D;
+    --error:#B3261E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg-app);
+    color: var(--text-body);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 24px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+  p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .key-row input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+  }
+  .search-row { margin-bottom: 20px; }
+  .search-row input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+  }
+  button {
+    padding: 12px 18px;
+    border-radius: 11px;
+    border: none;
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status { font-size: 13px; color: var(--error); font-weight: 600; margin: -4px 0 20px; }
+  #status:empty { display: none; }
+  #count { font-size: 13px; color: var(--text-muted); margin: -12px 0 20px; }
+  #count:empty { display: none; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  thead th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    padding: 12px 14px;
+    background: var(--bg-app);
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 12px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  .contact-name { font-weight: 600; color: var(--text-primary); }
+  .contact-phone { color: var(--text-muted); font-size: 12.5px; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    margin-right: 4px;
+  }
+  .badge-muted { background: var(--bg-app); color: var(--text-muted); }
+  #empty { text-align: center; color: var(--text-muted); padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>WhatsApp contacts</h1>
+  <p class="sub">Everyone who has messaged the Sorted WhatsApp bot — registered or not. Not linked from the main app; the admin key is never stored, you re-enter it each visit.</p>
+
+  <div class="key-row">
+    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
+    <button id="load-btn" type="button">Load contacts</button>
+  </div>
+  <div class="search-row">
+    <input type="text" id="search-input" placeholder="Filter by name or phone…" />
+  </div>
+  <p id="status"></p>
+  <p id="count"></p>
+
+  <table id="table" hidden>
+    <thead>
+      <tr>
+        <th>Contact</th>
+        <th>Status</th>
+        <th>First messaged</th>
+        <th>Last message</th>
+      </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+  <p id="empty" hidden>No contacts yet.</p>
+</div>
+
+<script>
+  var API_BASE_URL = 'https://sorted-api.vercel.app';
+  var keyInput = document.getElementById('admin-key');
+  var searchInput = document.getElementById('search-input');
+  var loadBtn = document.getElementById('load-btn');
+  var statusEl = document.getElementById('status');
+  var countEl = document.getElementById('count');
+  var tableEl = document.getElementById('table');
+  var tableBodyEl = document.getElementById('table-body');
+  var emptyEl = document.getElementById('empty');
+  var allContacts = [];
+
+  function adminApi(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json', 'x-admin-key': keyInput.value };
+    return fetch(API_BASE_URL + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? JSON.parse(text) : undefined;
+        if (!res.ok) {
+          var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+          throw new Error(Array.isArray(message) ? message.join(', ') : message);
+        }
+        return data;
+      });
+    });
+  }
+
+  var STATE_LABEL = {
+    idle: 'Idle',
+    awaiting_category: 'Posting a gig…',
+    awaiting_location: 'Posting a gig…',
+    awaiting_price: 'Posting a gig…',
+    awaiting_confirmation: 'Posting a gig…',
+    awaiting_reassignment: 'Awaiting reassignment',
+  };
+
+  function renderRow(c) {
+    var tr = document.createElement('tr');
+
+    var contactTd = document.createElement('td');
+    var nameDiv = document.createElement('div');
+    nameDiv.className = 'contact-name';
+    nameDiv.textContent = c.waProfileName || (c.registeredUser && c.registeredUser.name) || 'Unknown';
+    var phoneDiv = document.createElement('div');
+    phoneDiv.className = 'contact-phone';
+    phoneDiv.textContent = c.phone;
+    contactTd.appendChild(nameDiv);
+    contactTd.appendChild(phoneDiv);
+    if (c.registeredUser) {
+      var badgeWrap = document.createElement('div');
+      badgeWrap.style.marginTop = '4px';
+      (c.registeredUser.roles || []).forEach(function (r) {
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = r === 'professional' ? 'Professional' : 'Client';
+        badgeWrap.appendChild(badge);
+      });
+      contactTd.appendChild(badgeWrap);
+    } else {
+      var notReg = document.createElement('span');
+      notReg.className = 'badge badge-muted';
+      notReg.textContent = 'Not registered';
+      var notRegWrap = document.createElement('div');
+      notRegWrap.style.marginTop = '4px';
+      notRegWrap.appendChild(notReg);
+      contactTd.appendChild(notRegWrap);
+    }
+    tr.appendChild(contactTd);
+
+    var statusTd = document.createElement('td');
+    statusTd.textContent = STATE_LABEL[c.conversationState] || c.conversationState;
+    tr.appendChild(statusTd);
+
+    var firstTd = document.createElement('td');
+    firstTd.textContent = new Date(c.createdAt).toLocaleString();
+    tr.appendChild(firstTd);
+
+    var lastTd = document.createElement('td');
+    lastTd.textContent = new Date(c.lastInboundAt).toLocaleString();
+    tr.appendChild(lastTd);
+
+    return tr;
+  }
+
+  function renderTable() {
+    var query = searchInput.value.trim().toLowerCase();
+    var filtered = !query
+      ? allContacts
+      : allContacts.filter(function (c) {
+          var name = (c.waProfileName || (c.registeredUser && c.registeredUser.name) || '').toLowerCase();
+          return name.indexOf(query) !== -1 || c.phone.toLowerCase().indexOf(query) !== -1;
+        });
+
+    tableBodyEl.innerHTML = '';
+    if (filtered.length === 0) {
+      tableEl.hidden = true;
+      emptyEl.hidden = false;
+      countEl.textContent = '';
+      return;
+    }
+    tableEl.hidden = false;
+    emptyEl.hidden = true;
+    filtered.forEach(function (c) {
+      tableBodyEl.appendChild(renderRow(c));
+    });
+    countEl.textContent = filtered.length + (filtered.length !== allContacts.length ? ' of ' + allContacts.length : '') + ' contact' + (allContacts.length === 1 ? '' : 's');
+  }
+
+  function load() {
+    if (!keyInput.value) {
+      statusEl.textContent = 'Enter the admin key first.';
+      return;
+    }
+    statusEl.textContent = '';
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Loading…';
+    tableEl.hidden = true;
+    emptyEl.hidden = true;
+    countEl.textContent = '';
+
+    adminApi('/admin/whatsapp/contacts')
+      .then(function (contacts) {
+        allContacts = contacts;
+        renderTable();
+      })
+      .catch(function (err) {
+        statusEl.textContent = err.message;
+      })
+      .finally(function () {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load contacts';
+      });
+  }
+
+  loadBtn.addEventListener('click', load);
+  keyInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') load();
+  });
+  searchInput.addEventListener('input', renderTable);
+</script>
+</body>
+</html>

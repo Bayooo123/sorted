@@ -572,6 +572,13 @@ model WhatsAppSession {
   phone         String   @unique // E.164, same shape as User.phone
   lastInboundAt DateTime @default(now())
   createdAt     DateTime @default(now())
+  // The sender's WhatsApp display name, from Meta's webhook payload
+  // (`value.contacts[0].profile.name`) — not something WhatsApp
+  // guarantees is a real name, but it's what makes an admin contacts
+  // list ("who's messaging the bot") legible instead of a bare phone
+  // number. Refreshed on every inbound message. See PLAN.md "WhatsApp
+  // contacts dashboard".
+  waProfileName String?
 
   // Gig-posting conversation state (WhatsApp integration Phase 2 — see
   // PLAN.md). A guided, USSD-style sequence rather than free-text NLP:
