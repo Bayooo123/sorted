@@ -667,3 +667,35 @@ model SiteEvent {
 
   @@index([type, createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Leads (PLAN.md "WhatsApp intake: capture + human handoff") — replaces the
+// guided category/location/price/assignment WhatsApp gig-posting flow.
+// A client's free-text message is captured here, best-effort tagged with a
+// category guess (reuses WhatsappCategoryClassifierService — no new AI
+// integration), and a human takes it from there: contact the client, agree
+// pickup and price, then create the real Gig through the app once terms are
+// settled. Deliberately NOT a Gig — nothing here is priced, escrowed, or
+// matched; it's a pre-sales record, same "leaf table, no relations out"
+// shape as WhatsAppSession.
+// ---------------------------------------------------------------------------
+
+enum LeadStatus {
+  new
+  contacted
+  converted
+  closed
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  phone          String
+  waProfileName  String?
+  message        String
+  submarketGuess String? // Submarket.key, best-effort — see WhatsappCategoryClassifierService
+  status         LeadStatus @default(new)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([status, createdAt])
+}

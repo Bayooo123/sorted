@@ -1,23 +1,27 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { IdentityUser } from '../identity/identity.interface';
 import { GigsService } from '../gigs/gigs.service';
 import { EscrowService } from '../escrow/escrow.service';
 import { RatingsService } from '../ratings/ratings.service';
-import { kobo } from '../../common/money';
+import { LeadsService } from '../leads/leads.service';
+import { LeadView } from '../leads/leads.interface';
 import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
 import { WhatsappCategoryClassifierService } from './whatsapp-category-classifier.service';
 
 /**
- * WhatsApp integration Phase 2 (PLAN.md) — a registered client can post a
- * real gig by texting, no app needed. Deliberately a guided, numbered-menu
- * sequence ("USSD-style", per the original product brief) rather than
- * free-text NLP extraction: taxonomy/location/price are hard requirements
- * of GigsService.createGig, and a wrong NLP guess on a money field is a
- * worse failure mode than one extra question. The category step is the
- * one exception (see "AI category classification" in PLAN.md) — a wrong
- * guess there just means one CATEGORY reply to fix, not a bad payout.
+ * WhatsApp integration Phase 2 (PLAN.md), superseded by "WhatsApp intake:
+ * capture + human handoff" — a client describing a job no longer walks
+ * through a guided category/location/price/assignment sequence and no
+ * longer gets a Gig created (or funded) by the bot itself. The bot's job
+ * now stops at: capture what they typed, best-effort tag it with a
+ * category (reuses WhatsappCategoryClassifierService — the one AI call
+ * this flow makes), save it as a Lead, and hand off to a human — who
+ * contacts the client to agree pickup and price before a real Gig is
+ * created through the app. Money/matching stays entirely human-decided;
+ * see LeadsService and the admin leads.html page.
  *
  * State lives on WhatsAppSession (one row per phone, already used for the
  * 24h session window) rather than a separate table — this conversation is
@@ -30,10 +34,12 @@ export class WhatsappGigConversationService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     private readonly identity: IdentityService,
     private readonly gigs: GigsService,
     private readonly escrow: EscrowService,
     private readonly ratings: RatingsService,
+    private readonly leads: LeadsService,
     private readonly classifier: WhatsappCategoryClassifierService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
@@ -41,7 +47,6 @@ export class WhatsappGigConversationService {
   private readonly browseKeywordRegex = /^(jobs|gigs|available|browse|see jobs|view jobs)$/i;
   private readonly postKeywordRegex = /^(post|post a job|post job|i want to post)$/i;
   private readonly menuKeywordRegex = /^(menu|help|commands|\?)$/i;
-  private readonly categoryKeywordRegex = /^(category|change category|wrong category)$/i;
 
   async handle(user: IdentityUser, phone: string, text: string): Promise<void> {
     const trimmed = text.trim();
@@ -55,20 +60,16 @@ export class WhatsappGigConversationService {
     const state = session?.conversationState ?? 'idle';
 
     // Global escape hatches — recognized in ANY state, not just idle, so
-    // someone mid-draft (or mid any other flow) isn't stuck answering the
-    // current question just to see the job list or start a fresh post.
-    // MENU/HELP is informational only and leaves the current flow alone;
-    // JOBS and POST interrupt it the same way CANCEL does (see PLAN.md
-    // "Global WhatsApp commands"), since this state machine has no
-    // resume-a-paused-draft mechanism to preserve it instead. CATEGORY is
-    // narrower: it only fires when a draft description already exists
-    // (see "AI category classification"), and deliberately does NOT wipe
-    // the rest of the draft — fixing a wrong AI guess shouldn't cost the
-    // location/price already collected.
+    // someone mid-flow isn't stuck answering the current question just to
+    // see the job list or start a fresh post. MENU/HELP is informational
+    // only and leaves the current flow alone; JOBS and POST interrupt it
+    // the same way CANCEL does (see PLAN.md "Global WhatsApp commands"),
+    // since this state machine has no resume-a-paused-flow mechanism to
+    // preserve it instead.
     if (this.menuKeywordRegex.test(trimmed)) {
       await this.whatsapp.sendMessage(
         phone,
-        'Commands:\nJOBS — see open work\nPOST — start a new job post\nCATEGORY — pick a different category for the job you\'re posting\nCANCEL — stop what you\'re doing\n\nOtherwise, just answer my last message.',
+        'Commands:\nJOBS — see open work\nPOST — describe a job you need done\nCANCEL — stop what you\'re doing\n\nOtherwise, just answer my last message.',
       );
       return;
     }
@@ -82,26 +83,8 @@ export class WhatsappGigConversationService {
       await this.whatsapp.sendMessage(phone, 'Sure — tell me what you need done.');
       return;
     }
-    if (this.categoryKeywordRegex.test(trimmed) && session?.draftDescription) {
-      const submarkets = await this.listSubmarkets();
-      await this.prisma.whatsAppSession.update({ where: { phone }, data: { conversationState: 'awaiting_category' } });
-      await this.whatsapp.sendMessage(phone, `What kind of job is this?\n\n${this.numberedList(submarkets)}\n\nReply with the number.`);
-      return;
-    }
 
     switch (state) {
-      case 'awaiting_category':
-        return this.handleCategory(phone, trimmed);
-      case 'awaiting_location':
-        return this.handleLocation(phone, trimmed);
-      case 'awaiting_price':
-        return this.handlePrice(phone, trimmed);
-      case 'awaiting_assignment_mode':
-        return this.handleAssignmentMode(phone, trimmed, session!);
-      case 'awaiting_invitee_phone':
-        return this.handleInviteePhone(phone, trimmed, session!);
-      case 'awaiting_confirmation':
-        return this.handleConfirmation(user, phone, trimmed, session!);
       case 'awaiting_reassignment':
         return this.handleReassignment(phone, trimmed, session!);
       case 'awaiting_rating':
@@ -109,7 +92,7 @@ export class WhatsappGigConversationService {
       case 'awaiting_gig_selection':
         return this.handleGigSelection(user, phone, trimmed, session!);
       case 'awaiting_post_description':
-        return this.startDraft(phone, trimmed);
+        return this.captureLead(phone, trimmed);
       case 'idle':
       default:
         return this.handleIdle(user, phone, trimmed);
@@ -142,7 +125,7 @@ export class WhatsappGigConversationService {
     if (user.roles.includes('professional')) {
       return this.showAvailableGigs(user, phone);
     }
-    return this.startDraft(phone, text);
+    return this.captureLead(phone, text);
   }
 
   /**
@@ -247,262 +230,65 @@ export class WhatsappGigConversationService {
   }
 
   /**
-   * PLAN.md "AI category classification" — tries Claude first so most
-   * users never see the ~20-item menu at all; only falls back to it when
-   * unconfigured (no ANTHROPIC_API_KEY), ambiguous, or erroring. A wrong
-   * guess costs one CATEGORY reply (global keyword above), never a
-   * corrupted gig — nothing here skips the location/price steps.
+   * PLAN.md "WhatsApp intake: capture + human handoff" — the entire
+   * replacement for the old category/location/price/assignment/confirm
+   * sequence. Reuses WhatsappCategoryClassifierService (the same Claude
+   * call "AI category classification" already made) purely to tag the
+   * lead for the admin's benefit — it never gates or blocks on the
+   * result, unlike the old flow where an unconfident guess meant a whole
+   * extra menu step. Nothing here prices, matches, or creates a Gig;
+   * that's a human decision now, made after they've actually talked to
+   * the client — see LeadsService and the admin leads.html page.
    */
-  private async startDraft(phone: string, description: string): Promise<void> {
-    if (description.length < 3) {
-      await this.whatsapp.sendMessage(phone, "Tell me a bit more about what you need done — e.g. \"fix a leaking kitchen tap\".");
+  private async captureLead(phone: string, text: string): Promise<void> {
+    if (text.length < 3) {
+      await this.whatsapp.sendMessage(phone, 'Tell me a bit more about what you need done — e.g. "dry clean 3 shirts and a suit".');
       return;
     }
 
+    const session = await this.prisma.whatsAppSession.findUnique({ where: { phone } });
     const submarkets = await this.listSubmarkets();
-    const guessed = await this.classifier.classify(description, submarkets);
+    const guessed = await this.classifier.classify(text, submarkets);
 
-    await this.prisma.whatsAppSession.update({
-      where: { phone },
-      data: {
-        conversationState: guessed ? 'awaiting_location' : 'awaiting_category',
-        draftDescription: description,
-        draftSubmarketId: guessed?.id ?? null,
-        draftLocationText: null,
-        draftBountyKobo: null,
-        draftInviteeProfessionalId: null,
-        draftInviteeName: null,
-      },
+    const lead = await this.leads.captureLead({
+      phone,
+      waProfileName: session?.waProfileName ?? null,
+      message: text,
+      submarketGuess: guessed?.key ?? null,
     });
 
-    if (guessed) {
-      await this.whatsapp.sendMessage(
-        phone,
-        `Got it — filed under *${guessed.label}*. Not right? Reply CATEGORY to pick a different one.\n\nWhere should this be done? (e.g. "Abule Oja, Yaba" or a full address)`,
-      );
-      return;
-    }
+    await this.resetToIdle(phone);
 
-    await this.whatsapp.sendMessage(phone, `Got it. What kind of job is this?\n\n${this.numberedList(submarkets)}\n\nReply with the number.`);
-  }
-
-  private async handleCategory(phone: string, reply: string): Promise<void> {
-    const submarkets = await this.listSubmarkets();
-    const index = Number.parseInt(reply, 10);
-    const chosen = Number.isInteger(index) ? submarkets[index - 1] : undefined;
-
-    if (!chosen) {
-      await this.whatsapp.sendMessage(phone, `Please reply with just the number, 1 to ${submarkets.length}.\n\n${this.numberedList(submarkets)}`);
-      return;
-    }
-
-    await this.prisma.whatsAppSession.update({
-      where: { phone },
-      data: { conversationState: 'awaiting_location', draftSubmarketId: chosen.id },
-    });
-    await this.whatsapp.sendMessage(phone, 'Where should this be done? (e.g. "Abule Oja, Yaba" or a full address)');
-  }
-
-  private async handleLocation(phone: string, location: string): Promise<void> {
-    if (location.length < 3) {
-      await this.whatsapp.sendMessage(phone, 'Please share the area or address where the work is needed.');
-      return;
-    }
-
-    await this.prisma.whatsAppSession.update({
-      where: { phone },
-      data: { conversationState: 'awaiting_price', draftLocationText: location },
-    });
-    await this.whatsapp.sendMessage(phone, 'How much are you paying for this? Reply with just the amount, e.g. 15000');
-  }
-
-  private async handlePrice(phone: string, reply: string): Promise<void> {
-    const amountNaira = this.parseNaira(reply);
-    if (!amountNaira || amountNaira <= 0) {
-      await this.whatsapp.sendMessage(phone, "Sorry, I didn't get that — reply with just the amount in naira, e.g. 15000");
-      return;
-    }
-
-    await this.prisma.whatsAppSession.update({
-      where: { phone },
-      data: { conversationState: 'awaiting_assignment_mode', draftBountyKobo: BigInt(Math.round(amountNaira * 100)) },
-    });
-
+    const categoryLine = guessed ? ` — sounds like a *${guessed.label}* job` : '';
     await this.whatsapp.sendMessage(
       phone,
-      'One more thing — do you already have someone in mind for this, or should I open it up to any professional in that category?\n\n1. Invite someone I know\n2. Open it up (search)\n\nReply with the number.',
+      `Got it${categoryLine}! 🙌 A member of the Sorted team will reach out to you shortly to arrange pickup and confirm pricing. Thanks for reaching out!`,
     );
-  }
 
-  private async handleAssignmentMode(
-    phone: string,
-    reply: string,
-    session: { draftSubmarketId: string | null },
-  ): Promise<void> {
-    if (/^(1|invite|someone|know)$/i.test(reply)) {
-      await this.prisma.whatsAppSession.update({
-        where: { phone },
-        data: { conversationState: 'awaiting_invitee_phone' },
-      });
-      await this.whatsapp.sendMessage(phone, "What's their WhatsApp number? (e.g. 08031234567)");
-      return;
-    }
-
-    if (/^(2|open|search|anyone)$/i.test(reply)) {
-      await this.prisma.whatsAppSession.update({
-        where: { phone },
-        data: { conversationState: 'awaiting_confirmation', draftInviteeProfessionalId: null, draftInviteeName: null },
-      });
-      await this.sendRecap(phone, session.draftSubmarketId!);
-      return;
-    }
-
-    await this.whatsapp.sendMessage(phone, 'Reply 1 to invite someone you know, or 2 to open the job up to any professional.');
-  }
-
-  private async handleInviteePhone(
-    phone: string,
-    reply: string,
-    session: { draftSubmarketId: string | null },
-  ): Promise<void> {
-    if (/^(2|open|search|anyone)$/i.test(reply)) {
-      await this.prisma.whatsAppSession.update({
-        where: { phone },
-        data: { conversationState: 'awaiting_confirmation', draftInviteeProfessionalId: null, draftInviteeName: null },
-      });
-      await this.sendRecap(phone, session.draftSubmarketId!);
-      return;
-    }
-
-    const invitee = await this.identity.findUserByPhone(reply);
-    if (!invitee) {
-      await this.whatsapp.sendMessage(
-        phone,
-        "I couldn't find a Sorted account with that number. They'll need to sign up first (https://sorted.com.ng) — or reply \"search\" to open this job to any matching professional instead.",
-      );
-      return;
-    }
-    if (!invitee.roles.includes('professional')) {
-      await this.whatsapp.sendMessage(
-        phone,
-        "That number's on Sorted but not set up as a professional yet — try another number, or reply \"search\" to open this job to any matching professional instead.",
-      );
-      return;
-    }
-
-    await this.prisma.whatsAppSession.update({
-      where: { phone },
-      data: {
-        conversationState: 'awaiting_confirmation',
-        draftInviteeProfessionalId: invitee.id,
-        draftInviteeName: invitee.name,
-      },
+    await this.notifyFounderOfLead(lead, guessed?.label).catch((err) => {
+      this.logger.warn(`Lead notification failed for lead ${lead.id}: ${err instanceof Error ? err.message : err}`);
     });
-    await this.sendRecap(phone, session.draftSubmarketId!, invitee.name);
   }
 
-  private async sendRecap(phone: string, submarketId: string, inviteeName?: string | null): Promise<void> {
-    const session = await this.prisma.whatsAppSession.findUniqueOrThrow({ where: { phone } });
-    const submarket = await this.prisma.submarket.findUniqueOrThrow({ where: { id: submarketId } });
-    const amountNaira = Number(session.draftBountyKobo) / 100;
+  /**
+   * Best-effort, same reasoning as every other notification hook in this
+   * codebase: a failed notify must never fail the lead capture that
+   * already saved successfully above. Closes the loop on the bot's own
+   * promise ("a human will reach out shortly") — without this, that line
+   * is only true once someone happens to check the leads page.
+   * LEAD_NOTIFICATION_PHONE unset -> silent no-op, same "unconfigured
+   * means skip, not crash" pattern as the KWIK/WhatsApp template config.
+   */
+  private async notifyFounderOfLead(lead: LeadView, categoryLabel?: string): Promise<void> {
+    const notifyPhone = this.config.get<string>('LEAD_NOTIFICATION_PHONE');
+    if (!notifyPhone) return;
 
-    const assignmentLine = inviteeName ? `👤 Sent directly to ${inviteeName} to accept or decline` : `🔍 Open to any matching professional`;
-
-    const summary =
-      `Here's the job:\n\n` +
-      `📝 ${session.draftDescription}\n` +
-      `🏷️ ${submarket.label}\n` +
-      `📍 ${session.draftLocationText}\n` +
-      `💰 You pay: ₦${amountNaira.toLocaleString('en-NG')}\n` +
-      `${assignmentLine}\n\n` +
-      `Reply YES to post it, or CANCEL to start over.`;
-    await this.whatsapp.sendMessage(phone, summary);
-  }
-
-  private async handleConfirmation(
-    user: IdentityUser,
-    phone: string,
-    reply: string,
-    session: {
-      draftDescription: string | null;
-      draftSubmarketId: string | null;
-      draftLocationText: string | null;
-      draftBountyKobo: bigint | null;
-      draftInviteeProfessionalId: string | null;
-    },
-  ): Promise<void> {
-    if (!/^(yes|y|confirm|post it)$/i.test(reply)) {
-      await this.whatsapp.sendMessage(phone, 'Reply YES to post this job, or CANCEL to start over.');
-      return;
-    }
-
-    const { draftDescription, draftSubmarketId, draftLocationText, draftBountyKobo, draftInviteeProfessionalId } = session;
-    if (!draftDescription || !draftSubmarketId || !draftLocationText || !draftBountyKobo) {
-      // Shouldn't happen (all four are set before reaching awaiting_confirmation) — recover rather than crash mid-conversation.
-      await this.reset(phone);
-      await this.whatsapp.sendMessage(phone, "Something went wrong on my end — let's start over. Tell me what you need done.");
-      return;
-    }
-
-    if (!user.roles.includes('client')) {
-      await this.identity.completeRoleProfile(user.id, {
-        roles: user.roles.includes('professional') ? [...user.roles, 'client'] : ['client'],
-        serviceOfferingSubmarketIds: user.roles.includes('professional') ? user.serviceOfferingSubmarketIds : undefined,
-        seekingCategorySubmarketIds: [draftSubmarketId],
-      });
-    }
-
-    const submarket = await this.prisma.submarket.findUniqueOrThrow({
-      where: { id: draftSubmarketId },
-      include: { domain: true },
-    });
-    if (!submarket.domain) {
-      // Every seeded submarket belongs to a domain (see prisma/seed.ts) —
-      // domainId is nullable at the schema level but not in practice.
-      throw new Error(`Submarket "${submarket.key}" has no domain — data integrity issue`);
-    }
-
-    const gig = await this.gigs.createGig({
-      clientId: user.id,
-      title: draftDescription.slice(0, 200),
-      description: draftDescription,
-      domain: submarket.domain.key,
-      submarket: submarket.key,
-      clientType: 'individual',
-      locationText: draftLocationText,
-      materialsMode: 'bounty_covers',
-      bountyKobo: kobo(Number(draftBountyKobo)),
-      criteria: [draftDescription],
-      restrictedToProfessionalId: draftInviteeProfessionalId ?? undefined,
-    });
-    await this.gigs.publishGig(gig.id);
-    const escrowRecord = await this.escrow.fundGig(gig.id);
-
-    await this.reset(phone);
-
-    // Surcharge model (EscrowService.fundGig / escrow.interface.ts's
-    // COMMISSION MODEL note): the client pays bounty + platform fee, added
-    // on top — escrowRecord.totalChargeKobo is what actually has to land in
-    // the holding account, not the bare bounty.
-    const totalNaira = Number(escrowRecord.totalChargeKobo) / 100;
-    const bountyNaira = Number(draftBountyKobo) / 100;
-    const feeNaira = Number(escrowRecord.feeKobo) / 100;
-    const breakdown = `(₦${bountyNaira.toLocaleString('en-NG')} bounty + ₦${feeNaira.toLocaleString('en-NG')} platform fee)`;
-    // The invited professional (if any) is only messaged once EscrowService
-    // confirms funding — see EscrowService.sendInvite — so there's nothing
-    // more to tell the client here about that leg yet.
-    if (escrowRecord.holdingAccount?.checkoutUrl) {
-      await this.whatsapp.sendMessage(
-        phone,
-        `Job posted! To make it live, pay ₦${totalNaira.toLocaleString('en-NG')} ${breakdown} here:\n${escrowRecord.holdingAccount.checkoutUrl}\n\nOnce payment is confirmed, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
-      );
-    } else {
-      const { accountNumber, bankName } = escrowRecord.holdingAccount ?? {};
-      await this.whatsapp.sendMessage(
-        phone,
-        `Job posted! To make it live, transfer ₦${totalNaira.toLocaleString('en-NG')} ${breakdown} to:\n${bankName ?? 'Sorted'} — ${accountNumber ?? '(see sorted.com.ng)'}\n\nOnce we confirm receipt, your job goes live${draftInviteeProfessionalId ? " and we'll send the invite" : ''}.`,
-      );
-    }
+    const who = lead.waProfileName ? `${lead.waProfileName} (${lead.phone})` : lead.phone;
+    const category = categoryLabel ? ` [${categoryLabel}]` : '';
+    await this.whatsapp.sendMessage(
+      notifyPhone,
+      `🆕 New lead${category}\n${who}\n"${lead.message}"\n\nReply to them on WhatsApp to arrange pickup and price.`,
+    );
   }
 
   /**
@@ -634,17 +420,5 @@ export class WhatsappGigConversationService {
 
   private async listSubmarkets() {
     return this.prisma.submarket.findMany({ orderBy: { label: 'asc' } });
-  }
-
-  private numberedList(items: { label: string }[]): string {
-    return items.map((item, i) => `${i + 1}. ${item.label}`).join('\n');
-  }
-
-  /** Accepts "15000", "15,000", "₦15000", "15k" — rejects anything else rather than guessing. */
-  private parseNaira(input: string): number | null {
-    const cleaned = input.trim().replace(/[₦,\s]/g, '');
-    const kMatch = /^(\d+(?:\.\d+)?)k$/i.exec(cleaned);
-    const value = kMatch ? Number.parseFloat(kMatch[1]) * 1000 : Number.parseFloat(cleaned);
-    return Number.isFinite(value) && value > 0 ? value : null;
   }
 }

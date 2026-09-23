@@ -9,18 +9,19 @@ import { WhatsappGigConversationService } from './whatsapp-gig-conversation.serv
 import { WhatsappInviteService } from './whatsapp-invite.service';
 import { WhatsappBroadcastService } from './whatsapp-broadcast.service';
 import { WhatsappCategoryClassifierService } from './whatsapp-category-classifier.service';
+import { LeadsModule } from '../leads/leads.module';
 
 /**
  * Separate from WhatsappModule on purpose — see whatsapp.interface.ts's
  * doc comment. Imported only by AppModule; nothing else may import this
  * module (that's what would reintroduce the cycle it exists to avoid).
  *
- * GigsModule/EscrowModule/RatingsModule are safe to import here (unlike
- * Identity's own dependency on Notifications->Whatsapp): none of them
- * imports anything that chains back to this module, so no cycle.
+ * GigsModule/EscrowModule/RatingsModule/LeadsModule are safe to import here
+ * (unlike Identity's own dependency on Notifications->Whatsapp): none of
+ * them imports anything that chains back to this module, so no cycle.
  */
 @Module({
-  imports: [IdentityModule, WhatsappModule, GigsModule, EscrowModule, RatingsModule],
+  imports: [IdentityModule, WhatsappModule, GigsModule, EscrowModule, RatingsModule, LeadsModule],
   controllers: [WhatsappWebhookController],
   providers: [WhatsappGigConversationService, WhatsappInviteService, WhatsappBroadcastService, WhatsappCategoryClassifierService],
 })

@@ -2229,6 +2229,66 @@ hover), not just eyeballing the source.
 
 ---
 
+## WhatsApp intake: capture + human handoff — IMPLEMENTED
+
+The ask: with the flier driving people to the WhatsApp bot as the contact
+number, should the bot get "more intelligent" (the ask specifically named
+OpenAI/"AI tokens") to take the order, confirm a human will reach out,
+and let that human arrange pickup and agree cost/payment.
+
+**Decision: no new AI vendor.** The bot already calls Claude (the same
+integration "AI category classification" built) — a second provider
+would mean a second API key and bill for zero functional gain. This
+reuses that existing call, it doesn't add one.
+
+**Replaces the guided WhatsApp gig-posting flow entirely** (product
+decision, confirmed with the user — not layered alongside it). The old
+category → location → price → assignment-mode → invitee-phone →
+confirmation sequence, and the Gig it created and funded directly from
+WhatsApp, is gone. A client describing a job now gets: free-text
+capture, a best-effort category tag (same Claude call as before, now
+informational only — it never blocks or gates), a confirmation that a
+human will follow up to arrange pickup and price, and nothing else. No
+price, location, or payment is collected by the bot. `WhatsappGigConversationService`
+lost `startDraft`/`handleCategory`/`handleLocation`/`handlePrice`/
+`handleAssignmentMode`/`handleInviteePhone`/`sendRecap`/`handleConfirmation`
+(and the CATEGORY global keyword, which no longer has a step to
+re-trigger) in favor of one `captureLead` method. Professional-facing
+flows (browse/claim, reassignment, ratings) are untouched — this only
+replaces the CLIENT gig-posting path.
+
+**New `Lead` model** (`leads` module) — deliberately not a `Gig`: no
+price, no escrow, no matching. A human converts it into a real Gig
+through the app once they've actually talked to the client and agreed
+pickup/price. Fields: phone, WhatsApp display name (reuses the same
+capture as the WhatsApp contacts dashboard), the raw message, a
+best-effort category guess, and a status (`new` → `contacted` →
+`converted`/`closed`) moved by hand — there's no automation deciding
+when a lead is "done." Migration: `20260923170000_leads`.
+
+**Closing the loop the bot's own message promises:** "a human will
+reach out shortly" is only true if a human finds out. New
+`LEAD_NOTIFICATION_PHONE` config (unset → silent no-op, same pattern as
+every other optional WhatsApp config) — when set, the bot best-effort
+WhatsApps that number with the lead's details the moment it's captured,
+so acting on it doesn't depend on remembering to check `leads.html`.
+
+**`GET/PATCH /admin/leads`** (`LeadsAdminController`, AdminGuard) and
+**`leads.html`** (new, repo root, same unlinked-admin-key pattern as the
+other three pages) — status filter chips, one card per lead, a status
+dropdown per card that PATCHes on change. Verified rendering with mocked
+data before shipping.
+
+**Deliberately not built:** the bot does not negotiate pickup time,
+price, or payment under any circumstance — that's not an AI-capability
+question, it's a "should an LLM make real money commitments
+unsupervised" question, and the user's own framing already put a human
+in that seat. No lead deduplication (a client who messages twice gets
+two lead rows — merge by hand); no auto-conversion from Lead to Gig
+(a human creates the real Gig through the app once terms are agreed).
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sorted — Leads</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root {
+    --green-primary:#027A61;
+    --green-deep:#007B5C;
+    --green-bright:#04C29C;
+    --green-mint-bg:#C8FFF6;
+    --bg-app:#F4FAF8;
+    --surface:#FFFFFF;
+    --border:#E0E6E4;
+    --text-primary:#0C1F1B;
+    --text-body:#3A4A47;
+    --text-muted:#7E8F8D;
+    --error:#B3261E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg-app);
+    color: var(--text-body);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 24px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+  p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .key-row input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+  }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-chip {
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .filter-chip.active { border-color: var(--green-bright); background: var(--green-mint-bg); color: var(--green-deep); }
+  button {
+    padding: 12px 18px;
+    border-radius: 11px;
+    border: none;
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status { font-size: 13px; color: var(--error); font-weight: 600; margin: -4px 0 20px; }
+  #status:empty { display: none; }
+  #count { font-size: 13px; color: var(--text-muted); margin: -8px 0 20px; }
+  #count:empty { display: none; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+  .lead-name { font-weight: 600; color: var(--text-primary); font-size: 14.5px; }
+  .lead-phone { font-size: 12.5px; color: var(--text-muted); }
+  .lead-meta { font-size: 11.5px; color: var(--text-muted); text-align: right; white-space: nowrap; }
+  .lead-message {
+    font-size: 13.5px;
+    color: var(--text-body);
+    background: var(--bg-app);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 8px 0 10px;
+    white-space: pre-wrap;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    margin-right: 6px;
+  }
+  .card-actions { display: flex; align-items: center; gap: 10px; }
+  .status-select {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 13px;
+    color: var(--text-body);
+  }
+  #empty { text-align: center; color: var(--text-muted); padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Leads</h1>
+  <p class="sub">Captured from WhatsApp — reply to them there to arrange pickup and price, then mark status here. Not linked from the main app; the admin key is never stored, you re-enter it each visit.</p>
+
+  <div class="key-row">
+    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
+    <button id="load-btn" type="button">Load leads</button>
+  </div>
+  <div class="filter-row" id="filter-row">
+    <button class="filter-chip active" data-status="" type="button">All</button>
+    <button class="filter-chip" data-status="new" type="button">New</button>
+    <button class="filter-chip" data-status="contacted" type="button">Contacted</button>
+    <button class="filter-chip" data-status="converted" type="button">Converted</button>
+    <button class="filter-chip" data-status="closed" type="button">Closed</button>
+  </div>
+  <p id="status"></p>
+  <p id="count"></p>
+
+  <div id="list"></div>
+  <p id="empty" hidden>No leads in this view.</p>
+</div>
+
+<script>
+  var API_BASE_URL = 'https://sorted-api.vercel.app';
+  var keyInput = document.getElementById('admin-key');
+  var loadBtn = document.getElementById('load-btn');
+  var filterRow = document.getElementById('filter-row');
+  var statusEl = document.getElementById('status');
+  var countEl = document.getElementById('count');
+  var listEl = document.getElementById('list');
+  var emptyEl = document.getElementById('empty');
+  var currentFilter = '';
+
+  function adminApi(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json', 'x-admin-key': keyInput.value };
+    return fetch(API_BASE_URL + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? JSON.parse(text) : undefined;
+        if (!res.ok) {
+          var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+          throw new Error(Array.isArray(message) ? message.join(', ') : message);
+        }
+        return data;
+      });
+    });
+  }
+
+  var STATUSES = ['new', 'contacted', 'converted', 'closed'];
+
+  function renderCard(lead) {
+    var card = document.createElement('div');
+    card.className = 'card';
+
+    var top = document.createElement('div');
+    top.className = 'card-top';
+
+    var nameWrap = document.createElement('div');
+    var nameEl = document.createElement('div');
+    nameEl.className = 'lead-name';
+    nameEl.textContent = lead.waProfileName || 'Unknown';
+    var phoneEl = document.createElement('div');
+    phoneEl.className = 'lead-phone';
+    phoneEl.textContent = lead.phone;
+    nameWrap.appendChild(nameEl);
+    nameWrap.appendChild(phoneEl);
+
+    var metaEl = document.createElement('div');
+    metaEl.className = 'lead-meta';
+    metaEl.textContent = new Date(lead.createdAt).toLocaleString();
+
+    top.appendChild(nameWrap);
+    top.appendChild(metaEl);
+    card.appendChild(top);
+
+    if (lead.submarketLabel) {
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = lead.submarketLabel;
+      card.appendChild(badge);
+    }
+
+    var messageEl = document.createElement('div');
+    messageEl.className = 'lead-message';
+    messageEl.textContent = lead.message;
+    card.appendChild(messageEl);
+
+    var actions = document.createElement('div');
+    actions.className = 'card-actions';
+    var select = document.createElement('select');
+    select.className = 'status-select';
+    STATUSES.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+      if (s === lead.status) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', function () {
+      var newStatus = select.value;
+      select.disabled = true;
+      adminApi('/admin/leads/' + lead.id + '/status', { method: 'PATCH', body: { status: newStatus } })
+        .then(function () {
+          if (currentFilter && newStatus !== currentFilter) {
+            card.remove();
+            if (!listEl.children.length) emptyEl.hidden = false;
+          }
+        })
+        .catch(function (err) {
+          statusEl.textContent = err.message;
+          select.value = lead.status;
+        })
+        .finally(function () {
+          select.disabled = false;
+        });
+    });
+    actions.appendChild(select);
+    card.appendChild(actions);
+
+    return card;
+  }
+
+  function load() {
+    if (!keyInput.value) {
+      statusEl.textContent = 'Enter the admin key first.';
+      return;
+    }
+    statusEl.textContent = '';
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Loading…';
+    listEl.innerHTML = '';
+    emptyEl.hidden = true;
+    countEl.textContent = '';
+
+    var query = currentFilter ? '?status=' + encodeURIComponent(currentFilter) : '';
+    adminApi('/admin/leads' + query)
+      .then(function (leads) {
+        if (leads.length === 0) {
+          emptyEl.hidden = false;
+          return;
+        }
+        leads.forEach(function (lead) {
+          listEl.appendChild(renderCard(lead));
+        });
+        countEl.textContent = leads.length + ' lead' + (leads.length === 1 ? '' : 's');
+      })
+      .catch(function (err) {
+        statusEl.textContent = err.message;
+      })
+      .finally(function () {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load leads';
+      });
+  }
+
+  loadBtn.addEventListener('click', load);
+  keyInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') load();
+  });
+  filterRow.addEventListener('click', function (e) {
+    var chip = e.target.closest('.filter-chip');
+    if (!chip) return;
+    currentFilter = chip.getAttribute('data-status');
+    Array.prototype.forEach.call(filterRow.children, function (c) {
+      c.classList.toggle('active', c === chip);
+    });
+    if (keyInput.value) load();
+  });
+</script>
+</body>
+</html>
