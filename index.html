@@ -1730,18 +1730,34 @@
   document.getElementById('year').textContent = new Date().getFullYear();
 
   // ---------- WhatsApp CTAs ----------
-  // One number for every door — set once, used everywhere below.
-  var WHATSAPP_NUMBER = '2349031812675';
+  // PLAN.md "Product analytics dashboard" — every WhatsApp CTA routes
+  // through the API's /go/whatsapp redirect instead of a bare wa.me link,
+  // so a click is actually counted (server-side, before the browser
+  // navigates away) rather than invisible. ctaId identifies which button
+  // was clicked on the dashboard; the destination number itself is
+  // server-configured (WHATSAPP_CONTACT_NUMBER), never passed here.
+  var SITE_API_BASE_URL = 'https://sorted-api.vercel.app'; // kept in sync with API_BASE_URL below by hand — this script has no module system to share it through
 
-  function waLink(text) {
-    return 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(text);
+  function waLink(text, ctaId) {
+    return SITE_API_BASE_URL + '/go/whatsapp?cta=' + encodeURIComponent(ctaId) + '&text=' + encodeURIComponent(text);
   }
+
+  (function trackPageview() {
+    try {
+      fetch(SITE_API_BASE_URL + '/site-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({ path: location.pathname, referrer: document.referrer || undefined }),
+      }).catch(function () {});
+    } catch (e) {}
+  })();
 
   // "I need something done" — one tap, no form, straight into WhatsApp
   // with the only thing that's actually live right now.
   var customerMessage = "Hi Sorted, I'd like to book a dry cleaning / laundry pickup in Yaba.";
-  document.getElementById('door-customer').href = waLink(customerMessage);
-  document.getElementById('door-customer-bottom').href = waLink(customerMessage);
+  document.getElementById('door-customer').href = waLink(customerMessage, 'door_customer_hero');
+  document.getElementById('door-customer-bottom').href = waLink(customerMessage, 'door_customer_bottom');
 
   // ---------- category chips -> "raise your hand" ----------
   // Closed-category handoff (PLAN.md-equivalent for the landing page): a
@@ -1767,7 +1783,7 @@
     var area = raiseHandArea.value.trim() || 'my area';
     var message = 'Hi Sorted, I\'m looking for ' + selectedCategory + ' in ' + area +
       '. I saw dry cleaning is live in Yaba — please let me know when you open in my category/area.';
-    window.open(waLink(message), '_blank', 'noopener');
+    window.open(waLink(message, 'raise_hand'), '_blank', 'noopener');
   });
 
   // ---------- professional pitch -> WhatsApp ----------
@@ -1776,7 +1792,7 @@
     var trade = document.getElementById('pro-trade').value.trim() || 'a professional';
     var area = document.getElementById('pro-area').value.trim() || 'my area';
     var message = "Hi Sorted, I'm " + trade + " in " + area + " — tell me more about joining.";
-    window.open(waLink(message), '_blank', 'noopener');
+    window.open(waLink(message, 'pro_pitch'), '_blank', 'noopener');
   });
 
   // ---------- service worker ----------

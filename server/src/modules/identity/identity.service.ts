@@ -158,7 +158,7 @@ export class IdentityService implements IdentityPort {
 
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
     const user = await this.prisma.user.create({
-      data: { email, phone, name, state, passwordHash, roleFlags: [] },
+      data: { email, phone, name, state, passwordHash, roleFlags: [], lastLoginAt: new Date() },
     });
 
     // Fire-and-log, not fire-and-fail: a Resend outage is real, but it
@@ -178,6 +178,8 @@ export class IdentityService implements IdentityPort {
 
     const isMatch = await bcrypt.compare(input.password, user.passwordHash);
     if (!isMatch) throw new UnauthorizedException('Incorrect email/phone or password');
+
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
     const accessToken = await this.jwt.signAsync({ sub: user.id });
     return { accessToken, user: await this.getUser(user.id) };

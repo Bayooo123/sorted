@@ -12,6 +12,8 @@ import { LedgerModule } from './modules/ledger/ledger.module';
 import { ReputationNotificationsModule } from './modules/reputation-notifications/reputation-notifications.module';
 import { RatingsModule } from './modules/ratings/ratings.module';
 import { WhatsappWebhookModule } from './modules/whatsapp/whatsapp-webhook.module';
+import { SiteEventsModule } from './modules/site-events/site-events.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 /**
  * Composition root. The modules below correspond 1:1 to HANDOFF.md §3, plus
@@ -35,6 +37,8 @@ import { WhatsappWebhookModule } from './modules/whatsapp/whatsapp-webhook.modul
     ReputationNotificationsModule,
     RatingsModule,
     WhatsappWebhookModule,
+    SiteEventsModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

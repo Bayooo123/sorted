@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sorted — Dashboard</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root {
+    --green-primary:#027A61;
+    --green-deep:#007B5C;
+    --green-bright:#04C29C;
+    --green-mint-bg:#C8FFF6;
+    --bg-app:#F4FAF8;
+    --surface:#FFFFFF;
+    --border:#E0E6E4;
+    --text-primary:#0C1F1B;
+    --text-body:#3A4A47;
+    --text-muted:#7E8F8D;
+    --error:#B3261E;
+    --gridline:#E9EFEC;
+    --area-fill: rgba(2,122,97,0.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg-app);
+    color: var(--text-body);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 24px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+  p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .key-row input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+  }
+  button {
+    padding: 12px 18px;
+    border-radius: 11px;
+    border: none;
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #status { font-size: 13px; color: var(--error); font-weight: 600; margin: -4px 0 20px; }
+  #status:empty { display: none; }
+  #generated-at { font-size: 12.5px; color: var(--text-muted); margin: -12px 0 24px; }
+  #generated-at:empty { display: none; }
+
+  #content { display: none; }
+
+  section { margin-bottom: 36px; }
+  .section-title { font-family: "Iowan Old Style", Georgia, serif; font-size: 18px; color: var(--text-primary); margin: 0 0 4px; }
+  .section-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 14px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .tile-label { font-size: 12px; color: var(--text-muted); margin: 0 0 6px; }
+  .tile-value { font-size: 22px; font-weight: 600; color: var(--text-primary); line-height: 1.1; }
+  .tile-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .chart-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    position: relative;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0 0 2px; }
+  .card-sub { font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px; }
+  .empty-note { font-size: 12.5px; color: var(--text-muted); padding: 20px 0; text-align: center; }
+
+  .line-chart-wrap { position: relative; }
+  .line-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--text-primary);
+    color: #fff;
+    font-size: 11.5px;
+    padding: 5px 9px;
+    border-radius: 7px;
+    white-space: nowrap;
+    transform: translate(-50%, -130%);
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 5;
+  }
+  .line-tooltip strong { font-weight: 700; }
+
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-label { flex: 0 0 130px; font-size: 12.5px; color: var(--text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; height: 20px; background: var(--bg-app); border-radius: 4px; position: relative; }
+  .bar-fill { height: 20px; background: var(--green-primary); border-radius: 0 4px 4px 0; min-width: 4px; }
+  .bar-value { flex: 0 0 auto; font-size: 12.5px; color: var(--text-muted); min-width: 34px; text-align: right; }
+
+  .two-col-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sorted — Dashboard</h1>
+  <p class="sub">Accounts, orders, WhatsApp activity, and site traffic, all in one place. Not linked from the main app; the admin key is never stored, you re-enter it each visit.</p>
+
+  <div class="key-row">
+    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
+    <button id="load-btn" type="button">Load dashboard</button>
+  </div>
+  <p id="status"></p>
+  <p id="generated-at"></p>
+
+  <div id="content">
+    <section>
+      <p class="section-title">At a glance</p>
+      <p class="section-sub">Last 30 days unless noted.</p>
+      <div class="kpi-grid" id="kpi-grid"></div>
+    </section>
+
+    <section>
+      <p class="section-title">Site traffic &amp; conversion</p>
+      <p class="section-sub">Pageviews and WhatsApp CTA clicks on the marketing site, and how they relate to signups.</p>
+      <div class="chart-grid">
+        <div class="card">
+          <p class="card-title">Pageviews</p>
+          <p class="card-sub">Last 30 days</p>
+          <div id="chart-pageviews"></div>
+        </div>
+        <div class="card">
+          <p class="card-title">WhatsApp CTA clicks</p>
+          <p class="card-sub">Last 30 days</p>
+          <div id="chart-whatsapp-clicks"></div>
+        </div>
+      </div>
+      <div class="two-col-tiles" id="site-ratio-tiles"></div>
+      <div class="card" style="margin-top:16px;">
+        <p class="card-title">Clicks by button</p>
+        <p class="card-sub">Which WhatsApp CTA is driving traffic, last 30 days</p>
+        <div id="chart-cta-breakdown"></div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-title">Accounts</p>
+      <div class="chart-grid">
+        <div class="card">
+          <p class="card-title">Signups</p>
+          <p class="card-sub">Last 30 days</p>
+          <div id="chart-signups"></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Verification (KYC)</p>
+          <p class="card-sub">All-time</p>
+          <div id="chart-kyc"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-title">Orders</p>
+      <p class="section-sub">"Orders" = gigs, excluding drafts (never left the client's device).</p>
+      <div class="chart-grid">
+        <div class="card">
+          <p class="card-title">Orders created</p>
+          <p class="card-sub">Last 30 days</p>
+          <div id="chart-gigs"></div>
+        </div>
+        <div class="card">
+          <p class="card-title">By status</p>
+          <p class="card-sub">All-time</p>
+          <div id="chart-status"></div>
+        </div>
+      </div>
+      <div class="chart-grid" style="margin-top:16px;">
+        <div class="card">
+          <p class="card-title">Top categories</p>
+          <p class="card-sub">By order count, all-time</p>
+          <div id="chart-categories"></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Top states</p>
+          <p class="card-sub">By client location, all-time</p>
+          <div id="chart-states"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-title">WhatsApp</p>
+      <p class="section-sub">Ties to the WhatsApp contacts dashboard — same underlying data.</p>
+      <div class="chart-grid">
+        <div class="card">
+          <p class="card-title">New contacts</p>
+          <p class="card-sub">Last 30 days</p>
+          <div id="chart-wa-contacts"></div>
+        </div>
+        <div class="card">
+          <p class="card-title">Registered vs. not</p>
+          <p class="card-sub">All-time contacts</p>
+          <div id="wa-registered-tiles" class="two-col-tiles" style="margin-top:0;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-title">Ops health &amp; retention</p>
+      <div class="two-col-tiles" id="ops-tiles"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+  var API_BASE_URL = 'https://sorted-api.vercel.app';
+  var keyInput = document.getElementById('admin-key');
+  var loadBtn = document.getElementById('load-btn');
+  var statusEl = document.getElementById('status');
+  var generatedAtEl = document.getElementById('generated-at');
+  var contentEl = document.getElementById('content');
+
+  function adminApi(path) {
+    return fetch(API_BASE_URL + path, {
+      headers: { 'x-admin-key': keyInput.value },
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? JSON.parse(text) : undefined;
+        if (!res.ok) {
+          var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+          throw new Error(Array.isArray(message) ? message.join(', ') : message);
+        }
+        return data;
+      });
+    });
+  }
+
+  // ---------- number formatting ----------
+  function compactNumber(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+  }
+
+  function naira(kobo) {
+    return (kobo / 100).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 });
+  }
+
+  function compactNaira(kobo) {
+    var n = kobo / 100;
+    if (n >= 1000000) return '₦' + (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return '₦' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return naira(kobo);
+  }
+
+  function percent(n) {
+    return n === null || n === undefined ? '—' : n.toFixed(1) + '%';
+  }
+
+  function ratio(n) {
+    return n === null || n === undefined ? '—' : n.toFixed(2);
+  }
+
+  // ---------- stat tile ----------
+  function statTile(label, value, sub) {
+    var tile = document.createElement('div');
+    tile.className = 'tile';
+    var labelEl = document.createElement('p');
+    labelEl.className = 'tile-label';
+    labelEl.textContent = label;
+    var valueEl = document.createElement('p');
+    valueEl.className = 'tile-value';
+    valueEl.textContent = value;
+    tile.appendChild(labelEl);
+    tile.appendChild(valueEl);
+    if (sub) {
+      var subEl = document.createElement('p');
+      subEl.className = 'tile-sub';
+      subEl.textContent = sub;
+      tile.appendChild(subEl);
+    }
+    return tile;
+  }
+
+  // ---------- line chart with crosshair + tooltip (dataviz skill: mark specs + interaction) ----------
+  // Single series, sequential brand hue — no legend needed (card title names the series).
+  function lineChart(container, points, opts) {
+    container.innerHTML = '';
+    if (!points || points.length === 0 || points.every(function (p) { return p.count === 0; })) {
+      var empty = document.createElement('p');
+      empty.className = 'empty-note';
+      empty.textContent = 'No data yet.';
+      container.appendChild(empty);
+      return;
+    }
+
+    var width = 460, height = 120, padTop = 10, padBottom = 20, padLeft = 4, padRight = 4;
+    var plotW = width - padLeft - padRight;
+    var plotH = height - padTop - padBottom;
+    var maxVal = Math.max.apply(null, points.map(function (p) { return p.count; }));
+    var niceMax = maxVal === 0 ? 1 : maxVal;
+
+    function xAt(i) { return padLeft + (points.length === 1 ? 0 : (i / (points.length - 1)) * plotW); }
+    function yAt(v) { return padTop + plotH - (v / niceMax) * plotH; }
+
+    var linePath = points.map(function (p, i) { return (i === 0 ? 'M' : 'L') + xAt(i) + ',' + yAt(p.count); }).join(' ');
+    var areaPath = linePath + ' L' + xAt(points.length - 1) + ',' + (padTop + plotH) + ' L' + xAt(0) + ',' + (padTop + plotH) + ' Z';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'line-chart-wrap';
+
+    var svgNs = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNs, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', height);
+    svg.style.display = 'block';
+    svg.style.overflow = 'visible';
+
+    // baseline
+    var baseline = document.createElementNS(svgNs, 'line');
+    baseline.setAttribute('x1', padLeft); baseline.setAttribute('x2', width - padRight);
+    baseline.setAttribute('y1', padTop + plotH); baseline.setAttribute('y2', padTop + plotH);
+    baseline.setAttribute('stroke', 'var(--gridline)');
+    baseline.setAttribute('stroke-width', '1');
+    svg.appendChild(baseline);
+
+    var area = document.createElementNS(svgNs, 'path');
+    area.setAttribute('d', areaPath);
+    area.setAttribute('fill', 'var(--area-fill)');
+    area.setAttribute('stroke', 'none');
+    svg.appendChild(area);
+
+    var line = document.createElementNS(svgNs, 'path');
+    line.setAttribute('d', linePath);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', 'var(--green-primary)');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-linejoin', 'round');
+    line.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(line);
+
+    // end marker with surface ring
+    var last = points[points.length - 1];
+    var ring = document.createElementNS(svgNs, 'circle');
+    ring.setAttribute('cx', xAt(points.length - 1)); ring.setAttribute('cy', yAt(last.count));
+    ring.setAttribute('r', 5); ring.setAttribute('fill', 'var(--surface)');
+    svg.appendChild(ring);
+    var dot = document.createElementNS(svgNs, 'circle');
+    dot.setAttribute('cx', xAt(points.length - 1)); dot.setAttribute('cy', yAt(last.count));
+    dot.setAttribute('r', 4); dot.setAttribute('fill', 'var(--green-primary)');
+    svg.appendChild(dot);
+
+    // crosshair (hidden until hover)
+    var crosshair = document.createElementNS(svgNs, 'line');
+    crosshair.setAttribute('y1', padTop); crosshair.setAttribute('y2', padTop + plotH);
+    crosshair.setAttribute('stroke', 'var(--text-muted)');
+    crosshair.setAttribute('stroke-width', '1');
+    crosshair.setAttribute('opacity', '0');
+    svg.appendChild(crosshair);
+
+    // hit layer — the whole plot area, snaps to nearest point (interaction.md)
+    var hitRect = document.createElementNS(svgNs, 'rect');
+    hitRect.setAttribute('x', 0); hitRect.setAttribute('y', 0);
+    hitRect.setAttribute('width', width); hitRect.setAttribute('height', height);
+    hitRect.setAttribute('fill', 'transparent');
+    svg.appendChild(hitRect);
+
+    wrap.appendChild(svg);
+
+    var tooltip = document.createElement('div');
+    tooltip.className = 'line-tooltip';
+    wrap.appendChild(tooltip);
+
+    function showAt(i) {
+      var p = points[i];
+      crosshair.setAttribute('x1', xAt(i)); crosshair.setAttribute('x2', xAt(i));
+      crosshair.setAttribute('opacity', '1');
+      var d = new Date(p.date + 'T00:00:00Z');
+      var dateLabel = d.toLocaleDateString('en-NG', { month: 'short', day: 'numeric' });
+      tooltip.innerHTML = '';
+      var strong = document.createElement('strong');
+      strong.textContent = p.count;
+      tooltip.appendChild(strong);
+      tooltip.appendChild(document.createTextNode(' · ' + dateLabel));
+      var pct = xAt(i) / width * 100;
+      tooltip.style.left = pct + '%';
+      tooltip.style.top = (yAt(p.count) / height * 100) + '%';
+      tooltip.style.opacity = '1';
+    }
+    function hide() {
+      crosshair.setAttribute('opacity', '0');
+      tooltip.style.opacity = '0';
+    }
+
+    hitRect.addEventListener('pointermove', function (e) {
+      var rect = svg.getBoundingClientRect();
+      var relX = (e.clientX - rect.left) / rect.width * width;
+      var i = Math.round(((relX - padLeft) / plotW) * (points.length - 1));
+      i = Math.max(0, Math.min(points.length - 1, i));
+      showAt(i);
+    });
+    hitRect.addEventListener('pointerleave', hide);
+
+    container.appendChild(wrap);
+  }
+
+  // ---------- ranked horizontal bar list (dataviz skill: magnitude compare, sequential/single hue) ----------
+  function barList(container, items, opts) {
+    container.innerHTML = '';
+    if (!items || items.length === 0) {
+      var empty = document.createElement('p');
+      empty.className = 'empty-note';
+      empty.textContent = 'No data yet.';
+      container.appendChild(empty);
+      return;
+    }
+    var formatValue = (opts && opts.formatValue) || function (v) { return String(v); };
+    var maxVal = Math.max.apply(null, items.map(function (i) { return i.count; }));
+    items.forEach(function (item) {
+      var row = document.createElement('div');
+      row.className = 'bar-row';
+
+      var label = document.createElement('div');
+      label.className = 'bar-label';
+      label.textContent = item.label;
+      label.title = item.label;
+
+      var track = document.createElement('div');
+      track.className = 'bar-track';
+      var fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      var widthPct = maxVal > 0 ? Math.max((item.count / maxVal) * 100, 2) : 0;
+      fill.style.width = widthPct + '%';
+      track.appendChild(fill);
+
+      var value = document.createElement('div');
+      value.className = 'bar-value';
+      value.textContent = formatValue(item.count);
+
+      row.appendChild(label);
+      row.appendChild(track);
+      row.appendChild(value);
+      container.appendChild(row);
+    });
+  }
+
+  // ---------- render ----------
+  function render(data) {
+    generatedAtEl.textContent = 'Generated ' + new Date(data.generatedAt).toLocaleString();
+
+    // At a glance
+    var kpiGrid = document.getElementById('kpi-grid');
+    kpiGrid.innerHTML = '';
+    kpiGrid.appendChild(statTile('Total accounts', compactNumber(data.accounts.total), data.accounts.clientRoleCount + ' clients · ' + data.accounts.professionalRoleCount + ' professionals'));
+    kpiGrid.appendChild(statTile('Active (last 7d)', compactNumber(data.accounts.activeLast7d), 'logged in — last 30d: ' + compactNumber(data.accounts.activeLast30d)));
+    kpiGrid.appendChild(statTile('New signups', compactNumber(data.accounts.newLast30d), 'last 7d: ' + compactNumber(data.accounts.newLast7d)));
+    kpiGrid.appendChild(statTile('Total orders', compactNumber(data.orders.totalNonDraft), 'excludes drafts'));
+    kpiGrid.appendChild(statTile('Active orders', compactNumber(data.orders.activeCount), 'open → signed off'));
+    kpiGrid.appendChild(statTile('Closed orders', compactNumber(data.orders.closedCount), 'released, refunded, cancelled'));
+    kpiGrid.appendChild(statTile('GMV funded', compactNaira(data.orders.gmv.fundedKobo), 'all-time'));
+    kpiGrid.appendChild(statTile('Fee revenue', compactNaira(data.orders.gmv.feeRevenueKobo), 'realized on release'));
+    kpiGrid.appendChild(statTile('WhatsApp contacts', compactNumber(data.whatsapp.totalContacts), data.whatsapp.registeredContacts + ' registered'));
+
+    // Site traffic
+    lineChart(document.getElementById('chart-pageviews'), data.site.pageviewsByDay);
+    lineChart(document.getElementById('chart-whatsapp-clicks'), data.site.whatsappClicksByDay);
+
+    var ratioTiles = document.getElementById('site-ratio-tiles');
+    ratioTiles.innerHTML = '';
+    ratioTiles.appendChild(statTile('Pageviews (30d)', compactNumber(data.site.pageviewsLast30d)));
+    ratioTiles.appendChild(statTile('WhatsApp clicks (30d)', compactNumber(data.site.whatsappClicksLast30d)));
+    ratioTiles.appendChild(statTile('Click → signup ratio', ratio(data.site.clickToSignupRatio), 'signups per WhatsApp click'));
+    ratioTiles.appendChild(statTile('Pageview → signup ratio', ratio(data.site.pageviewToSignupRatio), 'signups per pageview'));
+
+    barList(document.getElementById('chart-cta-breakdown'), data.site.whatsappClicksByCta);
+
+    // Accounts
+    lineChart(document.getElementById('chart-signups'), data.accounts.signupsByDay);
+    barList(document.getElementById('chart-kyc'), [
+      { label: 'Verified', count: data.accounts.kyc.verified },
+      { label: 'Pending', count: data.accounts.kyc.pending },
+      { label: 'Unverified', count: data.accounts.kyc.unverified },
+      { label: 'Rejected', count: data.accounts.kyc.rejected },
+    ]);
+
+    // Orders
+    lineChart(document.getElementById('chart-gigs'), data.orders.gigsByDay);
+    var statusOrder = ['open', 'claimed', 'in_progress', 'submitted', 'signed_off', 'disputed', 'released', 'refunded', 'cancelled', 'escrow_pending', 'draft'];
+    var statusLabels = {
+      draft: 'Draft', escrow_pending: 'Awaiting funding', open: 'Open', claimed: 'Claimed',
+      in_progress: 'In progress', submitted: 'Awaiting sign-off', signed_off: 'Signed off',
+      disputed: 'Disputed', released: 'Complete', refunded: 'Refunded', cancelled: 'Cancelled',
+    };
+    barList(
+      document.getElementById('chart-status'),
+      statusOrder.map(function (s) { return { label: statusLabels[s], count: data.orders.byStatus[s] || 0 }; }).filter(function (r) { return r.count > 0; }),
+    );
+    barList(document.getElementById('chart-categories'), data.orders.byCategory);
+    barList(document.getElementById('chart-states'), data.orders.byState);
+
+    // WhatsApp
+    lineChart(document.getElementById('chart-wa-contacts'), data.whatsapp.contactsByDay);
+    var waTiles = document.getElementById('wa-registered-tiles');
+    waTiles.innerHTML = '';
+    waTiles.appendChild(statTile('Registered', compactNumber(data.whatsapp.registeredContacts)));
+    waTiles.appendChild(statTile('Not registered', compactNumber(data.whatsapp.totalContacts - data.whatsapp.registeredContacts)));
+
+    // Ops health & retention
+    var opsTiles = document.getElementById('ops-tiles');
+    opsTiles.innerHTML = '';
+    opsTiles.appendChild(statTile('Disputes open', compactNumber(data.disputes.open), data.disputes.total + ' total · rate ' + percent(data.disputes.ratePercentOfNonDraftGigs)));
+    opsTiles.appendChild(statTile('Disputes closed', compactNumber(data.disputes.closed + data.disputes.ruled)));
+    opsTiles.appendChild(statTile('Delivery failures', compactNumber(data.deliveryFailures.failed), data.deliveryFailures.skippedOrFailedWithReason + ' skipped or failed w/ reason'));
+    opsTiles.appendChild(statTile('Repeat clients', compactNumber(data.retention.repeatClients), '2+ orders posted'));
+    opsTiles.appendChild(statTile('Repeat professionals', compactNumber(data.retention.repeatProfessionals), '2+ orders completed'));
+    opsTiles.appendChild(statTile('GMV released', compactNaira(data.orders.gmv.releasedKobo)));
+    opsTiles.appendChild(statTile('GMV refunded', compactNaira(data.orders.gmv.refundedKobo)));
+    opsTiles.appendChild(statTile('Total posted', compactNaira(data.orders.gmv.postedKobo), 'bounty value, all orders'));
+
+    contentEl.style.display = 'block';
+  }
+
+  function load() {
+    if (!keyInput.value) {
+      statusEl.textContent = 'Enter the admin key first.';
+      return;
+    }
+    statusEl.textContent = '';
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Loading…';
+
+    adminApi('/admin/analytics/overview')
+      .then(render)
+      .catch(function (err) {
+        statusEl.textContent = err.message;
+      })
+      .finally(function () {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load dashboard';
+      });
+  }
+
+  loadBtn.addEventListener('click', load);
+  keyInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') load();
+  });
+</script>
+</body>
+</html>

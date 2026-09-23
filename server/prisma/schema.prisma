@@ -63,6 +63,12 @@ model User {
   state               String? // Nigerian state — see common/nigerian-states.ts
   avatarBase64        String? // data URI (e.g. "data:image/jpeg;base64,...") — profile photo, all roles. See PLAN.md "Profile photo + KYC apply flow".
   roleFlags           String[] // e.g. ["client","professional"] — flags, not a fixed enum, so new actor types (§3.1 seam) are additive
+  // PLAN.md "Product analytics dashboard" — stamped on login (and at
+  // signup, which counts as the first one). Deliberately login-only, not
+  // touched on every authenticated request — "active" for the dashboard
+  // means "logged in recently," a coarser but much cheaper signal than a
+  // per-request heartbeat.
+  lastLoginAt         DateTime?
   kycStatus           KycStatus @default(unverified)
   identityRef         String? // SEAM (§3.1): opaque ref into whichever IdentityVerifier produced kycStatus
   monnifyCustomerRef  String?
@@ -634,4 +640,30 @@ model WhatsAppSession {
   // this one phone's own browsing state, never shared across phones
   // (unlike pendingBroadcastGigId, where many phones share one gig id).
   browseGigIds String?
+}
+
+// ---------------------------------------------------------------------------
+// Site analytics (PLAN.md "Product analytics dashboard") — append-only,
+// same discipline as LedgerEntry: nothing here is ever updated or deleted.
+// Two event types cover what the marketing site can't otherwise answer:
+// how many people load the page, and how many of them click through to
+// WhatsApp. Deliberately no IP/user-agent/device fingerprinting — this
+// exists to answer "is the flier/QR code driving traffic," not to profile
+// visitors.
+// ---------------------------------------------------------------------------
+
+enum SiteEventType {
+  pageview
+  whatsapp_click
+}
+
+model SiteEvent {
+  id        String        @id @default(cuid())
+  type      SiteEventType
+  path      String? // pathname, pageview events
+  ctaId     String? // which button/link, whatsapp_click events — see index.html's waLink() call sites
+  referrer  String?
+  createdAt DateTime      @default(now())
+
+  @@index([type, createdAt])
 }

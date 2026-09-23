@@ -2160,6 +2160,75 @@ pagination beyond the 500-row cap, no outbound messaging from this page
 
 ---
 
+## Product analytics dashboard — IMPLEMENTED
+
+The ask: a robust view of what's happening in the product — active
+accounts, last activity, site clicks, click-to-signup ratio, orders
+(active/closed) — explicitly meant to tie in with the WhatsApp contacts
+dashboard above, since WhatsApp is where a lot of "orders" actually
+originate.
+
+**Two things genuinely didn't exist and needed new instrumentation
+before any number could be honest:**
+1. **`User.lastLoginAt`** — nothing stamped "last seen" anywhere.
+   Decision (confirmed with the user): login-only, not a per-request
+   heartbeat — stamped in `IdentityService.login` and at `signup` (which
+   counts as the first one). Cheaper than touching it on every
+   authenticated request; "active" means "logged in recently."
+2. **`SiteEvent`** (new model, `pageview` | `whatsapp_click`) — the
+   marketing site (`index.html`) had zero analytics. Decision (confirmed
+   with the user): full click tracking, not just a pageview counter.
+   Every WhatsApp CTA on the site (`door_customer_hero`,
+   `door_customer_bottom`, `raise_hand`, `pro_pitch`) now routes through
+   a new `GET /go/whatsapp?cta=<id>&text=<msg>` redirect instead of a
+   bare `wa.me` link — an external link can't be click-tracked directly,
+   so the click has to pass through the server first. The destination
+   number is server-configured (`WHATSAPP_CONTACT_NUMBER`, defaults to
+   the number already hardcoded in `index.html`), never taken from the
+   query string — the one thing that keeps a public redirect endpoint
+   from being an open redirect. A pageview beacon
+   (`POST /site-events`, fire-and-forget, `sendBeacon`-style via
+   `fetch(..., {keepalive:true})`) fires once per page load. Migration:
+   `20260923150000_analytics_dashboard`.
+
+**`GET /admin/analytics/overview`** (new `AnalyticsModule`, AdminGuard —
+same pattern as every other admin surface) returns one aggregated
+payload for `dashboard.html`'s single page load: accounts (totals, role
+split, individual/business, active 7d/30d, new 7d/30d, 30-day signup
+trend, KYC funnel), orders (status breakdown, active vs. closed count,
+30-day trend, GMV funded/released/refunded, realized fee revenue, top
+categories, top client states), WhatsApp (contact totals, registered vs.
+not, 30-day trend), site (pageviews, WhatsApp clicks by day and by CTA,
+click→signup and pageview→signup ratios), disputes (open/ruled/closed,
+rate), delivery failures, and retention (repeat clients/professionals).
+Every number is derived from data the product already writes (plus the
+two additions above) — nothing estimated.
+
+**One thing recommended but deliberately NOT built**: WhatsApp broadcast
+accept/decline rate. `WhatsappBroadcastService`/`WhatsappInviteService`
+don't persist a decline anywhere today — a decline just clears the
+pending-reply field and sends a message, with no row written. Faking
+this number from data that doesn't exist would be worse than not having
+it; flagged here as a real future addition (one write per decline) if
+it's wanted later.
+
+**`dashboard.html`** (new, repo root, same unlinked-admin-key pattern as
+the other two pages) — built per the `dataviz` skill: form chosen before
+color (stat tiles for headline numbers, 30-day line charts with a real
+crosshair+tooltip for trends, single-hue ranked horizontal bars for
+magnitude comparisons — never a distinct hue per category, since none of
+these are "tell series apart" charts). Color is the Sorted brand green
+throughout, matching the other two admin pages, rather than the skill's
+generic default palette — a deliberate substitution the skill itself
+calls out as the right move ("to target your brand, substitute this
+file's values"). No date-range picker: the API computes a fixed 7-/30-day
+window, so there's nothing for a filter to scope yet; flagged as a
+natural next step if a custom range is ever needed. Verified by rendering
+with mocked data before shipping (screenshots, including the tooltip
+hover), not just eyeballing the source.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
