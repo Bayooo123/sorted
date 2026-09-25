@@ -2583,6 +2583,52 @@ documentation, not user-facing copy, and out of scope for this phase.
 
 ---
 
+## Account number verification (PaymentsProvider.resolveAccount)
+
+Prompted by Paystack's own "Verify Account Number" docs (`/bank/resolve`,
+free, Nigeria/Ghana) — confirms a bank code + account number actually
+resolves to a real account before Sorted trusts it, catching a mistyped
+account number at the point a professional enters it rather than deep
+inside a `chargeWithSplit` failure at release time.
+
+- `PaymentsProvider` gains `resolveAccount(bankCode, accountNumber):
+  Promise<ResolvedAccount>` — `ResolvedAccount.accountName` is the
+  provider's own name on file, or `null` when the provider can't verify
+  at all.
+- `PaystackProvider.resolveAccount` — `GET /bank/resolve`. Unverified
+  against a live call, same caveat as `createSubaccount`/`chargeWithSplit`.
+- `ManualPilotProvider.resolveAccount` — always returns `accountName:
+  null` (no API to check against during the pilot) rather than
+  fabricating a match — same trust-based posture as every other
+  manual-pilot method.
+- `IdentityService.setPayoutDestination` now calls `resolveAccount`
+  before saving, and **fails closed**: any resolution error (account
+  doesn't exist, invalid bank code, or the provider being unreachable)
+  rejects the whole call. Real trade-off, stated plainly: a Paystack
+  outage would also block saving payout details — accepted as the safer
+  default for money-adjacent data. When resolved, the provider's
+  `accountName` overwrites whatever the professional typed (Paystack's
+  own name-on-file is the trust anchor, not free-text input); when the
+  provider can't verify (manual pilot), the typed name is kept.
+- `IdentityModule` now imports `PaymentsModule` — safe, no cycle
+  (`PaymentsModule` is a leaf, same reasoning `GigsModule`'s own doc
+  comment gives for importing `WhatsappModule` in phase 2).
+
+**Verification:** `tsc --noEmit` and `nest build` clean; booted the
+compiled server against a fake `DATABASE_URL` and confirmed all 40 routes
+map with zero `Nest can't resolve`/`UnknownDependenciesException` errors
+— specifically proving the new `IdentityModule → PaymentsModule` edge
+resolves. (The boot then fails on `PrismaClientInitializationError:
+Can't reach database server` — expected, same pre-existing "no local
+Postgres in this sandbox" limitation as every earlier boot test this
+session, unrelated to this change.)
+
+No UI currently calls `PATCH /me/payout-destination` on mobile or web —
+checked both before making this change, so there's no existing screen
+whose behavior could break from a corrected `accountName` coming back.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -15,6 +15,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NIGERIAN_STATES } from '../../common/nigerian-states';
 import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
+import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interface';
 import {
   AccountType,
   ApplyForKycInput,
@@ -132,6 +133,7 @@ export class IdentityService implements IdentityPort {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
+    @Inject(PAYMENTS_PROVIDER) private readonly payments: PaymentsProvider,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -476,16 +478,36 @@ export class IdentityService implements IdentityPort {
     };
   }
 
+  /**
+   * PLAN.md "Account number verification" — resolves bankCode+accountNumber
+   * against the provider before saving, catching a mistyped account
+   * number here rather than deep inside a release/chargeWithSplit
+   * failure later. Fails closed: any resolution error (account doesn't
+   * exist, invalid bank code, or the provider's API being unreachable)
+   * rejects the whole call rather than saving an unverified destination
+   * — the trade-off being a real Paystack outage also blocks saving
+   * payout details, accepted as the safer default for money-adjacent
+   * data. When the provider can't verify at all (manual pilot,
+   * accountName: null), the professional's own typed name is trusted,
+   * same posture as everywhere else in that provider.
+   */
   async setPayoutDestination(userId: string, dest: PayoutDestination): Promise<PayoutDestination> {
+    const resolved = await this.payments.resolveAccount(dest.bankCode, dest.accountNumber).catch((err) => {
+      throw new BadRequestException(
+        `Could not verify this account number: ${err instanceof Error ? err.message : err}`,
+      );
+    });
+    const accountName = resolved.accountName ?? dest.accountName;
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         payoutBankCode: dest.bankCode,
         payoutAccountNumber: dest.accountNumber,
-        payoutAccountName: dest.accountName,
+        payoutAccountName: accountName,
       },
     });
-    return dest;
+    return { ...dest, accountName };
   }
 
   /**

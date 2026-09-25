@@ -9,6 +9,7 @@ import {
   HoldingAccount,
   PaymentsProvider,
   RefundResult,
+  ResolvedAccount,
   SplitCharge,
   SplitDestination,
   Subaccount,
@@ -143,6 +144,23 @@ export class PaystackProvider implements PaymentsProvider {
   async refund(ref: string): Promise<RefundResult> {
     const data = await this.call<{ id: number }>('POST', '/refund', { transaction: ref });
     return { refundRef: String(data.id) };
+  }
+
+  /**
+   * PLAN.md "Account number verification" — GET /bank/resolve, free to
+   * call per Paystack's docs. Nigeria/Ghana only (their own restriction,
+   * not something this method enforces — a bank code outside those
+   * countries will just fail the call, which IdentityService.
+   * setPayoutDestination surfaces as a normal rejection). Unverified
+   * against a live call from this sandboxed environment, same caveat as
+   * every other Paystack method in this file.
+   */
+  async resolveAccount(bankCode: string, accountNumber: string): Promise<ResolvedAccount> {
+    const data = await this.call<{ account_number: string; account_name: string }>(
+      'GET',
+      `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+    );
+    return { accountNumber: data.account_number, accountName: data.account_name };
   }
 
   /**

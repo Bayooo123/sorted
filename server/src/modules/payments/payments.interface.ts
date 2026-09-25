@@ -80,6 +80,18 @@ export interface SplitCharge {
   bankName?: string;
 }
 
+export interface ResolvedAccount {
+  accountNumber: string;
+  /**
+   * The bank's own name on file for this account, per the provider's
+   * verification call — null when the active provider can't verify one
+   * (manual pilot has no API to check against). A caller should trust
+   * this over whatever the account holder typed when it's present, and
+   * fall back to the typed name when it's null.
+   */
+  accountName: string | null;
+}
+
 export interface PaymentsProvider {
   readonly name: string;
   /** payerEmail: checkout-link providers (Paystack) require a customer email at session creation; account-number providers ignore it. */
@@ -98,10 +110,8 @@ export interface PaymentsProvider {
    * licensed-partner arrangement. createSubaccount registers a payout
    * destination Paystack can pay DIRECTLY at settlement time instead.
    *
-   * Not yet called by any service — EscrowService still runs the
-   * pre-pivot hold-then-disburse flow above until its own rewrite lands;
-   * this and chargeWithSplit exist so that rewrite has a real interface to
-   * build against.
+   * Called by EscrowService.getOrCreateSubaccount, lazily, the first time
+   * a professional's gig actually reaches release — see escrow.service.ts.
    */
   createSubaccount(dest: SubaccountDestination): Promise<Subaccount>;
 
@@ -115,6 +125,21 @@ export interface PaymentsProvider {
    * createHoldingAccount.
    */
   chargeWithSplit(gigId: string, amountKobo: Kobo, payerEmail: string, splits: SplitDestination[]): Promise<SplitCharge>;
+
+  /**
+   * PLAN.md "Account number verification" — confirms a bank code +
+   * account number actually resolves to a real account before Sorted
+   * trusts it, same idea Paystack's own docs recommend ("confirm a
+   * customer's bank details before creating a transfer recipient").
+   * Called by IdentityService.setPayoutDestination before a professional's
+   * payout details are saved — catches a mistyped account number at the
+   * point of entry, not deep inside a release/chargeWithSplit failure.
+   * Throws (never returns a fabricated match) when the provider can
+   * positively determine the account doesn't exist or the bank code is
+   * invalid; returns accountName: null when the provider simply can't
+   * verify at all (manual pilot).
+   */
+  resolveAccount(bankCode: string, accountNumber: string): Promise<ResolvedAccount>;
 }
 
 export const PAYMENTS_PROVIDER = 'PAYMENTS_PROVIDER';

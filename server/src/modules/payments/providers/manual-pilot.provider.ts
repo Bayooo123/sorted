@@ -8,6 +8,7 @@ import {
   HoldingAccount,
   PaymentsProvider,
   RefundResult,
+  ResolvedAccount,
   SplitCharge,
   SplitDestination,
   Subaccount,
@@ -88,6 +89,17 @@ export class ManualPilotProvider implements PaymentsProvider {
   async refund(ref: string): Promise<RefundResult> {
     this.logger.warn(`MANUAL REFUND NEEDED — no automated refund exists for ref ${ref}. Send it by hand.`);
     return { refundRef: ref };
+  }
+
+  /**
+   * PLAN.md "Account number verification" — no API to check against
+   * during the manual pilot, so this can't positively confirm or reject
+   * anything. accountName: null tells the caller to trust whatever the
+   * professional typed, same trust-based posture as every other
+   * manual-pilot method here — never fabricate a name to look verified.
+   */
+  async resolveAccount(_bankCode: string, accountNumber: string): Promise<ResolvedAccount> {
+    return { accountNumber, accountName: null };
   }
 
   /**
