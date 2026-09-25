@@ -1693,6 +1693,31 @@
         <div id="profile-kyc-status"></div>
       </div>
 
+      <div class="profile-kyc" id="profile-payout-section" hidden>
+        <p class="field-label">Payout account</p>
+        <div id="profile-payout-view">
+          <p class="cat-sub" id="profile-payout-summary"></p>
+          <button class="btn btn-block" id="profile-payout-edit-btn" type="button">Add payout account</button>
+        </div>
+        <div id="profile-payout-form" hidden>
+          <p class="field-label">Bank</p>
+          <div class="field-row">
+            <select id="profile-payout-bank" aria-label="Bank">
+              <option value="">Select your bank</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <input type="text" inputmode="numeric" maxlength="10" id="profile-payout-account-number" placeholder="10-digit account number" aria-label="Account number" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="profile-payout-account-name" placeholder="Account holder name" aria-label="Account holder name" />
+          </div>
+          <p class="modal-error" id="profile-payout-error"></p>
+          <button class="btn btn-block" id="profile-payout-cancel-btn" type="button">Cancel</button>
+          <button class="btn btn-block" id="profile-payout-save-btn" type="button">Save</button>
+        </div>
+      </div>
+
       <div class="profile-kyc" id="profile-business-section" hidden>
         <p class="field-label">Business account</p>
         <div id="profile-business-view">
@@ -2482,6 +2507,7 @@
       profileError.textContent = '';
       renderAvatar(user);
       renderKycSection();
+      renderPayoutSection();
       renderBusinessSection();
     }
 
@@ -2587,6 +2613,132 @@
         .finally(function () {
           bizSaveBtn.disabled = false;
           bizSaveBtn.textContent = 'Save';
+        });
+    });
+
+    // ---- payout account — professional only; PLAN.md "Bank list endpoint + payout account screen" ----
+    var payoutSectionEl = document.getElementById('profile-payout-section');
+    var payoutViewEl = document.getElementById('profile-payout-view');
+    var payoutFormEl = document.getElementById('profile-payout-form');
+    var payoutSummaryEl = document.getElementById('profile-payout-summary');
+    var payoutErrorEl = document.getElementById('profile-payout-error');
+    var payoutEditBtn = document.getElementById('profile-payout-edit-btn');
+    var payoutCancelBtn = document.getElementById('profile-payout-cancel-btn');
+    var payoutSaveBtn = document.getElementById('profile-payout-save-btn');
+    var payoutBankSelect = document.getElementById('profile-payout-bank');
+    var payoutAccountNumberInput = document.getElementById('profile-payout-account-number');
+    var payoutAccountNameInput = document.getElementById('profile-payout-account-name');
+    var payoutBanks = []; // fetched once and cached — doesn't change within a session, same as NIGERIAN_STATES
+    var payoutBanksLoaded = false;
+    var payoutDestination = null; // null once we know there's genuinely nothing saved; undefined until the fetch resolves
+
+    function bankNameForCode(code) {
+      var match = payoutBanks.filter(function (b) { return b.code === code; })[0];
+      return match ? match.name : code;
+    }
+
+    function fillPayoutForm(dest) {
+      payoutAccountNumberInput.value = dest ? dest.accountNumber : '';
+      payoutAccountNameInput.value = dest ? dest.accountName : '';
+      if (!payoutBankSelect.querySelector('option[value="' + (dest ? dest.bankCode : '') + '"]')) {
+        payoutBankSelect.value = '';
+      } else {
+        payoutBankSelect.value = dest ? dest.bankCode : '';
+      }
+    }
+
+    function ensurePayoutBanksLoaded() {
+      if (payoutBanksLoaded) return Promise.resolve();
+      return api('/taxonomy/banks').then(function (banks) {
+        payoutBanks = banks;
+        payoutBanksLoaded = true;
+        banks.forEach(function (b) {
+          var opt = document.createElement('option');
+          opt.value = b.code;
+          opt.textContent = b.name;
+          payoutBankSelect.appendChild(opt);
+        });
+      });
+    }
+
+    function renderPayoutViewState() {
+      payoutFormEl.hidden = true;
+      payoutViewEl.hidden = false;
+      payoutErrorEl.textContent = '';
+
+      if (payoutDestination) {
+        payoutSummaryEl.textContent =
+          bankNameForCode(payoutDestination.bankCode) + ' · ' +
+          payoutDestination.accountNumber + ' · ' + payoutDestination.accountName;
+        payoutEditBtn.textContent = 'Edit payout account';
+      } else {
+        payoutSummaryEl.textContent =
+          'Add the bank account you want to be paid into when a client approves your work.';
+        payoutEditBtn.textContent = 'Add payout account';
+      }
+    }
+
+    function renderPayoutSection() {
+      var user = shellState.user;
+      var isProfessional = (user.roles || []).indexOf('professional') !== -1;
+      payoutSectionEl.hidden = !isProfessional;
+      if (!isProfessional) return;
+
+      payoutSummaryEl.textContent = 'Loading…';
+      payoutViewEl.hidden = false;
+      payoutFormEl.hidden = true;
+
+      api('/me/payout-destination', { auth: true })
+        .then(function (dest) {
+          payoutDestination = dest;
+          renderPayoutViewState();
+        })
+        .catch(function () {
+          payoutSummaryEl.textContent = 'Could not load your payout account — try again.';
+        });
+    }
+
+    payoutEditBtn.addEventListener('click', function () {
+      payoutErrorEl.textContent = '';
+      payoutViewEl.hidden = true;
+      payoutFormEl.hidden = false;
+      ensurePayoutBanksLoaded()
+        .then(function () { fillPayoutForm(payoutDestination); })
+        .catch(function () { payoutErrorEl.textContent = 'Could not load the bank list — try again.'; });
+    });
+
+    payoutCancelBtn.addEventListener('click', function () {
+      payoutFormEl.hidden = true;
+      payoutViewEl.hidden = false;
+    });
+
+    payoutSaveBtn.addEventListener('click', function () {
+      var bankCode = payoutBankSelect.value;
+      var accountNumber = payoutAccountNumberInput.value.trim();
+      var accountName = payoutAccountNameInput.value.trim();
+      if (!bankCode) { payoutErrorEl.textContent = 'Choose a bank.'; return; }
+      if (accountNumber.length !== 10) { payoutErrorEl.textContent = 'Enter a 10-digit account number.'; return; }
+      if (!accountName) { payoutErrorEl.textContent = 'Enter the account holder name.'; return; }
+
+      payoutErrorEl.textContent = '';
+      payoutSaveBtn.disabled = true;
+      payoutSaveBtn.textContent = 'Saving…';
+
+      api('/me/payout-destination', {
+        method: 'PATCH',
+        auth: true,
+        body: { bankCode: bankCode, accountNumber: accountNumber, accountName: accountName },
+      })
+        .then(function (saved) {
+          payoutDestination = saved;
+          renderPayoutViewState();
+        })
+        .catch(function (err) {
+          payoutErrorEl.textContent = err.message;
+        })
+        .finally(function () {
+          payoutSaveBtn.disabled = false;
+          payoutSaveBtn.textContent = 'Save';
         });
     });
 

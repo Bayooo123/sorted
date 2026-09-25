@@ -2682,11 +2682,59 @@ destination` routes map with zero DI resolution errors (the new
 — same no-simulator limitation as every other mobile UI change this
 session.
 
-**Still not done:** the equivalent web payout screen (index.html's
-Profile panel has no payout section either — not touched this phase,
-mobile only). Live Paystack verification for all of `resolveAccount`/
-`createSubaccount`/`chargeWithSplit`/`listBanks` remains the single
-biggest open item — none of it has hit a real Paystack call yet.
+**Still not done (at the time this phase shipped):** the equivalent web
+payout screen — see the next section, built as an immediate follow-up.
+Live Paystack verification for all of `resolveAccount`/`createSubaccount`/
+`chargeWithSplit`/`listBanks` remains the single biggest open item — none
+of it has hit a real Paystack call yet.
+
+---
+
+## Bank list endpoint + payout account screen — web client
+
+Follow-up to the previous section: `index.html`'s Profile panel had no
+payout section at all (mobile-only in that phase). Mirrors
+`ProfileScreen.tsx`'s card exactly, adapted to this file's plain
+view/form-toggle pattern (same shape as its existing "Business account"
+section) rather than React state:
+
+- New `#profile-payout-section` card in the profile panel markup,
+  positioned between Verification and Business account (same ordering as
+  mobile). View state shows a one-line summary (`bankName · accountNumber
+  · accountName`, bank name looked up from the fetched `/taxonomy/banks`
+  list by code) and an Add/Edit button; empty state explains what it's
+  for. Edit state is a `<select>` bank picker (not chips — matches this
+  file's existing State field, the only other "pick one value" control in
+  the profile panel) plus account number/name inputs, Cancel/Save.
+- `renderPayoutSection()` is called from `renderProfile()` alongside the
+  existing `renderKycSection()`/`renderBusinessSection()`, so it re-fetches
+  `GET /me/payout-destination` every time the Profile tab is opened (same
+  cadence as KYC status). The bank list itself is fetched once and cached
+  in a closure var (`payoutBanksLoaded`) the first time the edit form
+  opens, not on every render — it doesn't change within a session, same
+  reasoning as the `NIGERIAN_STATES` option-building guard already in this
+  file.
+- Reuses the `api()` helper and existing CSS classes (`profile-kyc`,
+  `cat-sub`, `field-row`, `field-label`, `modal-error`, `btn btn-block`) —
+  no new styles needed.
+
+**Verification:** extracted the page's inline `<script>` and ran `node
+--check` on it (clean — this file has no build step of its own). Then
+drove the actual flow in a headless Chromium (`/opt/pw-browsers/chromium`
+via Playwright), against a served copy of the file with `/auth/login`,
+`/me/kyc`, `/taxonomy/banks`, and `/me/payout-destination` (GET+PATCH)
+mocked via `page.route()`: logged in as a professional, opened the Profile
+tab (empty-state screenshot), opened the edit form (screenshot), picked
+GTBank/entered an account, saved, confirmed the view state read back
+"GTBank · 0123456789 · Tunde Adebayo," then switched away and back to the
+Profile tab to confirm the GET round-trip renders the same saved value
+again. Zero `pageerror`/console-error events other than favicon 404s from
+the test harness not serving that file (unrelated — confirmed by checking
+`index.html` only references `/favicon.svg`, nothing this change touched).
+
+**Still open:** same live-Paystack-verification gap as everywhere else in
+this pivot — `listBanks`/`getPayoutDestination` have only been exercised
+against mocks, never a real Paystack sandbox.
 
 ---
 
