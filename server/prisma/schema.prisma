@@ -75,6 +75,14 @@ model User {
   payoutBankCode      String?
   payoutAccountNumber String?
   payoutAccountName   String?
+  // PLAN.md "Split payment pivot" — a Paystack Subaccount wrapping the
+  // payout details above, created automatically once
+  // PaystackProvider.createSubaccount is wired into
+  // IdentityService.setPayoutDestination. Lets a gig's payment split
+  // straight to this professional at Paystack's end, so Sorted's own
+  // balance never receives money that belongs to them — see
+  // PaymentsProvider.chargeWithSplit. Null until that wiring lands.
+  paystackSubaccountCode String?
   createdAt           DateTime  @default(now())
 
   // PLAN.md "KWIK delivery integration" — a physical pickup/drop-off point

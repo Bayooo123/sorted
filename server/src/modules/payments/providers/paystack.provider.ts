@@ -9,6 +9,10 @@ import {
   HoldingAccount,
   PaymentsProvider,
   RefundResult,
+  SplitCharge,
+  SplitDestination,
+  Subaccount,
+  SubaccountDestination,
   WebhookVerificationResult,
 } from '../payments.interface';
 
@@ -157,6 +161,78 @@ export class PaystackProvider implements PaymentsProvider {
    * on a possibly-stale list risks silently dropping real webhooks. The
    * signature check above is the real guarantee.
    */
+  /**
+   * PLAN.md "Split payment pivot". percentage_charge is set to 0 here
+   * (Paystack requires the field at creation) but is never actually used —
+   * chargeWithSplit below always builds a fresh flat-amount split per gig,
+   * which overrides whatever default a subaccount carries. Request/
+   * response shape follows Paystack's documented Subaccount API but is
+   * unverified against a live call from this sandboxed environment —
+   * confirm against the real API before relying on it.
+   */
+  async createSubaccount(dest: SubaccountDestination): Promise<Subaccount> {
+    const data = await this.call<{ subaccount_code: string }>('POST', '/subaccount', {
+      business_name: dest.accountName,
+      settlement_bank: dest.bankCode,
+      account_number: dest.accountNumber,
+      percentage_charge: 0,
+    });
+    return { provider: this.name, subaccountCode: data.subaccount_code };
+  }
+
+  /**
+   * PLAN.md "Split payment pivot" — the compliant replacement for
+   * createHoldingAccount+disburse (see this interface method's doc
+   * comment). Two Paystack calls, not one: a Transaction Split can't be
+   * inlined into Transaction Initialize for more than one subaccount
+   * destination (needed once a future benefits-fund carve-out exists
+   * alongside the professional's own cut — see PLAN.md's HMO/pension
+   * note), so this always creates a fresh flat-amount split scoped to
+   * this one gig, then references it by split_code. type: 'flat' (not
+   * 'percentage') because splits.amountKobo is already computed exact
+   * kobo by the caller, same convention as DisbursementSplit above —
+   * no percentage rounding to get wrong on either side.
+   *
+   * bearer_type: 'account' — Sorted's main account absorbs Paystack's own
+   * transaction fee, not a subaccount; worth re-confirming this is still
+   * the desired split of that (small) cost once real volume exists.
+   *
+   * Reuses gigId as the transaction reference, same as
+   * createHoldingAccount — a caller retrying this for the same gig will
+   * collide at Paystack exactly like a repeat createHoldingAccount call
+   * does today; the eventual EscrowService rewrite needs the same
+   * idempotency guard fundGig already has (check for an existing charge
+   * before calling this again).
+   *
+   * Unverified against a live Paystack call from this sandboxed
+   * environment — confirm the exact request/response shape before relying
+   * on it.
+   */
+  async chargeWithSplit(gigId: string, amountKobo: Kobo, payerEmail: string, splits: SplitDestination[]): Promise<SplitCharge> {
+    const splitData = await this.call<{ split_code: string }>('POST', '/split', {
+      name: `gig-${gigId}`,
+      type: 'flat',
+      currency: 'NGN',
+      bearer_type: 'account',
+      subaccounts: splits.map((s) => ({ subaccount: s.subaccountCode, share: s.amountKobo })),
+    });
+
+    const data = await this.call<{ authorization_url: string; reference: string }>(
+      'POST',
+      '/transaction/initialize',
+      {
+        email: payerEmail,
+        amount: amountKobo,
+        reference: gigId,
+        currency: 'NGN',
+        split_code: splitData.split_code,
+        metadata: { gigId },
+      },
+    );
+
+    return { provider: this.name, chargeRef: data.reference, checkoutUrl: data.authorization_url };
+  }
+
   async verifyWebhook(payload: unknown, headers: Record<string, string>): Promise<WebhookVerificationResult> {
     const signature = headers['x-paystack-signature'];
     const rawBody = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload ?? ''), 'utf8');

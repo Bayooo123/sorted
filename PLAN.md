@@ -2289,6 +2289,80 @@ two lead rows — merge by hand); no auto-conversion from Lead to Gig
 
 ---
 
+## Split payment pivot — schema + PaymentsProvider interface (phase 1 of N)
+
+**Why:** Paystack declined activation — offering escrow (receiving and
+holding third-party funds before disbursing them) is a CBN-regulated
+activity Sorted isn't licensed for. `PaystackProvider.createHoldingAccount`
++ `disburse` is exactly that shape: the client's full payment lands in
+Sorted's own Paystack balance and is paid out to the professional later.
+Paystack's own suggested fix is their Split Payment feature: the payment
+splits to each destination AT SETTLEMENT, so Sorted's balance never
+receives money that isn't its own cut.
+
+**Decision (confirmed with the founder):** adopt Split Payment, and pair
+it with a second change — charge the client only once they confirm the
+job is done, not upfront at posting. This is a genuine trade-off, not
+free: professionals currently have zero payment guarantee before starting
+work under this shape, and there's no clean fix for that on Nigerian
+payment rails specifically (most payers use bank transfer/USSD, not
+saved cards, so a "pre-authorize now, capture later" card mechanic
+wouldn't cover most transactions anyway). Accepted deliberately — same
+trust-based posture as the WhatsApp lead-capture pivot, backed by the
+existing ratings/track-record system rather than a financial guarantee.
+Mitigate operationally (e.g. gate early access by KYC/rating), not by
+pretending a technical safety net exists where it doesn't.
+
+**This phase — schema + interface only, nothing wired up yet:**
+- `User.paystackSubaccountCode` (migration
+  `20260925090000_paystack_subaccount`) — a Paystack Subaccount wrapping
+  the same `payoutBankCode`/`payoutAccountNumber`/`payoutAccountName` a
+  professional already provides. Nothing sets this yet —
+  `IdentityService.setPayoutDestination` doesn't call
+  `createSubaccount` until the next phase.
+- `PaymentsProvider` gains `createSubaccount` and `chargeWithSplit`
+  alongside (not replacing) `createHoldingAccount`/`disburse` — those
+  stay in place because `EscrowService` still runs the old
+  hold-then-disburse flow until its own rewrite lands. `chargeWithSplit`
+  replaces `createHoldingAccount` + `confirmFunding` + `disburse` as ONE
+  call once wired up: the payer's charge and every destination's payout
+  happen atomically at Paystack's end.
+- `PaystackProvider`: `createSubaccount` (`POST /subaccount`);
+  `chargeWithSplit` creates a fresh flat-amount Transaction Split per gig
+  (`POST /split`, multi-destination — ready for a future HMO/pension
+  carve-out alongside the professional's own cut) then references it by
+  `split_code` at `POST /transaction/initialize`. Both unverified against
+  a live Paystack call from this sandboxed environment — confirm exact
+  request/response shape before relying on them, same caveat as every
+  other Paystack method in this file.
+- `ManualPilotProvider`: matching stubs, same "hand it to the founder"
+  pattern as its existing `disburse`/`refund` — no real subaccount or
+  split concept exists during the manual pilot.
+
+**Not done yet (later phases):**
+- `EscrowService` rewrite — no service calls `createSubaccount` or
+  `chargeWithSplit` yet. `fundGig`/`confirmFunding`/`holdStake`/
+  `releaseToProfessional`/`refundClient`/`freezeForDispute`/
+  `resolveFrozen` are all unchanged and still work exactly as before.
+- `GigStatus`/`EscrowState` enum changes (`escrow_pending` needs to stop
+  meaning "charge before matching" — payment moves to the
+  submitted→signed_off step instead).
+- Disputes: before payment happens, a ruling for the professional can't
+  force a charge on an uncooperative client via API — enforcement becomes
+  reputational (rating/access), not financial. Needs designing, not just
+  wiring — see the trade-off note above.
+- Backfill: existing professionals with payout details on file need a
+  one-time script to create their Paystack subaccount retroactively.
+- Copy: the welcome email and any landing-page copy promising "money
+  sits safely in escrow until it's verified" needs rewriting — that
+  promise doesn't hold under this model. `FundEscrowScreen.tsx` (mobile)
+  needs to move or disappear.
+- Reply to Paystack's compliance email once there's something concrete
+  to show — worth asking them directly whether a description of the plan
+  is enough or they need to see it live first.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

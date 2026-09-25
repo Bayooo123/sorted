@@ -8,6 +8,10 @@ import {
   HoldingAccount,
   PaymentsProvider,
   RefundResult,
+  SplitCharge,
+  SplitDestination,
+  Subaccount,
+  SubaccountDestination,
   WebhookVerificationResult,
 } from '../payments.interface';
 
@@ -84,6 +88,44 @@ export class ManualPilotProvider implements PaymentsProvider {
   async refund(ref: string): Promise<RefundResult> {
     this.logger.warn(`MANUAL REFUND NEEDED — no automated refund exists for ref ${ref}. Send it by hand.`);
     return { refundRef: ref };
+  }
+
+  /**
+   * PLAN.md "Split payment pivot" — no real subaccount concept during the
+   * manual pilot (money isn't automated at all, see this file's own top
+   * comment). Returns a deterministic placeholder so a caller written
+   * against the new interface doesn't need a provider-specific branch;
+   * nothing reads subaccountCode meaningfully until
+   * PAYMENTS_PROVIDER_KEY=paystack.
+   */
+  async createSubaccount(dest: SubaccountDestination): Promise<Subaccount> {
+    return { provider: this.name, subaccountCode: `manual:${dest.accountNumber}` };
+  }
+
+  /**
+   * Same "hand it to the founder" pattern as disburse() above, just
+   * carrying the split breakdown instead of a single payout so whoever
+   * acts on this warning knows exactly who gets what once the client's
+   * transfer actually lands in MANUAL_PILOT_ACCOUNT_NUMBER.
+   */
+  async chargeWithSplit(gigId: string, amountKobo: Kobo, _payerEmail: string, splits: SplitDestination[]): Promise<SplitCharge> {
+    const accountNumber = this.config.get<string>('MANUAL_PILOT_ACCOUNT_NUMBER');
+    const accountName = this.config.get<string>('MANUAL_PILOT_ACCOUNT_NAME');
+    const bankName = this.config.get<string>('MANUAL_PILOT_BANK');
+    if (!accountNumber || !accountName || !bankName) {
+      throw new Error(
+        'MANUAL_PILOT_ACCOUNT_NUMBER / MANUAL_PILOT_ACCOUNT_NAME / MANUAL_PILOT_BANK are not set — see server/.env.example',
+      );
+    }
+    this.logger.warn(
+      `MANUAL SPLIT NEEDED once ₦${amountKobo / 100} for gig ${gigId} arrives — send these shares by hand: ${JSON.stringify(splits)}`,
+    );
+    return {
+      provider: this.name,
+      chargeRef: gigId,
+      accountNumber,
+      bankName: `${bankName} (${accountName})`,
+    };
   }
 
   async verifyWebhook(): Promise<WebhookVerificationResult> {
