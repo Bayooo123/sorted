@@ -15,7 +15,8 @@ import { useTheme } from '../theme/ThemeContext';
  * BrowseMarketScreen, which lists open GIGS for professionals, not
  * people. "Hire" doesn't contact a professional directly — it opens
  * PostGig pre-filled with that professional invited (restrictedToProfessionalId),
- * so the job still goes through escrow, same as every other gig.
+ * so the job goes through the same claim/work/pay flow as every other gig
+ * — see PLAN.md "Split payment pivot".
  */
 export default function DirectoryScreen({
   navigation,
@@ -50,7 +51,7 @@ export default function DirectoryScreen({
   return (
     <Screen>
       <Heading>Find a professional</Heading>
-      <Subtext>Browse by category, then hire straight into an escrow-protected gig.</Subtext>
+      <Subtext>Browse by category, then hire straight into a gig — you only pay once you approve the work.</Subtext>
 
       <View style={styles.chipWrap}>
         {submarkets.map((s) => {

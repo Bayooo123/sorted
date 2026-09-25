@@ -2518,6 +2518,71 @@ been seen directly, not deferring it as a vague "copy" line item anymore.
 
 ---
 
+## Split payment pivot — copy (phase 5 of N)
+
+Every "escrow"/"stake" mention actually shown to a user, rewritten.
+Deliberately left alone: internal names (`EscrowService`, `EscrowModule`,
+`getEscrow`, `/gigs/:id/escrow`, the `EscrowState`/`GigStatus` enum
+values themselves) — those are code, not copy, and renaming them is a
+much bigger refactor nobody asked for. Also left alone: `ClaimWorkScreen`'s
+"Your stake" display — that was ALREADY disclosed as illustrative/
+not-real before this pivot ("Sorted is not collecting a real stake
+payment during this pilot — shown for reference only"), so it isn't
+newly false; and the dead `escrow_pending`/`awaiting_funding` status-label
+entries in `HomeFeedScreen`, `dashboard.html`, and `index.html`'s own
+`STATUS_LABEL` maps, same "leave the unreachable value, don't chase every
+reference" call made in phases 2–4.
+
+**`index.html` (the landing page)** — the real content rewrite flagged at
+the end of phase 4:
+- "How it works" 3-step flow: step 2 ("Fund it in escrow") replaced with
+  "Professional gets to work" (nothing charged yet); step 3 ("Sign off,
+  get paid," which mentioned the professional's stake being returned —
+  never real even pre-pivot, see above) rewritten to "Sign off, pay,
+  done," describing what's actually true: payment and payout happen the
+  same moment, on approval.
+- "For professionals" pitch: "paid through escrow" → "paid the moment
+  it's approved."
+- "Transparent by design" math section: headline ("every naira accounted
+  for before work even starts") was now backwards — work starts BEFORE
+  any charge happens — changed to "every naira, fixed before you agree to
+  anything," and added a line making the charge timing explicit. The
+  worked example dropped both stake rows entirely (client pays once, at
+  approval; splits into professional's payout and Sorted's fee — no
+  separate stake line ever existed in the real payment flow).
+  Re-rendered and screenshotted at 2x to confirm nothing broke visually
+  after removing two rows — it didn't (the "strikethrough" look on the
+  amounts in an earlier screenshot was just the ₦ glyph's own double bar,
+  not a CSS bug — worth noting since it looked alarming at first glance).
+- "Escrow-protected" trust callout → "Pay only on approval" (description
+  underneath was already accurate, only the label was wrong).
+- Directory modal subtext → explicit "you only pay once you approve the
+  work" instead of the "escrow-protected" label.
+
+**Mobile:** `DirectoryScreen.tsx` had the identical "escrow-protected
+gig" subtext and a stale doc comment claiming hiring "still goes through
+escrow" — both fixed to match. (`ReviewSignOffScreen`'s own copy was
+already rewritten correctly in phase 3, alongside the screen itself.)
+
+**Server:** the welcome email's "the money sits safely in escrow until
+it's verified" → "nothing is charged until you sign off that it's
+actually done" — same promise, accurate to what's actually true now.
+
+**Verification:** `tsc --noEmit` clean on both server and mobile (all
+edits were comments/strings, so this mostly confirms nothing else broke).
+Re-rendered `index.html`'s four edited sections in headless Chromium at
+2x scale and screenshotted each — zero console errors, copy displays as
+intended, receipt layout holds with two rows removed.
+
+**Still not done:** professional subaccount backfill and live Paystack
+verification — the only items left from phase 2's original list. Mobile
+visual testing (phase 3) and a `mobile/README.md` doc-consistency pass
+were both explicitly deferred, not forgotten — the former needs a
+simulator this environment doesn't have, the latter is dev reference
+documentation, not user-facing copy, and out of scope for this phase.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

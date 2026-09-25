@@ -118,8 +118,8 @@ export class NotificationsService implements NotificationsPort {
         Here's what makes it different: every job you complete here becomes
         part of a real track record &mdash; proof of work you can point to,
         not just a payment that came and went. You set what &ldquo;done&rdquo;
-        looks like, the money sits safely in escrow until it's verified, and
-        once you sign off, that job is added to the record for good.
+        looks like, nothing is charged until you sign off that it's actually
+        done, and once you do, that job is added to the record for good.
       </p>
       <p style="font-size:15px;line-height:1.6;color:#3A4A47;margin:0;">
         Next step: open the Sorted app &mdash; that's where you post a gig or
