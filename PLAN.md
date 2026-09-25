@@ -2439,6 +2439,46 @@ already imports `GigsModule`). The one external caller
 
 ---
 
+## Split payment pivot — mobile client (phase 3 of N)
+
+**`FundEscrowScreen` deleted outright**, not just edited — its entire
+premise (a funding step between publish and open) no longer exists.
+Publishing now goes straight to `open`, so `PostGigScreen.handlePublish`
+navigates back to `HomeFeed` instead of to a funding screen. Removed from
+`GigStackParamList`/`MainNavigator`, and the dead `escrow_pending` "Fund
+escrow →" link on `HomeFeedScreen` is gone with it (the status itself
+stays in the `GigStatus` type — same "leave the dead value" policy as the
+server enum).
+
+**The payment-collection UI moved into `ReviewSignOffScreen`** — that's
+where payment happens now. "Approve & pay" calls `releaseGig` (unchanged
+endpoint, new meaning: THE payment moment, not a disbursal of
+already-held funds), which returns `releaseCheckout` (a Paystack checkout
+link, or manual-pilot transfer instructions — same shape
+`FundEscrowScreen` used to render, ported over including the "not
+automated escrow" disclosure banner). The screen then polls `getEscrow`
+until `state === 'released'`, same polling shape `FundEscrowScreen` used
+pre-pivot, just watching for a different terminal state.
+
+`EscrowRecordView.holdingAccount` renamed to `releaseCheckout` in
+`api/types.ts` (mirrors the server's own interface rename); `FundGigResult`
+and `api/escrow.ts`'s `fundGig` deleted outright, nothing left calling
+either.
+
+**Verification:** `npx tsc --noEmit` passes clean across the whole mobile
+app. **Not visually tested** — no simulator/emulator available in this
+sandboxed environment, so the actual screen flow (proof review → approve
+→ checkout → poll → released) has not been run by hand. Worth doing
+before shipping, particularly the Paystack `Linking.openURL` handoff and
+the return-to-app experience after paying.
+
+**Still not done:** web client (same `FundEscrowScreen`-equivalent
+pattern likely exists there — not checked yet), copy (welcome email,
+landing page "escrow" language), professional subaccount backfill, and
+live Paystack verification — unchanged from phase 2's list.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

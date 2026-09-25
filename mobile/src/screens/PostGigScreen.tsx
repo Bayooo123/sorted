@@ -116,11 +116,13 @@ export default function PostGigScreen({
         restrictedToProfessionalId: hireProfessionalId,
       });
       // publishGig locks criteria (server-enforced, immutable thereafter)
-      // and moves draft -> escrow_pending in one call, per HANDOFF.md §5
-      // PUBLISH. There's no separate "review" round-trip to the server —
-      // the review step below is purely client-side before that call.
-      const published = await publishGig(draft.id);
-      navigation.replace('FundEscrow', { gigId: published.id });
+      // and moves draft -> open in one call — PLAN.md "Split payment
+      // pivot": there's no funding step to wait on anymore, a published
+      // gig is immediately claimable. There's no separate "review"
+      // round-trip to the server either — the review step above is
+      // purely client-side before that call.
+      await publishGig(draft.id);
+      navigation.replace('HomeFeed');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not post this gig — try again');
     } finally {
@@ -136,7 +138,7 @@ export default function PostGigScreen({
 
         {hireProfessionalId ? (
           <Banner tone="info">
-            Inviting {hireProfessionalName ?? 'this professional'} directly — only they can claim this gig once it's funded.
+            Inviting {hireProfessionalName ?? 'this professional'} directly — only they can claim this gig once it's published.
           </Banner>
         ) : null}
 

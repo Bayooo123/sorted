@@ -173,24 +173,24 @@ export interface EscrowRecordView {
   platformFeeBps: number;
   /** Sorted's commission in kobo — added on top of the bounty, not deducted from it (interim mechanism until Nomba virtual accounts land). */
   feeKobo: number;
-  /** bountyKobo + feeKobo — what the client actually has to pay into the holding account. */
+  /** bountyKobo + feeKobo — what the client is actually charged at release. */
   totalChargeKobo: number;
   /**
-   * Present once fundGig has been called — what the client sees to
-   * actually pay. Shape depends on the active PaymentsProvider
-   * (server/src/modules/payments/payments.interface.ts's HoldingAccount):
+   * PLAN.md "Split payment pivot" — present once releaseGig (POST
+   * /gigs/:id/release) has been called, at sign-off. What the client sees
+   * to actually pay. Shape depends on the active PaymentsProvider
+   * (server/src/modules/payments/payments.interface.ts's SplitCharge):
    * manual-pilot populates accountNumber/bankName, Paystack populates
-   * checkoutUrl instead.
+   * checkoutUrl instead. The gig isn't released yet just because this is
+   * present — poll getEscrow until state === 'released'.
    */
-  holdingAccount?: {
+  releaseCheckout?: {
     provider: string;
     accountNumber?: string;
     bankName?: string;
     checkoutUrl?: string;
   };
 }
-
-export type FundGigResult = EscrowRecordView;
 
 export type DisputeStatus = 'open' | 'assigned' | 'ruled' | 'closed';
 export type DisputeRuling = 'for_professional' | 'for_client' | 'split';

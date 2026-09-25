@@ -44,8 +44,8 @@ export default function HomeFeedScreen({
   }, []);
 
   // Refetch every time this screen gains focus — e.g. right after posting
-  // a gig on PostGigScreen, or coming back from FundEscrow/ReviewSignOff
-  // having changed a gig's status.
+  // a gig on PostGigScreen, or coming back from ReviewSignOff having
+  // changed a gig's status.
   useFocusEffect(load);
 
   return (
@@ -81,11 +81,6 @@ export default function HomeFeedScreen({
                 currency: 'NGN',
                 maximumFractionDigits: 0,
               })}</Text>
-              {item.status === 'escrow_pending' ? (
-                <Pressable onPress={() => navigation.navigate('FundEscrow', { gigId: item.id })}>
-                  <Text style={styles.link}>Fund escrow →</Text>
-                </Pressable>
-              ) : null}
               {item.status === 'submitted' ? (
                 <Pressable onPress={() => navigation.navigate('ReviewSignOff', { gigId: item.id })}>
                   <Text style={styles.link}>Review & sign off →</Text>

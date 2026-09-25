@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeFeedScreen from '../screens/HomeFeedScreen';
 import DirectoryScreen from '../screens/DirectoryScreen';
 import PostGigScreen from '../screens/PostGigScreen';
-import FundEscrowScreen from '../screens/FundEscrowScreen';
 import ReviewSignOffScreen from '../screens/ReviewSignOffScreen';
 import BrowseMarketScreen from '../screens/BrowseMarketScreen';
 import ClaimWorkScreen from '../screens/ClaimWorkScreen';
@@ -26,7 +25,6 @@ function GigStackNavigator() {
       <GigStack.Screen name="HomeFeed" component={HomeFeedScreen} />
       <GigStack.Screen name="Directory" component={DirectoryScreen} />
       <GigStack.Screen name="PostGig" component={PostGigScreen} />
-      <GigStack.Screen name="FundEscrow" component={FundEscrowScreen} />
       <GigStack.Screen name="ReviewSignOff" component={ReviewSignOffScreen} />
     </GigStack.Navigator>
   );
