@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interface';
 
 /**
  * Read-only taxonomy listing. Deliberately NOT part of GigsService — that
@@ -7,10 +8,19 @@ import { PrismaService } from '../../prisma/prisma.service';
  * now because Identity's role-profile picker (slice 2) needs somewhere to
  * read Domain/Submarket options from; "list the categories" carries no gig
  * lifecycle logic, so shipping it early doesn't front-run slice 3.
+ *
+ * PLAN.md "Bank list endpoint" — `banks` isn't Prisma-backed like the rest
+ * of this controller (it comes from PaymentsProvider.listBanks), but the
+ * ROLE is identical: reference data to power a picker, needed by
+ * Identity's payout-destination screen the same way domains/submarkets
+ * are needed by the role-profile picker. Same precedent as those.
  */
 @Controller('taxonomy')
 export class TaxonomyController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(PAYMENTS_PROVIDER) private readonly payments: PaymentsProvider,
+  ) {}
 
   @Get('domains')
   listDomains() {
@@ -28,5 +38,10 @@ export class TaxonomyController {
   @Get('client-types')
   listClientTypes() {
     return this.prisma.clientTypeRef.findMany({ orderBy: { label: 'asc' } });
+  }
+
+  @Get('banks')
+  listBanks() {
+    return this.payments.listBanks();
   }
 }

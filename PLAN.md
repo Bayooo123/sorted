@@ -2629,6 +2629,67 @@ whose behavior could break from a corrected `accountName` coming back.
 
 ---
 
+## Bank list endpoint + payout account screen
+
+Prompted by realizing the previous phase's `resolveAccount`/`createSubaccount`
+work had nothing feeding it real data: `ProfileScreen.tsx` literally
+rendered `<StatRow label="Payout accounts" value="Not built yet" />` —
+there was no screen anywhere, mobile or web, where a professional could
+enter their bank details at all.
+
+**Backend:**
+- `PaymentsProvider.listBanks(): Promise<Bank[]>` — the picker data a
+  professional needs to know what `bankCode` to submit (`bankCode` is
+  required by `resolveAccount`/`createSubaccount`/`PayoutDestination`,
+  but nothing previously let a client discover valid codes).
+  `PaystackProvider.listBanks` calls `GET /bank?currency=NGN` — unverified
+  against a live call, same caveat as every other Paystack method.
+  `ManualPilotProvider.listBanks` returns a **hand-typed fallback of ~15
+  major banks** (Access, GTBank, Zenith, First Bank, UBA, ...) by their
+  well-established codes — explicitly NOT Paystack's real list, NOT
+  verified live, and deliberately not expanded further: the real fix is
+  flipping to `paystack`, not growing this list.
+- New `GET /taxonomy/banks` route on the existing `TaxonomyController` —
+  same "reference data for a picker" role as `domains`/`submarkets`/
+  `client-types` there already, even though this one comes from
+  `PaymentsProvider` instead of Prisma.
+- New `GET /me/payout-destination` route — `IdentityPort.
+  getPayoutDestination` already existed (`EscrowService` reads it
+  internally) but had no HTTP route, so a screen could write blind but
+  never read back what's already saved. Added alongside the existing
+  `PATCH`.
+- Module wiring: `GigsModule` now imports `PaymentsModule` directly
+  (`TaxonomyController` needs `PAYMENTS_PROVIDER` in its own DI scope —
+  Nest doesn't re-export a module's imports transitively, so
+  `IdentityModule` already importing `PaymentsModule` doesn't cover this).
+  Same no-cycle reasoning as every other leaf-module import this pivot.
+
+**Mobile:** `ProfileScreen.tsx` gains a "Payout account" card (professional
+role only), inserted between Verification and Business account — bank
+picker (chips, same pattern as the state picker), account number input,
+account holder name input. Fetches the bank list and current destination
+on mount alongside the existing KYC fetch; `PayoutDestination` view state
+uses `undefined`/`null`/value to distinguish "still loading" from
+"genuinely nothing saved yet" from "here's what's saved." The account
+name field stays required client-side (matches the DTO) even though the
+server overwrites it when Paystack can resolve one — during the manual
+pilot it's the only name that ever gets saved, so it can't be optional.
+
+**Verification:** `tsc --noEmit` clean on both server and mobile; booted
+the compiled server and confirmed `/taxonomy/banks` and both `/me/payout-
+destination` routes map with zero DI resolution errors (the new
+`GigsModule → PaymentsModule` edge specifically). **Not visually tested**
+— same no-simulator limitation as every other mobile UI change this
+session.
+
+**Still not done:** the equivalent web payout screen (index.html's
+Profile panel has no payout section either — not touched this phase,
+mobile only). Live Paystack verification for all of `resolveAccount`/
+`createSubaccount`/`chargeWithSplit`/`listBanks` remains the single
+biggest open item — none of it has hit a real Paystack call yet.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

@@ -57,6 +57,11 @@ export interface PayoutDestination {
   accountName: string;
 }
 
+export interface Bank {
+  name: string;
+  code: string;
+}
+
 export interface AuthResult {
   accessToken: string;
   user: IdentityUser;

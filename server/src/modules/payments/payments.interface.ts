@@ -92,6 +92,12 @@ export interface ResolvedAccount {
   accountName: string | null;
 }
 
+export interface Bank {
+  name: string;
+  /** Provider's own bank code — the same code resolveAccount/createSubaccount/PayoutDestination.bankCode expect. */
+  code: string;
+}
+
 export interface PaymentsProvider {
   readonly name: string;
   /** payerEmail: checkout-link providers (Paystack) require a customer email at session creation; account-number providers ignore it. */
@@ -140,6 +146,14 @@ export interface PaymentsProvider {
    * verify at all (manual pilot).
    */
   resolveAccount(bankCode: string, accountNumber: string): Promise<ResolvedAccount>;
+
+  /**
+   * PLAN.md "Bank list endpoint" — powers the bank picker on the payout-
+   * details screen; without it a professional has no way to know what
+   * bankCode to submit for "GTBank" or "Access Bank". Nigeria-only for
+   * now (matches PayoutDestination's own scope — see resolveAccount).
+   */
+  listBanks(): Promise<Bank[]>;
 }
 
 export const PAYMENTS_PROVIDER = 'PAYMENTS_PROVIDER';

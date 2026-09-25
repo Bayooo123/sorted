@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { Kobo, kobo } from '../../../common/money';
 import {
+  Bank,
   DisbursementResult,
   DisbursementSplit,
   FundingConfirmation,
@@ -161,6 +162,18 @@ export class PaystackProvider implements PaymentsProvider {
       `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
     );
     return { accountNumber: data.account_number, accountName: data.account_name };
+  }
+
+  /**
+   * PLAN.md "Bank list endpoint" — GET /bank, currency-filtered to NGN
+   * (matches PayoutDestination's Nigeria-only scope). Unverified against
+   * a live call, same caveat as every other Paystack method in this file
+   * — in particular, unconfirmed whether `active`/`country` also need
+   * filtering to avoid deprecated or non-NGN entries slipping through.
+   */
+  async listBanks(): Promise<Bank[]> {
+    const data = await this.call<Array<{ name: string; code: string }>>('GET', '/bank?currency=NGN');
+    return data.map((b) => ({ name: b.name, code: b.code }));
   }
 
   /**

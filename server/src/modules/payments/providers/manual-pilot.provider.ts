@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Kobo, kobo } from '../../../common/money';
 import {
+  Bank,
   DisbursementResult,
   DisbursementSplit,
   FundingConfirmation,
@@ -15,6 +16,33 @@ import {
   SubaccountDestination,
   WebhookVerificationResult,
 } from '../payments.interface';
+
+// PLAN.md "Bank list endpoint" — no API to call during the manual pilot
+// (see this file's top comment), so this is a hand-typed fallback rather
+// than a live lookup. Only the ~15 most commonly used Nigerian banks by
+// their well-established NIBSS/Paystack codes — NOT Paystack's actual
+// current list, and NOT verified against a live call from this sandboxed
+// environment. Good enough to unblock the payout-details screen during
+// the pilot; replace with PaystackProvider.listBanks (already correct)
+// by flipping PAYMENTS_PROVIDER_KEY to 'paystack' once that's live —
+// don't expand this list, fix the real source instead.
+const FALLBACK_BANKS: Bank[] = [
+  { name: 'Access Bank', code: '044' },
+  { name: 'Zenith Bank', code: '057' },
+  { name: 'Guaranty Trust Bank', code: '058' },
+  { name: 'First Bank of Nigeria', code: '011' },
+  { name: 'United Bank for Africa', code: '033' },
+  { name: 'Fidelity Bank', code: '070' },
+  { name: 'Union Bank of Nigeria', code: '032' },
+  { name: 'Sterling Bank', code: '232' },
+  { name: 'Stanbic IBTC Bank', code: '221' },
+  { name: 'Ecobank Nigeria', code: '050' },
+  { name: 'First City Monument Bank', code: '214' },
+  { name: 'Wema Bank', code: '035' },
+  { name: 'Polaris Bank', code: '076' },
+  { name: 'Keystone Bank', code: '082' },
+  { name: 'Unity Bank', code: '215' },
+];
 
 /**
  * PILOT ONLY — not Monnify. HANDOFF.md §3.4's SEAM in practice: "Monnify is
@@ -100,6 +128,10 @@ export class ManualPilotProvider implements PaymentsProvider {
    */
   async resolveAccount(_bankCode: string, accountNumber: string): Promise<ResolvedAccount> {
     return { accountNumber, accountName: null };
+  }
+
+  async listBanks(): Promise<Bank[]> {
+    return FALLBACK_BANKS;
   }
 
   /**

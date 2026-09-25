@@ -2,6 +2,7 @@ import { api } from './client';
 import {
   AccountType,
   AuthResult,
+  Bank,
   BusinessProfile,
   ClientTypeRef,
   Domain,
@@ -59,6 +60,11 @@ export function updateProfile(input: UpdateProfileInput) {
   return api.patch<IdentityUser>('me/profile', input);
 }
 
+/** null if never set. */
+export function getPayoutDestination() {
+  return api.get<PayoutDestination | null>('me/payout-destination');
+}
+
 export function setPayoutDestination(dest: PayoutDestination) {
   return api.patch<PayoutDestination>('me/payout-destination', dest);
 }
@@ -105,6 +111,10 @@ export function listSubmarkets() {
 
 export function listClientTypes() {
   return api.get<ClientTypeRef[]>('taxonomy/client-types', false);
+}
+
+export function listBanks() {
+  return api.get<Bank[]>('taxonomy/banks', false);
 }
 
 /** Public — PLAN.md "Professional directory". */

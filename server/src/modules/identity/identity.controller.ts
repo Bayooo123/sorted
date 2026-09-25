@@ -57,6 +57,16 @@ export class IdentityController {
     return this.identity.updateProfile(user.userId, dto);
   }
 
+  // PLAN.md "Bank list endpoint" — IdentityPort.getPayoutDestination
+  // already existed (EscrowService reads it internally), just never had
+  // an HTTP route; the payout-details screen needs to show what's
+  // already saved, not just write blind.
+  @UseGuards(JwtAuthGuard)
+  @Get('me/payout-destination')
+  getPayoutDestination(@CurrentUser() user: AuthenticatedUser) {
+    return this.identity.getPayoutDestination(user.userId);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Patch('me/payout-destination')
   setPayoutDestination(@CurrentUser() user: AuthenticatedUser, @Body() dto: PayoutDestinationDto) {

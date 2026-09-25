@@ -3,9 +3,18 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Banner, Body, Button, Card, Heading, Pill, Screen, Subtext, TextField } from '../components/ui';
 import { useAuth } from '../auth/AuthContext';
-import { applyForKyc, completeRoleProfile, getMyKycRequest, updateAvatar, updateProfile } from '../api/identity';
+import {
+  applyForKyc,
+  completeRoleProfile,
+  getMyKycRequest,
+  getPayoutDestination,
+  listBanks,
+  setPayoutDestination,
+  updateAvatar,
+  updateProfile,
+} from '../api/identity';
 import { ApiError } from '../api/client';
-import { KycRequestView } from '../api/types';
+import { Bank, KycRequestView, PayoutDestination } from '../api/types';
 import { fonts, fontSizes, radii, spacing, ThemeColors } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -55,11 +64,32 @@ export default function ProfileScreen() {
   const [bizError, setBizError] = useState<string | null>(null);
   const [bizSaving, setBizSaving] = useState(false);
 
+  // PLAN.md "Bank list endpoint" — payoutDestination undefined = still
+  // loading, null = none saved yet (both distinct from "" so the view
+  // below can tell "loading" from "genuinely empty").
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [payoutDestination, setPayoutDestinationState] = useState<PayoutDestination | null | undefined>(undefined);
+  const [editingPayout, setEditingPayout] = useState(false);
+  const [payoutBankCode, setPayoutBankCode] = useState('');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutAccountName, setPayoutAccountName] = useState('');
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [payoutSaving, setPayoutSaving] = useState(false);
+
   useEffect(() => {
     if (!user || !user.roles.includes('professional')) return;
     getMyKycRequest()
       .then(setKycRequest)
       .catch(() => setKycRequest(null));
+    listBanks()
+      .then(setBanks)
+      .catch(() => {
+        // Non-fatal here — the bank picker just shows nothing to choose
+        // from until this resolves; startEditingPayout retries on open.
+      });
+    getPayoutDestination()
+      .then(setPayoutDestinationState)
+      .catch(() => setPayoutDestinationState(null));
   }, [user?.id]);
 
   if (!user) return null;
@@ -191,6 +221,64 @@ export default function ProfileScreen() {
     }
   }
 
+  function startEditingPayout() {
+    if (payoutDestination) {
+      setPayoutBankCode(payoutDestination.bankCode);
+      setPayoutAccountNumber(payoutDestination.accountNumber);
+      setPayoutAccountName(payoutDestination.accountName);
+    } else {
+      setPayoutBankCode('');
+      setPayoutAccountNumber('');
+      setPayoutAccountName('');
+    }
+    setPayoutError(null);
+    setEditingPayout(true);
+    if (banks.length === 0) {
+      listBanks()
+        .then(setBanks)
+        .catch(() => setPayoutError('Could not load the bank list — try again.'));
+    }
+  }
+
+  /**
+   * PLAN.md "Account number verification" — the server resolves this
+   * against Paystack and overwrites accountName with the bank's own name
+   * on file whenever it can (see IdentityService.setPayoutDestination);
+   * what's typed here is only ever the fallback for when it can't
+   * (manual pilot). A rejection here almost always means the account
+   * number or bank doesn't match — shown as-is, not reworded, since the
+   * server's message is already specific.
+   */
+  async function handleSavePayout() {
+    if (!payoutBankCode) {
+      setPayoutError('Choose a bank.');
+      return;
+    }
+    if (payoutAccountNumber.trim().length !== 10) {
+      setPayoutError('Enter a 10-digit account number.');
+      return;
+    }
+    if (!payoutAccountName.trim()) {
+      setPayoutError('Enter the account holder name.');
+      return;
+    }
+    setPayoutError(null);
+    setPayoutSaving(true);
+    try {
+      const saved = await setPayoutDestination({
+        bankCode: payoutBankCode,
+        accountNumber: payoutAccountNumber.trim(),
+        accountName: payoutAccountName.trim(),
+      });
+      setPayoutDestinationState(saved);
+      setEditingPayout(false);
+    } catch (err) {
+      setPayoutError(err instanceof ApiError ? err.message : 'Could not save — try again.');
+    } finally {
+      setPayoutSaving(false);
+    }
+  }
+
   const avatarInitial = (user.name || user.email || user.phone || '?').trim().charAt(0).toUpperCase();
 
   return (
@@ -288,7 +376,6 @@ export default function ProfileScreen() {
             <StatRow label="Phone" value={user.phone ?? '—'} />
             <StatRow label="Email" value={user.email ?? '—'} />
             <StatRow label="State" value={user.state ?? '—'} />
-            <StatRow label="Payout accounts" value="Not built yet" />
             <StatRow label="Skills & services" value="Not built yet" />
             <Body onPress={startEditing} style={styles.editLink}>
               Edit name, phone, state
@@ -341,6 +428,76 @@ export default function ProfileScreen() {
                 loading={kycSubmitting}
                 disabled={!kycDocumentBase64}
               />
+            </>
+          )}
+        </Card>
+      ) : null}
+
+      {isProfessional ? (
+        <Card style={{ marginBottom: spacing.md }}>
+          <Text style={styles.cardTitle}>Payout account</Text>
+
+          {editingPayout ? (
+            <>
+              <Text style={styles.stateLabel}>Bank</Text>
+              {banks.length === 0 ? (
+                <Body>Loading banks…</Body>
+              ) : (
+                <View style={styles.chipWrap}>
+                  {banks.map((b) => {
+                    const active = payoutBankCode === b.code;
+                    return (
+                      <Pressable
+                        key={b.code}
+                        onPress={() => setPayoutBankCode(b.code)}
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{b.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              <TextField
+                label="Account number"
+                keyboardType="number-pad"
+                maxLength={10}
+                value={payoutAccountNumber}
+                onChangeText={setPayoutAccountNumber}
+              />
+              <TextField label="Account holder name" value={payoutAccountName} onChangeText={setPayoutAccountName} />
+
+              {payoutError ? <Banner tone="warning">{payoutError}</Banner> : null}
+
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <View style={{ flex: 1 }}>
+                  <Button title="Cancel" variant="secondary" onPress={() => setEditingPayout(false)} disabled={payoutSaving} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Save" onPress={handleSavePayout} loading={payoutSaving} />
+                </View>
+              </View>
+            </>
+          ) : payoutDestination === undefined ? (
+            <Body>Loading…</Body>
+          ) : payoutDestination ? (
+            <>
+              <StatRow
+                label="Bank"
+                value={banks.find((b) => b.code === payoutDestination!.bankCode)?.name ?? payoutDestination.bankCode}
+              />
+              <StatRow label="Account number" value={payoutDestination.accountNumber} />
+              <StatRow label="Account name" value={payoutDestination.accountName} />
+              <Body onPress={startEditingPayout} style={styles.editLink}>
+                Edit payout account
+              </Body>
+            </>
+          ) : (
+            <>
+              <Body style={{ marginBottom: spacing.md }}>
+                Add your bank details so you can get paid once a gig is approved and released.
+              </Body>
+              <Button title="Add payout account" variant="secondary" onPress={startEditingPayout} />
             </>
           )}
         </Card>
