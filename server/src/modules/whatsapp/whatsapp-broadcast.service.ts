@@ -9,7 +9,7 @@ import { WHATSAPP_PORT, WhatsAppPort } from './whatsapp.interface';
 /**
  * The claiming side of "open it up to any matching professional" (PLAN.md
  * "WhatsApp integration, Phase 4") — handles a YES reply from anyone
- * EscrowService.broadcastOpenGig messaged. Separate from
+ * GigsService.broadcastOpenGig messaged. Separate from
  * WhatsappInviteService (one named professional, YES/NO) because the
  * shape is genuinely different here: many phones can be racing for the
  * same gig, and a claim winning means telling everyone ELSE it's gone —

@@ -334,7 +334,7 @@ export class WhatsappGigConversationService {
     }
 
     await this.gigs.setRestrictedProfessional(gigId, invitee.id);
-    const sent = await this.escrow.sendInvite(gigId);
+    const sent = await this.gigs.sendInvite(gigId);
 
     if (sent) {
       await this.reset(phone);

@@ -488,6 +488,22 @@ export class IdentityService implements IdentityPort {
     return dest;
   }
 
+  /**
+   * PLAN.md "Split payment pivot". Deliberately NOT created here — doing
+   * it eagerly on every payout-destination edit would call Paystack even
+   * for a client with no gigs to be paid for. EscrowService creates it
+   * lazily, once, the first time a gig of theirs actually reaches release.
+   */
+  async getPaystackSubaccountCode(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    return user.paystackSubaccountCode;
+  }
+
+  async setPaystackSubaccountCode(userId: string, subaccountCode: string): Promise<void> {
+    await this.prisma.user.update({ where: { id: userId }, data: { paystackSubaccountCode: subaccountCode } });
+  }
+
   async assertRole(userId: string, role: Role): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');

@@ -291,6 +291,10 @@ enum MaterialsMode {
   professional_supplies
 }
 
+// PLAN.md "Split payment pivot" — escrow_pending is dead: publishGig goes
+// draft -> open directly now, no funding gate before a gig can be claimed.
+// Left in the enum rather than removed — same "not worth a migration for
+// an unused value" call as EscrowState's awaiting_funding/funded above.
 enum GigStatus {
   draft
   escrow_pending
@@ -448,6 +452,11 @@ model Claim {
 // Escrow (§3.5, §5) ★ — the money core
 // ---------------------------------------------------------------------------
 
+// PLAN.md "Split payment pivot" — awaiting_funding/funded are dead: no
+// EscrowRecord is ever created in either state anymore (see
+// EscrowService.holdStake, which creates it directly as stake_held).
+// Left in the enum rather than removed — dropping a Postgres enum value
+// needs a real migration, not worth it for values that just go unused.
 enum EscrowState {
   awaiting_funding
   funded
@@ -464,14 +473,14 @@ model EscrowRecord {
   gig                   Gig     @relation(fields: [gigId], references: [id])
   provider              String  @default("manual_pilot") // SEAM (§3.4): PaymentsProvider key
   holdingAccountRef     String?
-  // Whatever the provider returned to show the client at funding time —
-  // { accountNumber?, bankName?, checkoutUrl? } — captured once at
-  // creation (see PaystackProvider.createHoldingAccount) so a re-fetch of
-  // an already-created escrow record never needs to call the provider
-  // again. Shape varies by provider on purpose (Json, not fixed columns):
-  // account-number-based providers (manual pilot) vs. checkout-link-based
-  // providers (Paystack Transaction Initialize) genuinely return different
-  // things — see PLAN.md "Paystack integration".
+  // PLAN.md "Split payment pivot" — pre-pivot this held what the client
+  // paid a HOLDING account with, at funding time (before any professional
+  // was even matched). Nothing is charged that early anymore; these two
+  // columns are reused (not renamed — no migration for it) to hold the
+  // RELEASE charge's ref/checkout instead: { accountNumber?, bankName?,
+  // checkoutUrl? } from PaymentsProvider.chargeWithSplit, captured once
+  // when EscrowService.releaseToProfessional initiates it. Shape still
+  // varies by provider on purpose (Json, not fixed columns).
   holdingAccountDetails Json?
 
   bountyKobo BigInt // ★

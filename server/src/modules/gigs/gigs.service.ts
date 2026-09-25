@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
@@ -7,6 +8,7 @@ import { kobo } from '../../common/money';
 import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { PrismaTx } from '../../common/prisma-tx';
 import { DeliveryService } from '../delivery/delivery.service';
+import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
 import {
   CreateGigInput,
   GigListFilter,
@@ -22,9 +24,18 @@ import {
  * lifecycle now so later slices call transitionStatus() against a rule
  * that's already reviewed, instead of each slice inventing its own checks.
  */
+// PLAN.md "Split payment pivot" — 'escrow_pending' is no longer a reachable
+// state: publishGig used to transition draft -> escrow_pending and wait for
+// EscrowService.fundGig/confirmFunding before opening the gig to claims.
+// Nothing is charged until a professional actually finishes the work now
+// (see EscrowService.releaseToProfessional), so publish goes straight to
+// 'open'. Left in the GigStatus enum rather than removed (dropping a
+// Postgres enum value needs a real migration, not worth it for a value
+// that just becomes unused) — same policy as every other "leave the dead
+// column, don't drop it" call this codebase has made.
 const ALLOWED_TRANSITIONS: Record<GigStatus, GigStatus[]> = {
-  draft: ['escrow_pending', 'cancelled'],
-  escrow_pending: ['open', 'refunded', 'cancelled'], // slice 4: funded -> open, or funding fails/times out
+  draft: ['open', 'cancelled'],
+  escrow_pending: [],
   open: ['claimed', 'cancelled'],
   claimed: ['in_progress', 'disputed'],
   in_progress: ['submitted', 'disputed'],
@@ -50,9 +61,11 @@ export class GigsService implements GigsPort {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     private readonly identity: IdentityService,
     @Inject(MATCHING_STRATEGY) private readonly matchingStrategy: MatchingStrategy,
     private readonly delivery: DeliveryService,
+    @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
 
   async createGig(input: CreateGigInput): Promise<GigRecord> {
@@ -125,7 +138,7 @@ export class GigsService implements GigsPort {
   async publishGig(gigId: string): Promise<GigRecord> {
     const gig = await this.prisma.gig.findUnique({ where: { id: gigId } });
     if (!gig) throw new NotFoundException('Gig not found');
-    this.assertTransitionAllowed(gig.status as GigStatus, 'escrow_pending');
+    this.assertTransitionAllowed(gig.status as GigStatus, 'open');
 
     // Criterion.locked flips inside the same transaction as the status
     // change (HANDOFF.md §3.2: "locked ★ true at publish, immutable
@@ -135,12 +148,153 @@ export class GigsService implements GigsPort {
       await tx.criterion.updateMany({ where: { gigId }, data: { locked: true } });
       return tx.gig.update({
         where: { id: gigId },
-        data: { status: 'escrow_pending', publishedAt: new Date() },
+        data: { status: 'open', publishedAt: new Date() },
         include: GIG_INCLUDE,
       });
     });
 
+    // Best-effort, outside the transaction — a WhatsApp send failing must
+    // never roll back a real publish that already succeeded. PLAN.md
+    // "Split payment pivot": this used to fire from
+    // EscrowService.confirmFunding once a gig was funded; publishing IS
+    // the "gig became open" moment now that there's no funding gate.
+    await this.notifyGigIsOpen(gigId).catch((err) => {
+      this.logger.warn(`Open-gig notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+    });
+
     return this.toGigRecord(updated);
+  }
+
+  private async notifyGigIsOpen(gigId: string): Promise<void> {
+    const gig = await this.getGig(gigId);
+    if (gig.restrictedToProfessionalId) {
+      await this.sendInvite(gigId);
+    } else {
+      await this.broadcastOpenGig(gigId);
+    }
+  }
+
+  /**
+   * Sends (or re-sends, for a reassignment — PLAN.md "WhatsApp
+   * integration, Phase 3.1") the direct-invite message to whoever a gig
+   * is currently restricted to. Public and idempotent-safe to call again
+   * — used both from publishGig above and from
+   * WhatsappGigConversationService's reassignment flow after a decline.
+   * No-ops (returns true) for a gig that isn't restricted to anyone —
+   * the normal open-claim path has nothing to notify.
+   *
+   * Returns whether the professional was actually reached — see
+   * sendJobMessage's doc comment for the free-text/template mechanics.
+   * If BOTH fail, tells the CLIENT honestly instead of the invite
+   * silently vanishing, via WhatsAppPort.offerReassignment (same offer a
+   * decline triggers).
+   */
+  async sendInvite(gigId: string): Promise<boolean> {
+    const gig = await this.getGig(gigId);
+    if (!gig.restrictedToProfessionalId) return true;
+
+    const professional = await this.identity.getUser(gig.restrictedToProfessionalId);
+    if (!professional.phone) return true; // nothing reachable to invite — not this method's problem to solve
+
+    await this.prisma.whatsAppSession.upsert({
+      where: { phone: professional.phone },
+      create: { phone: professional.phone, pendingInviteGigId: gigId },
+      update: { pendingInviteGigId: gigId },
+    });
+
+    const amountNaira = Number(gig.bountyKobo) / 100;
+    const bodyText = `You've been invited to a job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nReply YES to accept, or NO to decline.`;
+    const templateParams = [gig.description, gig.locationText, `₦${amountNaira.toLocaleString('en-NG')}`];
+
+    const sent = await this.sendJobMessage(professional.phone, bodyText, templateParams);
+    if (sent) return true;
+
+    const client = await this.identity.getUser(gig.clientId);
+    if (client.phone) {
+      await this.whatsapp.offerReassignment(
+        client.phone,
+        gigId,
+        "We couldn't reach the professional you invited over WhatsApp — they haven't messaged Sorted recently, and no backup template is set up yet.",
+      );
+    }
+    return false;
+  }
+
+  /**
+   * The other half of "matching professional gets notified" (PLAN.md
+   * "WhatsApp integration, Phase 4") — a gig with no restriction goes to
+   * EVERY professional whose ProfessionalServiceOffering matches its
+   * submarket, not one named person. First to reply YES claims it (real
+   * claim via EscrowService.holdStake — see WhatsappBroadcastService,
+   * which owns that reply and the "sorry, taken" fan-out to everyone
+   * else); this method only sends. No shortlist/cap on how many get
+   * notified — v1's FixedPriceAcceptStrategy is already "first credible
+   * claim wins" with no arbitration beyond the restriction check, so this
+   * matches.
+   *
+   * Silent no-op for anyone unreachable (no phone, closed window, no
+   * template) — unlike sendInvite, there's no single point of failure to
+   * report back to the client about: the gig is still visible in the
+   * app's normal browse list (listGigs) regardless of who a WhatsApp
+   * broadcast did or didn't reach.
+   */
+  private async broadcastOpenGig(gigId: string): Promise<void> {
+    const gig = await this.getGig(gigId);
+    if (gig.restrictedToProfessionalId) return; // sendInvite's job, not this method's
+
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: gig.submarket } });
+    if (!submarket) return;
+
+    const offerings = await this.prisma.professionalServiceOffering.findMany({
+      where: { submarketId: submarket.id },
+      select: { userId: true },
+    });
+    if (offerings.length === 0) return;
+
+    const professionals = await this.prisma.user.findMany({
+      where: { id: { in: offerings.map((o) => o.userId) }, phone: { not: null } },
+      select: { phone: true },
+    });
+
+    const amountNaira = Number(gig.bountyKobo) / 100;
+    const bodyText = `New job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nFirst to reply YES gets it.`;
+    const templateParams = [gig.description, gig.locationText, `₦${amountNaira.toLocaleString('en-NG')}`];
+
+    await Promise.all(
+      professionals.map(async ({ phone }) => {
+        if (!phone) return;
+        await this.prisma.whatsAppSession.upsert({
+          where: { phone },
+          create: { phone, pendingBroadcastGigId: gigId },
+          update: { pendingBroadcastGigId: gigId },
+        });
+        await this.sendJobMessage(phone, bodyText, templateParams).catch((err) => {
+          this.logger.warn(`Broadcast send to ${phone} failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+        });
+      }),
+    );
+  }
+
+  /**
+   * Free-form text if the recipient's 24h window is open, else a
+   * Meta-approved template (WHATSAPP_INVITE_TEMPLATE_NAME — external,
+   * manual approval required, see .env.example; the same template covers
+   * both the direct-invite and broadcast wording, deliberately generic:
+   * "New job... reply YES to respond" reads fine either way). Returns
+   * whether the recipient was actually reached, never throws — a
+   * notification failing must never break the publish or reassignment
+   * flow that called this.
+   */
+  private async sendJobMessage(phone: string, bodyText: string, templateParams: string[]): Promise<boolean> {
+    if (await this.whatsapp.isSessionOpen(phone)) {
+      await this.whatsapp.sendMessage(phone, bodyText);
+      return true;
+    }
+
+    const templateName = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_NAME');
+    if (!templateName) return false;
+    const templateLang = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_LANG') || 'en_US';
+    return this.whatsapp.sendTemplate(phone, templateName, templateLang, templateParams);
   }
 
   async getGig(gigId: string): Promise<GigRecord> {

@@ -11,9 +11,10 @@ interface RequestWithRawBody extends Request {
 /**
  * Paystack calls this directly — no JwtAuthGuard/AdminGuard, verified
  * instead via HMAC signature (PaystackProvider.verifyWebhook). This is
- * what actually automates funding confirmation: EscrowService.
- * confirmFunding's doc comment already anticipated this exact shape
- * ("called by a Payments webhook handler after verifyWebhook() passes").
+ * what actually automates release confirmation (PLAN.md "Split payment
+ * pivot"): EscrowService.confirmRelease's doc comment already anticipated
+ * this exact shape ("called by a Payments webhook handler after
+ * verifyWebhook() passes").
  *
  * Non-negotiables from HANDOFF.md §9 / escrow.service.ts's doc comment —
  * IP-allowlist + signature verification + idempotency on event_id, all
@@ -22,7 +23,7 @@ interface RequestWithRawBody extends Request {
  *     guarantee);
  *   - IP-allowlist: soft/logged only, see the doc comment on
  *     verifyWebhook for why it isn't a hard gate here;
- *   - idempotency: EscrowService.confirmFunding's own state-guard +
+ *   - idempotency: EscrowService.confirmRelease's own state-guard +
  *     LedgerEntry.eventId upsert — a replayed webhook (Paystack retries
  *     on anything but 2xx) is already a safe no-op, nothing new needed
  *     in this controller.
@@ -58,14 +59,14 @@ export class PaystackWebhookController {
     if (event.event === 'charge.success' && event.data?.reference) {
       const providerRef = event.data.id != null ? String(event.data.id) : event.data.reference;
       try {
-        await this.escrow.confirmFunding(event.data.reference, providerRef);
+        await this.escrow.confirmRelease(event.data.reference, providerRef);
       } catch (err) {
         // Logged, not rethrown as a non-2xx — see the class doc comment
         // on why we don't want Paystack retrying this forever. A gigId
         // that no longer matches an EscrowRecord (e.g. a stale/replayed
         // reference) ends up here, not as a crash.
         this.logger.error(
-          `Failed to confirm funding for gig ${event.data.reference}: ${err instanceof Error ? err.message : err}`,
+          `Failed to confirm release for gig ${event.data.reference}: ${err instanceof Error ? err.message : err}`,
         );
       }
     }

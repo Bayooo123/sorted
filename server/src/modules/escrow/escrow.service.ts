@@ -5,30 +5,30 @@ import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interf
 import { LEDGER_PORT, LedgerPort } from '../ledger/ledger.interface';
 import { GigsService } from '../gigs/gigs.service';
 import { IdentityService } from '../identity/identity.service';
+import { PayoutDestination } from '../identity/identity.interface';
 import { MATCHING_STRATEGY, MatchingStrategy } from '../matching/matching.interface';
 import { ConfigService } from '@nestjs/config';
 import { Kobo, addKobo, applyBps, kobo } from '../../common/money';
-import { PrismaTx } from '../../common/prisma-tx';
 import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
 import { DeliveryService } from '../delivery/delivery.service';
+import { PrismaTx } from '../../common/prisma-tx';
 import { EscrowPort, EscrowRecordView, EscrowState } from './escrow.interface';
 
 /**
- * fundGig/confirmFunding implemented for the manual-pilot funding flow
- * (PLAN.md's "Manual escrow pilot" section) — the rest (holdStake,
- * releaseToProfessional, refundClient, freezeForDispute, resolveFrozen)
- * stay stubs until their owning slice, same as before.
+ * PLAN.md "Split payment pivot" — see escrow.interface.ts's top doc
+ * comment for the full why. holdStake/releaseToProfessional/
+ * confirmRelease are the live flow; freezeForDispute/resolveFrozen cover
+ * disputes, which are always pre-payment under this model (see
+ * resolveFrozen's doc comment for what that does and doesn't guarantee).
  *
  * Non-negotiables from HANDOFF.md §9, upheld here:
- *   - confirmFunding writes the EscrowRecord state change, the Gig status
- *     transition, and the LedgerEntry inside ONE DB transaction (PrismaTx
- *     threaded through GigsService.transitionStatus and LedgerService.record)
- *     — all-or-nothing, not three separate round-trips;
- *   - the LedgerEntry's eventId is deterministic per gig
-     (`fund:${gigId}`), so a duplicate confirmFunding call is a no-op via
- *     LedgerService's upsert, not a double-credit;
- *   - no transition out of dispute_hold except through resolveFrozen()
- *     (unchanged — not reachable yet, no code path skips it);
+ *   - confirmRelease writes the EscrowRecord state change, the Gig status
+ *     transition, and the LedgerEntry inside ONE DB transaction — all-or-
+ *     nothing, not three separate round-trips;
+ *   - LedgerEntry eventIds are deterministic per gig, so a duplicate
+ *     confirmRelease call is a no-op via LedgerService's upsert, not a
+ *     double-credit;
+ *   - no transition out of dispute_hold except through resolveFrozen();
  *   - this service calls PaymentsProvider only through the injected
  *     interface — never a concrete provider class.
  */
@@ -47,245 +47,6 @@ export class EscrowService implements EscrowPort {
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
     private readonly delivery: DeliveryService,
   ) {}
-
-  async fundGig(gigId: string): Promise<EscrowRecordView> {
-    const gig = await this.prisma.gig.findUnique({ where: { id: gigId } });
-    if (!gig) throw new NotFoundException('Gig not found');
-    if (gig.status !== 'escrow_pending') {
-      throw new BadRequestException(`Gig must be escrow_pending to fund, was "${gig.status}"`);
-    }
-
-    // Idempotent: a gig that already has a holding account (e.g. the
-    // client re-opened the funding screen) just gets that same record
-    // back instead of a duplicate, error, or a second holding account —
-    // this is also why holdingAccountDetails is captured once here and
-    // reused on every later read, never recomputed by calling the
-    // provider again (a checkout-link provider can't cheaply reconstruct
-    // the same link after the fact, unlike a static account number).
-    const existing = await this.prisma.escrowRecord.findUnique({ where: { gigId } });
-    if (existing) return this.toView(existing);
-
-    const client = await this.identity.getUser(gig.clientId);
-    if (!client.email) throw new BadRequestException('Client has no email on file — required to fund a gig');
-
-    // COMMISSION MODEL — see escrow.interface.ts's doc comment: the fee is
-    // added on top of the bounty, not deducted from it. The client's
-    // holding account is opened for bountyKobo + feeKobo; feeKobo is frozen
-    // here (not recomputed at release) so a mid-flight config change can't
-    // silently retarget an already-quoted charge.
-    const bountyKobo = kobo(Number(gig.bountyKobo));
-    const platformFeeBps = Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
-    const feeKobo = applyBps(bountyKobo, platformFeeBps);
-    const totalChargeKobo = addKobo(bountyKobo, feeKobo);
-
-    const holdingAccount = await this.payments.createHoldingAccount(gigId, totalChargeKobo, client.email);
-
-    const record = await this.prisma.escrowRecord.create({
-      data: {
-        gigId,
-        provider: holdingAccount.provider,
-        holdingAccountRef: holdingAccount.holdingAccountRef,
-        holdingAccountDetails: {
-          provider: holdingAccount.provider,
-          accountNumber: holdingAccount.accountNumber,
-          bankName: holdingAccount.bankName,
-          checkoutUrl: holdingAccount.checkoutUrl,
-        },
-        bountyKobo: gig.bountyKobo,
-        platformFeeBps,
-        feeKobo: BigInt(feeKobo),
-        state: 'awaiting_funding',
-      },
-    });
-
-    return this.toView(record);
-  }
-
-  async confirmFunding(gigId: string, providerRef: string): Promise<EscrowRecordView> {
-    let alreadyFunded = false;
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const record = await tx.escrowRecord.findUnique({ where: { gigId } });
-      if (!record) throw new NotFoundException('No escrow record for this gig — call fundGig first');
-
-      // Idempotent: confirming an already-funded gig just returns its
-      // current state rather than erroring — an admin double-clicking
-      // "confirm" shouldn't be able to break anything. Also means the
-      // invite notification below never double-sends on a retry.
-      if (record.state !== 'awaiting_funding') {
-        alreadyFunded = true;
-        return record;
-      }
-
-      const updated = await tx.escrowRecord.update({
-        where: { gigId },
-        data: { state: 'funded', stateChangedAt: new Date() },
-      });
-
-      await this.gigs.transitionStatus(gigId, 'open', tx);
-
-      // Surcharge model: the actual inbound transfer is bounty + fee, not
-      // just the bounty — see escrow.interface.ts's COMMISSION MODEL note.
-      const totalChargeKobo = kobo(Number(record.bountyKobo) + Number(record.feeKobo ?? 0));
-      await this.ledger.record(
-        {
-          gigId,
-          type: 'fund',
-          amountKobo: totalChargeKobo,
-          direction: 'in',
-          providerRef,
-          eventId: `fund:${gigId}`,
-        },
-        tx,
-      );
-
-      return updated;
-    });
-
-    if (!alreadyFunded) {
-      // Best-effort, outside the transaction (a WhatsApp send failing must
-      // never roll back a real funding confirmation) — see PLAN.md
-      // "WhatsApp integration, Phase 3/4". Restricted -> sendInvite (one
-      // named professional); otherwise -> broadcastOpenGig (everyone
-      // matching the category, first YES wins).
-      await this.notifyGigIsOpen(gigId).catch((err) => {
-        this.logger.warn(`Open-gig notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
-      });
-    }
-
-    return this.toView(result);
-  }
-
-  private async notifyGigIsOpen(gigId: string): Promise<void> {
-    const gig = await this.gigs.getGig(gigId);
-    if (gig.restrictedToProfessionalId) {
-      await this.sendInvite(gigId);
-    } else {
-      await this.broadcastOpenGig(gigId);
-    }
-  }
-
-  /**
-   * Sends (or re-sends, for a reassignment — PLAN.md "WhatsApp
-   * integration, Phase 3.1") the direct-invite message to whoever a gig
-   * is currently restricted to. Public and idempotent-safe to call again
-   * — used both from confirmFunding above and from
-   * WhatsappGigConversationService's reassignment flow after a decline.
-   * No-ops (returns true) for a gig that isn't restricted to anyone —
-   * the normal open-claim path has nothing to notify.
-   *
-   * Returns whether the professional was actually reached — see
-   * sendJobMessage's doc comment for the free-text/template mechanics.
-   * If BOTH fail, tells the CLIENT honestly instead of the invite
-   * silently vanishing, via WhatsAppPort.offerReassignment (same offer a
-   * decline triggers).
-   */
-  async sendInvite(gigId: string): Promise<boolean> {
-    const gig = await this.gigs.getGig(gigId);
-    if (!gig.restrictedToProfessionalId) return true;
-
-    const professional = await this.identity.getUser(gig.restrictedToProfessionalId);
-    if (!professional.phone) return true; // nothing reachable to invite — not this method's problem to solve
-
-    await this.prisma.whatsAppSession.upsert({
-      where: { phone: professional.phone },
-      create: { phone: professional.phone, pendingInviteGigId: gigId },
-      update: { pendingInviteGigId: gigId },
-    });
-
-    const amountNaira = Number(gig.bountyKobo) / 100;
-    const bodyText = `You've been invited to a job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nReply YES to accept, or NO to decline.`;
-    const templateParams = [gig.description, gig.locationText, `₦${amountNaira.toLocaleString('en-NG')}`];
-
-    const sent = await this.sendJobMessage(professional.phone, bodyText, templateParams);
-    if (sent) return true;
-
-    const client = await this.identity.getUser(gig.clientId);
-    if (client.phone) {
-      await this.whatsapp.offerReassignment(
-        client.phone,
-        gigId,
-        "We couldn't reach the professional you invited over WhatsApp — they haven't messaged Sorted recently, and no backup template is set up yet.",
-      );
-    }
-    return false;
-  }
-
-  /**
-   * The other half of "matching professional gets notified" (PLAN.md
-   * "WhatsApp integration, Phase 4") — a gig with no restriction goes to
-   * EVERY professional whose ProfessionalServiceOffering matches its
-   * submarket, not one named person. First to reply YES claims it (real
-   * claim via holdStake — see WhatsappBroadcastService, which owns that
-   * reply and the "sorry, taken" fan-out to everyone else); this method
-   * only sends. No shortlist/cap on how many get notified — v1's
-   * FixedPriceAcceptStrategy is already "first credible claim wins" with
-   * no arbitration beyond the restriction check, so this matches.
-   *
-   * Silent no-op for anyone unreachable (no phone, closed window, no
-   * template) — unlike sendInvite, there's no single point of failure to
-   * report back to the client about: the gig is still visible in the
-   * app's normal browse list (GigsService.listGigs) regardless of who a
-   * WhatsApp broadcast did or didn't reach.
-   */
-  private async broadcastOpenGig(gigId: string): Promise<void> {
-    const gig = await this.gigs.getGig(gigId);
-    if (gig.restrictedToProfessionalId) return; // sendInvite's job, not this method's
-
-    const submarket = await this.prisma.submarket.findUnique({ where: { key: gig.submarket } });
-    if (!submarket) return;
-
-    const offerings = await this.prisma.professionalServiceOffering.findMany({
-      where: { submarketId: submarket.id },
-      select: { userId: true },
-    });
-    if (offerings.length === 0) return;
-
-    const professionals = await this.prisma.user.findMany({
-      where: { id: { in: offerings.map((o) => o.userId) }, phone: { not: null } },
-      select: { phone: true },
-    });
-
-    const amountNaira = Number(gig.bountyKobo) / 100;
-    const bodyText = `New job on Sorted:\n\n📝 ${gig.description}\n📍 ${gig.locationText}\n💰 ₦${amountNaira.toLocaleString('en-NG')}\n\nFirst to reply YES gets it.`;
-    const templateParams = [gig.description, gig.locationText, `₦${amountNaira.toLocaleString('en-NG')}`];
-
-    await Promise.all(
-      professionals.map(async ({ phone }) => {
-        if (!phone) return;
-        await this.prisma.whatsAppSession.upsert({
-          where: { phone },
-          create: { phone, pendingBroadcastGigId: gigId },
-          update: { pendingBroadcastGigId: gigId },
-        });
-        await this.sendJobMessage(phone, bodyText, templateParams).catch((err) => {
-          this.logger.warn(`Broadcast send to ${phone} failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
-        });
-      }),
-    );
-  }
-
-  /**
-   * Free-form text if the recipient's 24h window is open, else a
-   * Meta-approved template (WHATSAPP_INVITE_TEMPLATE_NAME — external,
-   * manual approval required, see .env.example; the same template covers
-   * both the direct-invite and broadcast wording, deliberately generic:
-   * "New job... reply YES to respond" reads fine either way). Returns
-   * whether the recipient was actually reached, never throws — a
-   * notification failing must never break the funding confirmation or
-   * reassignment flow that called this.
-   */
-  private async sendJobMessage(phone: string, bodyText: string, templateParams: string[]): Promise<boolean> {
-    if (await this.whatsapp.isSessionOpen(phone)) {
-      await this.whatsapp.sendMessage(phone, bodyText);
-      return true;
-    }
-
-    const templateName = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_NAME');
-    if (!templateName) return false;
-    const templateLang = this.config.get<string>('WHATSAPP_INVITE_TEMPLATE_LANG') || 'en_US';
-    return this.whatsapp.sendTemplate(phone, templateName, templateLang, templateParams);
-  }
 
   async getEscrow(gigId: string): Promise<EscrowRecordView> {
     const record = await this.prisma.escrowRecord.findUnique({ where: { gigId } });
@@ -317,6 +78,11 @@ export class EscrowService implements EscrowPort {
 
     const stakeBps = Number(this.config.get('DEFAULT_STAKE_BPS') ?? 1000);
     const stakeKobo = applyBps(gig.bountyKobo, stakeBps);
+    // PLAN.md "Split payment pivot" — frozen at claim time (the earliest
+    // point an EscrowRecord now exists), not recomputed at release, same
+    // reasoning fundGig used to apply pre-pivot: a mid-flight config
+    // change can't retarget an already-quoted charge.
+    const platformFeeBps = Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
 
     const record = await this.prisma.$transaction(async (tx) => {
       // staked: false is honest, not a placeholder — no real money moves
@@ -324,9 +90,11 @@ export class EscrowService implements EscrowPort {
       // flow"); stakeKobo below is tracked/displayed only.
       await tx.claim.create({ data: { gigId, professionalId, staked: false, status: 'active' } });
 
-      const updated = await tx.escrowRecord.update({
-        where: { gigId },
-        data: { stakeKobo: BigInt(stakeKobo), state: 'stake_held', stateChangedAt: new Date() },
+      // First EscrowRecord this gig gets — pre-pivot this was created by
+      // fundGig before any claim existed; there's nothing to fund upfront
+      // anymore, so claim time is the earliest point it's needed.
+      const created = await tx.escrowRecord.create({
+        data: { gigId, bountyKobo: gig.bountyKobo, stakeKobo: BigInt(stakeKobo), platformFeeBps, state: 'stake_held' },
       });
 
       // Two hops, not a shortcut edge in ALLOWED_TRANSITIONS — 'claimed'
@@ -336,7 +104,7 @@ export class EscrowService implements EscrowPort {
       await this.gigs.transitionStatus(gigId, 'claimed', tx);
       await this.gigs.transitionStatus(gigId, 'in_progress', tx);
 
-      return updated;
+      return created;
     });
 
     // Best-effort, outside the transaction — same reasoning as every other
@@ -355,17 +123,28 @@ export class EscrowService implements EscrowPort {
     if (gig.status !== 'submitted') {
       throw new BadRequestException(`Gig must be submitted to release, was "${gig.status}"`);
     }
+    return this.initiateRelease(gigId);
+  }
 
+  /**
+   * PLAN.md "Split payment pivot" — THE payment moment, shared by the
+   * normal submitted->release path (releaseToProfessional) and the
+   * ruled-for-professional dispute path (resolveFrozen), which is
+   * otherwise identical: initiate the same charge+split, just entered
+   * from a different gig status. Only INITIATES the charge — confirmRelease
+   * is what finalizes it once the provider confirms it succeeded.
+   */
+  private async initiateRelease(gigId: string): Promise<EscrowRecordView> {
+    const gig = await this.gigs.getGig(gigId);
     const claim = await this.prisma.claim.findFirst({ where: { gigId, status: 'active' } });
     if (!claim) throw new NotFoundException('No active claim for this gig');
 
     const existing = await this.prisma.escrowRecord.findUnique({ where: { gigId } });
     if (!existing) throw new NotFoundException('No escrow record for this gig');
 
-    // Idempotent: a released gig (or a disbursement already recorded) is a
-    // safe no-op return, never a second payout — see disbursementRef's own
-    // schema comment ("double-release protection").
-    if (existing.state === 'released' || existing.disbursementRef) {
+    // Idempotent: already released, or a charge already initiated, is a
+    // safe no-op return — never a second charge for the same gig.
+    if (existing.state === 'released' || existing.holdingAccountRef) {
       return this.toView(existing);
     }
 
@@ -373,14 +152,18 @@ export class EscrowService implements EscrowPort {
     if (!destination) {
       throw new BadRequestException('Professional has not set a payout destination yet');
     }
+    const subaccountCode = await this.getOrCreateSubaccount(claim.professionalId, destination);
+
+    const client = await this.identity.getUser(gig.clientId);
+    if (!client.email) throw new BadRequestException('Client has no email on file — required to charge for release');
 
     // Compare-and-swap into 'releasing' before calling out to the payment
-    // provider — an external disburse() call can't be rolled back by a DB
-    // transaction, so this claims the release BEFORE the side effect runs,
-    // not after. Two concurrent "Approve" taps race here; only one wins
-    // (count === 1) and proceeds to actually pay.
+    // provider — an external call can't be rolled back by a DB
+    // transaction, so this claims the release BEFORE the side effect
+    // runs, not after. Two concurrent "Approve" taps race here; only one
+    // wins (count === 1) and proceeds to actually charge.
     const claimed = await this.prisma.escrowRecord.updateMany({
-      where: { gigId, disbursementRef: null, state: { in: ['stake_held', 'releasing'] } },
+      where: { gigId, holdingAccountRef: null, state: { in: ['stake_held', 'dispute_hold', 'releasing'] } },
       data: { state: 'releasing', stateChangedAt: new Date() },
     });
     if (claimed.count === 0) {
@@ -388,92 +171,153 @@ export class EscrowService implements EscrowPort {
       return this.toView(current);
     }
 
-    // Surcharge model: fee was already collected upfront at funding time
-    // (see fundGig) — the professional is paid the full bounty, nothing
-    // deducted here. Prefer the fee frozen on the record at funding; fall
-    // back to recomputing only for an escrow record created before this
-    // mechanism existed (feeKobo was null pre-surcharge).
-    const feeKobo = existing.feeKobo != null ? kobo(Number(existing.feeKobo)) : applyBps(gig.bountyKobo, existing.platformFeeBps);
-    const professionalPayoutKobo = gig.bountyKobo;
-    const idempotencyKey = `release:${gigId}`;
+    const bountyKobo = kobo(Number(existing.bountyKobo));
+    const feeKobo = applyBps(bountyKobo, existing.platformFeeBps);
+    const totalChargeKobo = addKobo(bountyKobo, feeKobo);
 
-    let disbursementRef: string;
+    let charge: Awaited<ReturnType<PaymentsProvider['chargeWithSplit']>>;
     try {
-      const result = await this.payments.disburse(
-        [
-          {
-            destinationRef: JSON.stringify(destination),
-            amountKobo: professionalPayoutKobo,
-            narration: `Sorted gig ${gigId} payout`,
-          },
-        ],
-        idempotencyKey,
-      );
-      disbursementRef = result.disbursementRef;
+      charge = await this.payments.chargeWithSplit(gigId, totalChargeKobo, client.email, [
+        // Sorted's fee has no split destination of its own — it's
+        // whatever the charge total minus this one share comes to, paid
+        // to Sorted's main account by the provider automatically. See
+        // escrow.interface.ts's COMMISSION MODEL note.
+        { subaccountCode, amountKobo: bountyKobo, narration: `Sorted gig ${gigId} payout` },
+      ]);
     } catch (err) {
-      // Left in 'releasing' with no disbursementRef on purpose — the CAS
-      // above lets a retried call (client taps "Approve" again) attempt
-      // disburse() again instead of getting stuck. See this method's own
-      // idempotency guard above.
+      // Left in 'releasing' with no ref on purpose — the CAS above lets a
+      // retried call (client taps "Approve" again) attempt
+      // chargeWithSplit again instead of getting stuck.
       throw new BadRequestException(
-        `Disbursement failed, gig left in 'releasing' for retry: ${err instanceof Error ? err.message : err}`,
+        `Charge failed, gig left in 'releasing' for retry: ${err instanceof Error ? err.message : err}`,
       );
     }
 
-    const record = await this.prisma.$transaction(async (tx) => {
+    const record = await this.prisma.escrowRecord.update({
+      where: { gigId },
+      data: {
+        feeKobo: BigInt(feeKobo),
+        professionalPayoutKobo: BigInt(bountyKobo),
+        // Reuses the pre-pivot holdingAccountRef/holdingAccountDetails
+        // columns for the release charge's ref/checkout — see
+        // EscrowRecord's schema comment for why this wasn't worth a
+        // migration to rename.
+        holdingAccountRef: charge.chargeRef,
+        holdingAccountDetails: {
+          provider: charge.provider,
+          accountNumber: charge.accountNumber,
+          bankName: charge.bankName,
+          checkoutUrl: charge.checkoutUrl,
+        },
+        stateChangedAt: new Date(),
+      },
+    });
+
+    return this.toView(record);
+  }
+
+  /**
+   * PLAN.md "Split payment pivot" — lazy, not eager: called the first
+   * time a professional's gig actually reaches release, not on every
+   * payout-destination edit (IdentityService.setPayoutDestination doesn't
+   * call this — see its own doc comment). Persists the result so a
+   * professional only ever gets one Paystack subaccount no matter how
+   * many gigs they complete.
+   */
+  private async getOrCreateSubaccount(professionalId: string, destination: PayoutDestination): Promise<string> {
+    const existing = await this.identity.getPaystackSubaccountCode(professionalId);
+    if (existing) return existing;
+
+    const subaccount = await this.payments.createSubaccount(destination);
+    await this.identity.setPaystackSubaccountCode(professionalId, subaccount.subaccountCode);
+    return subaccount.subaccountCode;
+  }
+
+  /**
+   * PLAN.md "Split payment pivot" — the only place a gig actually becomes
+   * "paid." Called by the Paystack webhook once charge.success fires for
+   * a releaseToProfessional-initiated charge, or by an admin action
+   * during the manual pilot (mirrors how confirmFunding used to work
+   * pre-pivot — see PaystackWebhookController / EscrowController's
+   * confirm-release route). gig.status (read BEFORE the transaction,
+   * same pattern as every other method here) decides which transition
+   * path applies: 'submitted' is the normal happy path (submitted ->
+   * signed_off -> released, same two-hop pre-pivot releaseToProfessional
+   * always did in one call); 'disputed' is the ruled-for-professional
+   * path ('disputed' -> 'released' is a direct hop in ALLOWED_TRANSITIONS,
+   * no signed_off step).
+   */
+  async confirmRelease(gigId: string, providerRef: string): Promise<EscrowRecordView> {
+    const gig = await this.gigs.getGig(gigId);
+    let alreadyReleased = false;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const record = await tx.escrowRecord.findUnique({ where: { gigId } });
+      if (!record) throw new NotFoundException('No escrow record for this gig');
+
+      if (record.state === 'released') {
+        alreadyReleased = true;
+        return record;
+      }
+      if (record.state !== 'releasing') {
+        throw new BadRequestException(`Cannot confirm release from escrow state "${record.state}"`);
+      }
+
       const updated = await tx.escrowRecord.update({
         where: { gigId },
-        data: {
-          state: 'released',
-          feeKobo: BigInt(feeKobo),
-          professionalPayoutKobo: BigInt(professionalPayoutKobo),
-          disbursementRef,
-          stateChangedAt: new Date(),
-        },
+        data: { state: 'released', stateChangedAt: new Date() },
       });
 
-      await this.gigs.transitionStatus(gigId, 'signed_off', tx);
-      await this.gigs.transitionStatus(gigId, 'released', tx);
+      if (gig.status === 'submitted') {
+        await this.gigs.transitionStatus(gigId, 'signed_off', tx);
+        await this.gigs.transitionStatus(gigId, 'released', tx);
+      } else if (gig.status === 'disputed') {
+        await this.gigs.transitionStatus(gigId, 'released', tx);
+      } else {
+        throw new BadRequestException(`Cannot confirm release for a gig in status "${gig.status}"`);
+      }
+
+      // Single charge, but recorded as three ledger entries (in from the
+      // client, out to the professional, out as Sorted's fee) — accurate
+      // double-entry bookkeeping for what actually happened, unlike
+      // pre-pivot's 'fund' entry recorded separately at a now-nonexistent
+      // funding step.
+      const professionalPayoutKobo = kobo(Number(record.professionalPayoutKobo ?? 0));
+      const feeKobo = kobo(Number(record.feeKobo ?? 0));
+      const totalChargeKobo = addKobo(professionalPayoutKobo, feeKobo);
 
       await this.ledger.record(
-        {
-          gigId,
-          type: 'release',
-          amountKobo: professionalPayoutKobo,
-          direction: 'out',
-          providerRef: disbursementRef,
-          eventId: `release:${gigId}`,
-        },
+        { gigId, type: 'fund', amountKobo: totalChargeKobo, direction: 'in', providerRef, eventId: `fund:${gigId}` },
         tx,
       );
       await this.ledger.record(
-        {
-          gigId,
-          type: 'fee',
-          amountKobo: feeKobo,
-          direction: 'out',
-          providerRef: disbursementRef,
-          eventId: `fee:${gigId}`,
-        },
+        { gigId, type: 'release', amountKobo: professionalPayoutKobo, direction: 'out', providerRef, eventId: `release:${gigId}` },
+        tx,
+      );
+      await this.ledger.record(
+        { gigId, type: 'fee', amountKobo: feeKobo, direction: 'out', providerRef, eventId: `fee:${gigId}` },
         tx,
       );
 
       return updated;
     });
 
-    // Best-effort, outside the transaction — same reasoning as the WhatsApp
-    // hooks elsewhere in this file (PLAN.md "Simple professional ratings"):
-    // a prompt failing to send must never fail a real payout that already
-    // happened. Only reached once per real release (the CAS above already
-    // guards the idempotent-retry paths from getting here twice).
-    await this.promptForRating(gigId, claim.professionalId, gig.clientId).catch((err) => {
-      this.logger.warn(`Rating prompt failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
-    });
-    await this.notifyProfessionalOfCompletion(gigId, claim.professionalId).catch((err) => {
-      this.logger.warn(`Completion notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
-    });
+    if (!alreadyReleased) {
+      const claim = await this.prisma.claim.findFirst({ where: { gigId, status: 'active' } });
+      if (claim) {
+        // Best-effort, outside the transaction — same reasoning as every
+        // other notification hook in this file: a prompt/notification
+        // failing must never fail a real payout that already happened.
+        await this.promptForRating(gigId, claim.professionalId, gig.clientId).catch((err) => {
+          this.logger.warn(`Rating prompt failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+        });
+        await this.notifyProfessionalOfCompletion(gigId, claim.professionalId).catch((err) => {
+          this.logger.warn(`Completion notification failed for gig ${gigId}: ${err instanceof Error ? err.message : err}`);
+        });
+      }
+    }
 
-    return this.toView(record);
+    return this.toView(result);
   }
 
   private async promptForRating(gigId: string, professionalId: string, clientId: string): Promise<void> {
@@ -486,9 +330,9 @@ export class EscrowService implements EscrowPort {
 
   /**
    * PLAN.md "Congrats on your first gig" — fires once per real release
-   * (guarded by the same CAS as the payout above). "First gig" is counted
-   * from released gigs, not a stored flag, so it stays correct even if a
-   * professional's history predates this feature.
+   * (guarded by confirmRelease's own idempotency check above). "First
+   * gig" is counted from released gigs, not a stored flag, so it stays
+   * correct even if a professional's history predates this feature.
    */
   private async notifyProfessionalOfCompletion(gigId: string, professionalId: string): Promise<void> {
     const professional = await this.identity.getUser(professionalId);
@@ -507,71 +351,6 @@ export class EscrowService implements EscrowPort {
     );
   }
 
-  async refundClient(gigId: string): Promise<EscrowRecordView> {
-    const gig = await this.gigs.getGig(gigId);
-    const existing = await this.prisma.escrowRecord.findUnique({ where: { gigId } });
-    if (!existing) throw new NotFoundException('No escrow record for this gig');
-
-    if (existing.state === 'refunded') return this.toView(existing); // idempotent
-
-    if (!['escrow_pending', 'disputed'].includes(gig.status)) {
-      throw new BadRequestException(`Cannot refund a gig in status "${gig.status}"`);
-    }
-    if (!['funded', 'stake_held', 'dispute_hold'].includes(existing.state)) {
-      throw new BadRequestException(`Cannot refund from escrow state "${existing.state}"`);
-    }
-
-    // disbursementRef doubles as the CAS lock for both release AND refund
-    // — a gig only ever settles once, in one direction or the other, so
-    // "already has a ref" means "don't do this again" either way. Written
-    // as a placeholder here (not the real ref yet) since refund() is an
-    // external call that can't be rolled back by a DB transaction; reset
-    // to null on failure below so a retry isn't permanently locked out.
-    const claimed = await this.prisma.escrowRecord.updateMany({
-      where: { gigId, disbursementRef: null },
-      data: { disbursementRef: 'pending' },
-    });
-    if (claimed.count === 0) {
-      const current = await this.prisma.escrowRecord.findUniqueOrThrow({ where: { gigId } });
-      return this.toView(current);
-    }
-
-    let refundRef: string;
-    try {
-      const result = await this.payments.refund(existing.holdingAccountRef ?? gigId);
-      refundRef = result.refundRef;
-    } catch (err) {
-      await this.prisma.escrowRecord.update({ where: { gigId }, data: { disbursementRef: null } });
-      throw new BadRequestException(`Refund failed: ${err instanceof Error ? err.message : err}`);
-    }
-
-    // Surcharge model: refund the FULL amount actually charged (bounty +
-    // fee) — a gig that never completed earns Sorted no commission either.
-    const refundKobo = kobo(Number(existing.bountyKobo) + Number(existing.feeKobo ?? 0));
-
-    const record = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.escrowRecord.update({
-        where: { gigId },
-        data: { state: 'refunded', disbursementRef: refundRef, stateChangedAt: new Date() },
-      });
-      await this.gigs.transitionStatus(gigId, 'refunded', tx);
-      await this.ledger.record(
-        {
-          gigId,
-          type: 'refund',
-          amountKobo: refundKobo,
-          direction: 'out',
-          providerRef: refundRef,
-          eventId: `refund:${gigId}`,
-        },
-        tx,
-      );
-      return updated;
-    });
-
-    return this.toView(record);
-  }
-
   async freezeForDispute(gigId: string, tx?: PrismaTx): Promise<EscrowRecordView> {
     const client = tx ?? this.prisma;
     const existing = await client.escrowRecord.findUnique({ where: { gigId } });
@@ -587,6 +366,30 @@ export class EscrowService implements EscrowPort {
     return this.toView(record);
   }
 
+  /**
+   * PLAN.md "Split payment pivot" — every dispute under this model is
+   * pre-payment (raiseDispute only allows claimed/in_progress/submitted,
+   * all before releaseToProfessional has ever run), so there is never
+   * money sitting anywhere to move either direction:
+   *
+   * for_client: no charge was ever attempted, so there's nothing to
+   * refund — this just closes the gig unpaid. Reuses the 'refunded'
+   * status/state (not literally accurate — nothing was refunded — but
+   * "closed, professional doesn't get paid" is the same real-world
+   * outcome, and adding a new GigStatus/EscrowState value for this is a
+   * bigger schema change than the semantic stretch is worth).
+   *
+   * for_professional: re-attempts the SAME charge+split
+   * releaseToProfessional would have done, just entered from
+   * dispute_hold. This is a REAL LIMIT, not a bug: it can prompt the
+   * client to pay, it CANNOT force a charge on an uncooperative one —
+   * Nigerian payment rails are mostly bank transfer/USSD, not saved
+   * cards, so there's no "already authorized, just capture it" fallback.
+   * Enforcement in the professional's favor is reputational (rating,
+   * restricted future access) once a client won't cooperate, not
+   * financial. Documented, not hidden — see escrow.interface.ts's top
+   * comment.
+   */
   async resolveFrozen(
     gigId: string,
     ruling: 'for_professional' | 'for_client' | 'split',
@@ -599,99 +402,29 @@ export class EscrowService implements EscrowPort {
     }
 
     if (ruling === 'split') {
-      // Genuinely undesigned, not an oversight: how fee applies to a
-      // partial payout/refund is its own product decision (does Sorted
-      // still take 10% of the professional's half? Of the whole bounty?).
-      // Deferred rather than guessed — see PLAN.md "Release + sign-off
-      // flow". 'for_professional' / 'for_client' cover the common cases.
+      // Genuinely undesigned, not an oversight — same as pre-pivot: how a
+      // partial ruling should even work when nothing has been charged
+      // yet is its own product decision, not guessed at here.
       throw new NotImplementedException(
-        "EscrowService.resolveFrozen('split') — fee treatment on a partial payout/refund isn't designed yet. Use 'for_professional' or 'for_client'.",
+        "EscrowService.resolveFrozen('split') — not designed yet. Use 'for_professional' or 'for_client'.",
       );
     }
 
     if (ruling === 'for_client') {
-      return this.refundClient(gigId);
-    }
-
-    // for_professional: same disbursement mechanics as releaseToProfessional,
-    // just entered from dispute_hold instead of submitted — 'disputed' ->
-    // 'released' is a direct hop in ALLOWED_TRANSITIONS (no signed_off step).
-    const gig = await this.gigs.getGig(gigId);
-    const claim = await this.prisma.claim.findFirst({ where: { gigId, status: 'active' } });
-    if (!claim) throw new NotFoundException('No active claim for this gig');
-    const destination = await this.identity.getPayoutDestination(claim.professionalId);
-    if (!destination) throw new BadRequestException('Professional has not set a payout destination yet');
-
-    const claimed = await this.prisma.escrowRecord.updateMany({
-      where: { gigId, disbursementRef: null, state: 'dispute_hold' },
-      data: { state: 'releasing', stateChangedAt: new Date() },
-    });
-    if (claimed.count === 0) {
-      const current = await this.prisma.escrowRecord.findUniqueOrThrow({ where: { gigId } });
-      return this.toView(current);
-    }
-
-    // Same surcharge-model reasoning as releaseToProfessional above.
-    const feeKobo = existing.feeKobo != null ? kobo(Number(existing.feeKobo)) : applyBps(gig.bountyKobo, existing.platformFeeBps);
-    const professionalPayoutKobo = gig.bountyKobo;
-
-    let disbursementRef: string;
-    try {
-      const result = await this.payments.disburse(
-        [
-          {
-            destinationRef: JSON.stringify(destination),
-            amountKobo: professionalPayoutKobo,
-            narration: `Sorted gig ${gigId} dispute payout`,
-          },
-        ],
-        `dispute-release:${gigId}`,
-      );
-      disbursementRef = result.disbursementRef;
-    } catch (err) {
-      throw new BadRequestException(
-        `Disbursement failed, gig left in 'releasing' for retry: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-
-    const record = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.escrowRecord.update({
-        where: { gigId },
-        data: {
-          state: 'released',
-          feeKobo: BigInt(feeKobo),
-          professionalPayoutKobo: BigInt(professionalPayoutKobo),
-          disbursementRef,
-          stateChangedAt: new Date(),
-        },
+      const record = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.escrowRecord.update({
+          where: { gigId },
+          data: { state: 'refunded', stateChangedAt: new Date() },
+        });
+        await this.gigs.transitionStatus(gigId, 'refunded', tx);
+        return updated;
       });
-      await this.gigs.transitionStatus(gigId, 'released', tx);
-      await this.ledger.record(
-        {
-          gigId,
-          type: 'release',
-          amountKobo: professionalPayoutKobo,
-          direction: 'out',
-          providerRef: disbursementRef,
-          eventId: `dispute-release:${gigId}`,
-        },
-        tx,
-      );
-      await this.ledger.record(
-        {
-          gigId,
-          type: 'fee',
-          amountKobo: feeKobo,
-          direction: 'out',
-          providerRef: disbursementRef,
-          eventId: `dispute-fee:${gigId}`,
-        },
-        tx,
-      );
-      return updated;
-    });
+      return this.toView(record);
+    }
 
-    return this.toView(record);
+    // for_professional — see this method's own doc comment for why this
+    // is a best-effort prompt, not a guarantee.
+    return this.initiateRelease(gigId);
   }
 
   private toView(record: EscrowRecord): EscrowRecordView {
@@ -699,6 +432,7 @@ export class EscrowService implements EscrowPort {
     // Pre-surcharge records (feeKobo null) fall back to computing it from
     // platformFeeBps so old escrow rows still render sane totals.
     const feeKobo = record.feeKobo != null ? kobo(Number(record.feeKobo)) : applyBps(bountyKobo, record.platformFeeBps);
+    const details = record.holdingAccountDetails as { provider: string; accountNumber?: string; bankName?: string; checkoutUrl?: string } | null;
     return {
       gigId: record.gigId,
       state: record.state as EscrowState,
@@ -707,7 +441,7 @@ export class EscrowService implements EscrowPort {
       platformFeeBps: record.platformFeeBps,
       feeKobo,
       totalChargeKobo: addKobo(bountyKobo, feeKobo),
-      holdingAccount: record.holdingAccountDetails as EscrowRecordView['holdingAccount'],
+      releaseCheckout: details ?? undefined,
     };
   }
 }

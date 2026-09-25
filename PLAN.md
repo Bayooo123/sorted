@@ -2363,6 +2363,82 @@ pretending a technical safety net exists where it doesn't.
 
 ---
 
+## Split payment pivot — EscrowService wired up (phase 2 of N)
+
+**No new migration** — every schema change this phase reuses existing
+enum values/columns with new meaning (see the comments added to
+`EscrowState`, `GigStatus`, and `EscrowRecord.holdingAccountRef/Details`
+in schema.prisma) rather than adding new ones. Verified with a real
+`npx tsc --noEmit` + `nest build` + a live Nest bootstrap (DI graph
+resolves cleanly, full route table confirmed) — not just read-through.
+
+**New gig lifecycle:** `publishGig` now goes `draft -> open` directly —
+no funding gate before a gig is claimable. `escrow_pending` is dead
+(unreachable, left in the enum). Nothing is charged until a professional
+submits work and the client approves it — that's the new payment moment.
+
+**`EscrowService`, what changed:**
+- `fundGig`/`confirmFunding`/`refundClient` deleted — no pre-charge step
+  exists anymore, and there's nothing left to refund from (see disputes
+  below).
+- `holdStake` (claim) now creates the `EscrowRecord` itself — no money
+  moves, same as before, just earlier in the lifecycle since there's no
+  funding step to have created it first.
+- `releaseToProfessional` is now THE payment moment: initiates
+  `PaymentsProvider.chargeWithSplit` (lazily creating the professional's
+  Paystack subaccount via a new `getOrCreateSubaccount` helper, backed by
+  two new `IdentityService` methods —
+  `get/setPaystackSubaccountCode`) and returns a `releaseCheckout`
+  (checkout URL / account details) for the client to actually pay with —
+  it does NOT mark the gig released; that only happens once the charge is
+  confirmed.
+- New `confirmRelease(gigId, providerRef)` — the only place a gig
+  actually becomes "paid." Called by the Paystack webhook
+  (`charge.success` now routes here instead of the deleted
+  `confirmFunding`) or by a new admin-gated `POST /gigs/:id/confirm-release`
+  route for the manual pilot. Records three ledger entries (fund in,
+  release out, fee out) in one transaction — the charge and the payout
+  happen together now, so the bookkeeping does too.
+- `resolveFrozen`: every dispute is pre-payment under this model
+  (`raiseDispute` only allows claimed/in_progress/submitted, all before
+  `releaseToProfessional` has ever run), so there's never money sitting
+  anywhere to move. `for_client` just closes the gig unpaid (reuses the
+  `refunded` state/status — nothing was actually refunded, but it's the
+  same real-world outcome and didn't justify a new enum value).
+  `for_professional` re-attempts the same charge+split
+  `releaseToProfessional` would have done. **This is a real, documented
+  limit, not a bug: it can prompt the client to pay, it cannot force a
+  charge on an uncooperative one** — see escrow.interface.ts's top
+  comment for the full trade-off already confirmed with the founder.
+
+**Moved, not just renamed:** `notifyGigIsOpen`/`sendInvite`/
+`broadcastOpenGig`/`sendJobMessage` moved from `EscrowService` to
+`GigsService` (`GigsModule` now imports `WhatsappModule` — a leaf module,
+so no cycle). "A gig became open" is a publish-time event now, not a
+funding-time one, and `GigsModule` importing `EscrowModule` to keep this
+logic in Escrow instead would have created a real cycle (`EscrowModule`
+already imports `GigsModule`). The one external caller
+(`WhatsappGigConversationService`'s reassignment flow) now calls
+`gigs.sendInvite` instead of `escrow.sendInvite`.
+
+**Still not done (unchanged from phase 1's list, now more urgent):**
+- Mobile/web: `FundEscrowScreen.tsx` calls a route (`/gigs/:id/fund`)
+  that no longer exists — the app WILL break on that screen until it's
+  updated to redirect to `releaseCheckout` at the sign-off step instead.
+  Not touched this phase — backend-only, as asked.
+- Copy: welcome email, landing page, and any other "money sits safely in
+  escrow" language still needs rewriting.
+- Backfill: existing professionals' subaccounts are created lazily
+  (first release attempt), not retroactively — fine for a pilot with few
+  transactions, worth a real backfill script before real volume.
+- `PaystackProvider.createSubaccount`/`chargeWithSplit` are still
+  unverified against a live Paystack call — this phase only proves the
+  code compiles and the DI graph resolves, not that the actual Paystack
+  API calls are shaped correctly. Test against Paystack's sandbox before
+  flipping `PAYMENTS_PROVIDER_KEY` to `paystack` for real.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

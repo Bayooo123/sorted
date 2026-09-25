@@ -217,6 +217,9 @@ export interface IdentityPort {
   getUser(userId: string): Promise<IdentityUser>;
   verifyIdentity(userId: string, input: unknown): Promise<KycStatus>;
   getPayoutDestination(userId: string): Promise<PayoutDestination | null>;
+  /** PLAN.md "Split payment pivot" — null until EscrowService.getOrCreateSubaccount has run for this professional at least once. */
+  getPaystackSubaccountCode(userId: string): Promise<string | null>;
+  setPaystackSubaccountCode(userId: string, subaccountCode: string): Promise<void>;
   assertRole(userId: string, role: Role): Promise<void>;
   /**
    * Accepts local (0-prefixed) or E.164 form, same normalization as
