@@ -2354,7 +2354,6 @@
     }
 
     function signOut() {
-      stopAllFundingPolls();
       state.accessToken = null;
       shellState.user = null;
       try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
@@ -2363,7 +2362,6 @@
     shellSignout.addEventListener('click', signOut);
 
     function showShellTab(name) {
-      if (name !== 'mine') stopAllFundingPolls();
       Array.prototype.forEach.call(shellTabs.children, function (tab) {
         tab.classList.toggle('auth-tab-active', tab.getAttribute('data-tab') === name);
       });
@@ -2407,120 +2405,15 @@
       return card;
     }
 
-    // ---- funding (manual-pilot escrow — same flow as mobile's FundEscrowScreen) ----
-    var activeFundingPolls = [];
-    function stopAllFundingPolls() {
-      activeFundingPolls.forEach(function (h) { clearInterval(h); });
-      activeFundingPolls = [];
-    }
-
-    function fundingCard(gig) {
-      var card = gigCard(gig, null);
-      var body = document.createElement('div');
-      body.className = 'funding-body';
-      card.appendChild(body);
-
-      function renderRequest() {
-        body.innerHTML = '';
-        var note = document.createElement('p');
-        note.className = 'gig-card-note';
-        note.style.marginTop = '0';
-        note.style.paddingTop = '0';
-        note.style.borderTop = 'none';
-        note.textContent = 'Get your funding details to send the bounty into escrow.';
-        body.appendChild(note);
-        var err = document.createElement('p');
-        err.className = 'modal-error';
-        body.appendChild(err);
-        var btn = document.createElement('button');
-        btn.className = 'btn btn-block';
-        btn.type = 'button';
-        btn.textContent = 'Get transfer details';
-        btn.addEventListener('click', function () {
-          btn.disabled = true;
-          btn.textContent = 'Loading…';
-          api('/gigs/' + gig.id + '/fund', { method: 'POST', auth: true })
-            .then(renderInstructions)
-            .catch(function (e) {
-              err.textContent = e.message;
-              btn.disabled = false;
-              btn.textContent = 'Get transfer details';
-            });
-        });
-        body.appendChild(btn);
-      }
-
-      function renderInstructions(result) {
-        body.innerHTML = '';
-        var feeKobo = result.feeKobo != null ? result.feeKobo : Math.round((result.bountyKobo * result.platformFeeBps) / 10000);
-        var totalChargeKobo = result.totalChargeKobo != null ? result.totalChargeKobo : result.bountyKobo + feeKobo;
-        var holding = result.holdingAccount || {};
-        var payHtml = holding.checkoutUrl
-          ? '<button type="button" class="btn btn-block funding-pay-btn">Pay now with Paystack</button>' +
-            '<p class="gig-card-note" style="margin-top:8px;padding-top:8px;">Card, bank transfer, or USSD — funding confirms automatically once payment lands.</p>'
-          : '<div class="funding-transfer">' +
-              '<p class="funding-transfer-label">Transfer to</p>' +
-              '<p class="funding-transfer-account"></p>' +
-              '<p class="funding-transfer-bank"></p>' +
-            '</div>' +
-            '<p class="gig-card-note" style="margin-top:8px;padding-top:8px;">Sorted is running a manual funding pilot — there is no automated payment rail on this account yet. Send the transfer, and funding is confirmed by hand once it is seen.</p>';
-        var box = document.createElement('div');
-        box.innerHTML =
-          '<p class="funding-row"><span>Bounty (professional gets all of this)</span><span class="v-bounty"></span></p>' +
-          '<p class="funding-row funding-row-muted"><span>Platform fee (added on top)</span><span class="v-fee"></span></p>' +
-          '<p class="funding-row funding-row-bold"><span>Send exactly</span><span class="v-total"></span></p>' +
-          payHtml +
-          '<span class="status-pill" data-tone="neutral"></span>' +
-          '<p class="gig-card-note funding-status-note" style="margin-top:8px;padding-top:8px;"></p>';
-        box.querySelector('.v-bounty').textContent = formatNaira(result.bountyKobo);
-        box.querySelector('.v-fee').textContent = formatNaira(feeKobo);
-        box.querySelector('.v-total').textContent = formatNaira(totalChargeKobo);
-        if (holding.checkoutUrl) {
-          box.querySelector('.funding-pay-btn').addEventListener('click', function () {
-            window.open(holding.checkoutUrl, '_blank', 'noopener');
-          });
-        } else {
-          box.querySelector('.funding-transfer-account').textContent = holding.accountNumber || '';
-          box.querySelector('.funding-transfer-bank').textContent = holding.bankName || '';
-        }
-        body.appendChild(box);
-
-        var statusPill = box.querySelector('.status-pill');
-        var noteEl = box.querySelector('.funding-status-note');
-
-        function applyState(escrow) {
-          var confirmed = escrow.state !== 'awaiting_funding';
-          statusPill.textContent = confirmed ? 'Funding confirmed' : 'Waiting for confirmation';
-          statusPill.setAttribute('data-tone', confirmed ? 'active' : 'neutral');
-          noteEl.textContent = confirmed
-            ? 'Funding confirmed — this gig is now open to professionals.'
-            : 'Once you’ve sent the transfer, this updates automatically after the transfer is confirmed — usually within a few hours.';
-          if (confirmed) {
-            setTimeout(loadMineList, 1200);
-          }
-        }
-
-        applyState(result);
-        var handle = setInterval(function () {
-          api('/gigs/' + gig.id + '/escrow', { auth: true })
-            .then(function (escrow) {
-              applyState(escrow);
-              if (escrow.state !== 'awaiting_funding') {
-                clearInterval(handle);
-                activeFundingPolls = activeFundingPolls.filter(function (h) { return h !== handle; });
-              }
-            })
-            .catch(function () {});
-        }, 4000);
-        activeFundingPolls.push(handle);
-      }
-
-      renderRequest();
-      return card;
-    }
+    // PLAN.md "Split payment pivot" — the funding card that used to live
+    // here (fundingCard/renderRequest/renderInstructions, wired to the
+    // now-deleted POST /gigs/:id/fund) is gone: publishing a gig goes
+    // straight to 'open' now, no funding step in between. Payment moves
+    // to the submitted -> released step instead (POST /gigs/:id/release),
+    // which — like sign-off itself — isn't built on the web client yet,
+    // only on mobile (ReviewSignOffScreen). See loadMineList's note below.
 
     function loadMineList() {
-      stopAllFundingPolls();
       var container = document.getElementById('shell-mine-list');
       container.innerHTML = '<p class="shell-empty">Loading…</p>';
       api('/gigs/mine', { auth: true })
@@ -2531,13 +2424,10 @@
             return;
           }
           gigs.forEach(function (gig) {
-            if (gig.status === 'escrow_pending') {
-              container.appendChild(fundingCard(gig));
-              return;
-            }
-            // Sign-off isn't built on the web yet (only on the mobile
-            // app) — say so plainly rather than showing a dead button.
-            var note = gig.status === 'submitted' ? 'Review and sign off from the Sorted mobile app.' : null;
+            // Sign-off (and now payment — PLAN.md "Split payment pivot")
+            // isn't built on the web yet, only on the mobile app — say so
+            // plainly rather than showing a dead button.
+            var note = gig.status === 'submitted' ? 'Review, sign off, and pay from the Sorted mobile app.' : null;
             container.appendChild(gigCard(gig, note));
           });
         })
@@ -2995,7 +2885,7 @@
       el.hidden = false;
       el.innerHTML =
         '<p style="background:var(--green-mint-bg);border:1px solid var(--green-bright);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-body);margin-bottom:16px;">' +
-        'Inviting <strong>' + escapeHtml(shellState.hireProfessionalName || 'this professional') + '</strong> directly — only they can claim this gig once it is funded. ' +
+        'Inviting <strong>' + escapeHtml(shellState.hireProfessionalName || 'this professional') + '</strong> directly — only they can claim this gig once it is published. ' +
         '<a href="#" id="post-hire-clear" style="color:var(--green-deep);">Remove</a></p>';
       document.getElementById('post-hire-clear').addEventListener('click', function (e) {
         e.preventDefault();

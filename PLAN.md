@@ -2479,6 +2479,45 @@ live Paystack verification — unchanged from phase 2's list.
 
 ---
 
+## Split payment pivot — web client (phase 4 of N)
+
+Turned out simpler than mobile: `index.html` (the single-file app shell
+embedded in the marketing page) never had a sign-off/payment screen at
+all — `loadMineList` already said "Review and sign off from the Sorted
+mobile app" for a `submitted` gig, so there was no payment UI to move
+anywhere, only the pre-pivot funding UI to delete.
+
+Removed `fundingCard`/`renderRequest`/`renderInstructions`/
+`activeFundingPolls`/`stopAllFundingPolls` outright (~110 lines) — wired
+to the now-deleted `POST /gigs/:id/fund`, polling a `state` value
+(`awaiting_funding`) nothing transitions into anymore. `loadMineList`'s
+`escrow_pending` branch is gone with it; its note for a `submitted` gig
+now says "...sign off, and pay from the Sorted mobile app" since payment
+happens at that same mobile-only step now. Publishing already just
+navigated back to the `mine` tab with no funding-screen detour — nothing
+to change there. Fixed the same "once it is funded" → "once it is
+published" invite-banner copy as mobile's `PostGigScreen`.
+
+**Verified for real, not just typechecked** — `node --check` on the
+extracted inline script, then rendered the app shell's `mine` tab in
+headless Chromium (Playwright) with mocked `/me` and `/gigs/mine`
+responses including a `submitted` gig, screenshotted it, and confirmed
+zero console/page errors and the new copy displaying correctly.
+
+**Found, not fixed (confirms and sharpens the existing "Copy" item):**
+scrolling the same page past the app shell, the marketing copy is far
+more specific than "money sits safely in escrow" — there's a whole
+"Fund it in escrow" step description, a "Sign off, get paid" section
+mentioning the professional's stake being returned, an "Escrow-protected"
+feature callout, AND a worked numeric example ("Client funds ₦120,000 /
+Professional stake (held, refundable) ₦12,000 / Sorted fee ₦12,000 /
+Professional earns ₦108,000 / Stake returned separately") that describes
+the exact pre-pivot mechanics in detail. This is a real content rewrite,
+not a find-and-replace — flagging the actual size of it now that it's
+been seen directly, not deferring it as a vague "copy" line item anymore.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
