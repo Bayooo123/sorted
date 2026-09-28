@@ -37,14 +37,28 @@
     margin: 0 0 6px;
   }
   p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
-  .key-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .key-row input {
     flex: 1;
+    min-width: 140px;
     padding: 12px 14px;
     border-radius: 11px;
     border: 1px solid var(--border);
     background: var(--surface);
     font-size: 14px;
+  }
+  .change-password-link { font-size: 12.5px; color: var(--green-deep); font-weight: 600; cursor: pointer; margin: -8px 0 20px; }
+  .change-password-link:not([hidden]) { display: inline-block; }
+  .change-password-row { gap: 8px; margin: -8px 0 20px; flex-wrap: wrap; }
+  .change-password-row:not([hidden]) { display: flex; }
+  .change-password-row input {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 13px;
   }
   button {
     padding: 12px 18px;
@@ -159,14 +173,21 @@
 <body>
 <div class="wrap">
   <h1>Sorted — Dashboard</h1>
-  <p class="sub">Accounts, orders, WhatsApp activity, and site traffic, all in one place. Not linked from the main app; the admin key is never stored, you re-enter it each visit.</p>
+  <p class="sub">Accounts, orders, WhatsApp activity, and site traffic, all in one place. Not linked from the main app; your session is never stored, you log in again each visit.</p>
 
   <div class="key-row">
-    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
-    <button id="load-btn" type="button">Load dashboard</button>
+    <input type="text" id="admin-username" placeholder="Username" autocomplete="username" />
+    <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" />
+    <button id="load-btn" type="button">Log in</button>
   </div>
   <p id="status"></p>
   <p id="generated-at"></p>
+  <p class="change-password-link" id="change-password-toggle" hidden>Change password</p>
+  <div class="change-password-row" id="change-password-row" hidden>
+    <input type="password" id="current-password" placeholder="Current password" autocomplete="current-password" />
+    <input type="password" id="new-password" placeholder="New password (min 12 characters)" autocomplete="new-password" />
+    <button id="change-password-btn" type="button">Update password</button>
+  </div>
 
   <div id="content">
     <section>
@@ -292,15 +313,24 @@
 
 <script>
   var API_BASE_URL = 'https://sorted-api.vercel.app';
-  var keyInput = document.getElementById('admin-key');
+  var usernameInput = document.getElementById('admin-username');
+  var passwordInput = document.getElementById('admin-password');
   var loadBtn = document.getElementById('load-btn');
   var statusEl = document.getElementById('status');
   var generatedAtEl = document.getElementById('generated-at');
   var contentEl = document.getElementById('content');
 
-  function adminApi(path) {
+  // Kept in memory only, never localStorage/sessionStorage — same "never
+  // stored, re-enter each visit" posture the old shared admin key had.
+  // See PLAN.md "Admin username/password login".
+  var accessToken = null;
+
+  function rawApi(path, opts) {
+    opts = opts || {};
     return fetch(API_BASE_URL + path, {
-      headers: { 'x-admin-key': keyInput.value },
+      method: opts.method || 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (res) {
       return res.text().then(function (text) {
         var data = text ? JSON.parse(text) : undefined;
@@ -312,6 +342,75 @@
       });
     });
   }
+
+  function adminApi(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json' };
+    if (accessToken) headers.Authorization = 'Bearer ' + accessToken;
+    return fetch(API_BASE_URL + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? JSON.parse(text) : undefined;
+        if (!res.ok) {
+          var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+          throw new Error(Array.isArray(message) ? message.join(', ') : message);
+        }
+        return data;
+      });
+    });
+  }
+
+  function ensureLoggedIn() {
+    if (accessToken) return Promise.resolve();
+    if (!usernameInput.value || !passwordInput.value) {
+      return Promise.reject(new Error('Enter your username and password.'));
+    }
+    return rawApi('/admin/login', { method: 'POST', body: { username: usernameInput.value, password: passwordInput.value } }).then(function (data) {
+      accessToken = data.accessToken;
+      passwordInput.value = '';
+      document.getElementById('change-password-toggle').hidden = false;
+    });
+  }
+
+  // ---------- change password ----------
+  var changePasswordToggle = document.getElementById('change-password-toggle');
+  var changePasswordRow = document.getElementById('change-password-row');
+  var currentPasswordInput = document.getElementById('current-password');
+  var newPasswordInput = document.getElementById('new-password');
+  var changePasswordBtn = document.getElementById('change-password-btn');
+
+  changePasswordToggle.addEventListener('click', function () {
+    changePasswordRow.hidden = !changePasswordRow.hidden;
+  });
+
+  changePasswordBtn.addEventListener('click', function () {
+    statusEl.textContent = '';
+    changePasswordBtn.disabled = true;
+    changePasswordBtn.textContent = 'Updating…';
+    adminApi('/admin/password', {
+      method: 'PATCH',
+      body: { currentPassword: currentPasswordInput.value, newPassword: newPasswordInput.value },
+    })
+      .then(function () {
+        currentPasswordInput.value = '';
+        newPasswordInput.value = '';
+        changePasswordRow.hidden = true;
+        statusEl.textContent = '';
+        statusEl.style.color = 'var(--green-deep)';
+        statusEl.textContent = 'Password updated.';
+      })
+      .catch(function (err) {
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = err.message;
+      })
+      .finally(function () {
+        changePasswordBtn.disabled = false;
+        changePasswordBtn.textContent = 'Update password';
+      });
+  });
 
   // ---------- number formatting ----------
   function compactNumber(n) {
@@ -700,15 +799,15 @@
   }
 
   function load() {
-    if (!keyInput.value) {
-      statusEl.textContent = 'Enter the admin key first.';
-      return;
-    }
+    statusEl.style.color = 'var(--error)';
     statusEl.textContent = '';
     loadBtn.disabled = true;
-    loadBtn.textContent = 'Loading…';
+    loadBtn.textContent = accessToken ? 'Loading…' : 'Logging in…';
 
-    Promise.all([adminApi('/admin/analytics/overview'), adminApi('/admin/users')])
+    ensureLoggedIn()
+      .then(function () {
+        return Promise.all([adminApi('/admin/analytics/overview'), adminApi('/admin/users')]);
+      })
       .then(function (results) {
         render(results[0]);
         allUsers = results[1];
@@ -720,13 +819,15 @@
       })
       .finally(function () {
         loadBtn.disabled = false;
-        loadBtn.textContent = 'Load dashboard';
+        loadBtn.textContent = accessToken ? 'Refresh' : 'Log in';
       });
   }
 
   loadBtn.addEventListener('click', load);
-  keyInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') load();
+  [usernameInput, passwordInput].forEach(function (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') load();
+    });
   });
 </script>
 </body>

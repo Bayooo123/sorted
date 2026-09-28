@@ -716,3 +716,21 @@ model Lead {
 
   @@index([status, createdAt])
 }
+
+// PLAN.md "Admin username/password login" — replaces the shared
+// ADMIN_API_KEY/x-admin-key secret as the primary way into every admin
+// route (KYC review, dispute resolution, escrow confirm-release, and the
+// four admin dashboards). Deliberately its own table, not a flag on User:
+// an admin is an operator of the platform, not a customer account, and
+// mixing the two would put a password hash on a table three other
+// modules already read broadly. Meant to stay at one row (a single
+// founder-operator, same trust model as the rest of this pilot) —
+// AdminAuthService.register enforces that at the application layer by
+// refusing once any row exists, rather than modeling permissions for a
+// table that isn't meant to grow.
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}

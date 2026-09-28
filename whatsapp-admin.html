@@ -35,9 +35,10 @@
     margin: 0 0 6px;
   }
   p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
-  .key-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .key-row input {
     flex: 1;
+    min-width: 140px;
     padding: 12px 14px;
     border-radius: 11px;
     border: 1px solid var(--border);
@@ -101,11 +102,12 @@
 <body>
 <div class="wrap">
   <h1>WhatsApp contacts</h1>
-  <p class="sub">Everyone who has messaged the Sorted WhatsApp bot — registered or not. Not linked from the main app; the admin key is never stored, you re-enter it each visit.</p>
+  <p class="sub">Everyone who has messaged the Sorted WhatsApp bot — registered or not. Not linked from the main app; your session is never stored, you log in again each visit.</p>
 
   <div class="key-row">
-    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
-    <button id="load-btn" type="button">Load contacts</button>
+    <input type="text" id="admin-username" placeholder="Username" autocomplete="username" />
+    <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" />
+    <button id="load-btn" type="button">Log in</button>
   </div>
   <div class="search-row">
     <input type="text" id="search-input" placeholder="Filter by name or phone…" />
@@ -129,7 +131,8 @@
 
 <script>
   var API_BASE_URL = 'https://sorted-api.vercel.app';
-  var keyInput = document.getElementById('admin-key');
+  var usernameInput = document.getElementById('admin-username');
+  var passwordInput = document.getElementById('admin-password');
   var searchInput = document.getElementById('search-input');
   var loadBtn = document.getElementById('load-btn');
   var statusEl = document.getElementById('status');
@@ -139,9 +142,15 @@
   var emptyEl = document.getElementById('empty');
   var allContacts = [];
 
+  // Kept in memory only, never localStorage/sessionStorage — same "never
+  // stored, re-enter each visit" posture the old shared admin key had.
+  // See PLAN.md "Admin username/password login".
+  var accessToken = null;
+
   function adminApi(path, opts) {
     opts = opts || {};
-    var headers = { 'Content-Type': 'application/json', 'x-admin-key': keyInput.value };
+    var headers = { 'Content-Type': 'application/json' };
+    if (accessToken) headers.Authorization = 'Bearer ' + accessToken;
     return fetch(API_BASE_URL + path, {
       method: opts.method || 'GET',
       headers: headers,
@@ -155,6 +164,17 @@
         }
         return data;
       });
+    });
+  }
+
+  function ensureLoggedIn() {
+    if (accessToken) return Promise.resolve();
+    if (!usernameInput.value || !passwordInput.value) {
+      return Promise.reject(new Error('Enter your username and password.'));
+    }
+    return adminApi('/admin/login', { method: 'POST', body: { username: usernameInput.value, password: passwordInput.value } }).then(function (data) {
+      accessToken = data.accessToken;
+      passwordInput.value = '';
     });
   }
 
@@ -239,18 +259,17 @@
   }
 
   function load() {
-    if (!keyInput.value) {
-      statusEl.textContent = 'Enter the admin key first.';
-      return;
-    }
     statusEl.textContent = '';
     loadBtn.disabled = true;
-    loadBtn.textContent = 'Loading…';
+    loadBtn.textContent = accessToken ? 'Loading…' : 'Logging in…';
     tableEl.hidden = true;
     emptyEl.hidden = true;
     countEl.textContent = '';
 
-    adminApi('/admin/whatsapp/contacts')
+    ensureLoggedIn()
+      .then(function () {
+        return adminApi('/admin/whatsapp/contacts');
+      })
       .then(function (contacts) {
         allContacts = contacts;
         renderTable();
@@ -260,13 +279,15 @@
       })
       .finally(function () {
         loadBtn.disabled = false;
-        loadBtn.textContent = 'Load contacts';
+        loadBtn.textContent = accessToken ? 'Refresh' : 'Log in';
       });
   }
 
   loadBtn.addEventListener('click', load);
-  keyInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') load();
+  [usernameInput, passwordInput].forEach(function (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') load();
+    });
   });
   searchInput.addEventListener('input', renderTable);
 </script>

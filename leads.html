@@ -35,9 +35,10 @@
     margin: 0 0 6px;
   }
   p.sub { font-size: 14px; color: var(--text-muted); margin: 0 0 24px; }
-  .key-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .key-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
   .key-row input {
     flex: 1;
+    min-width: 140px;
     padding: 12px 14px;
     border-radius: 11px;
     border: 1px solid var(--border);
@@ -117,11 +118,12 @@
 <body>
 <div class="wrap">
   <h1>Leads</h1>
-  <p class="sub">Captured from WhatsApp — reply to them there to arrange pickup and price, then mark status here. Not linked from the main app; the admin key is never stored, you re-enter it each visit.</p>
+  <p class="sub">Captured from WhatsApp — reply to them there to arrange pickup and price, then mark status here. Not linked from the main app; your session is never stored, you log in again each visit.</p>
 
   <div class="key-row">
-    <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" />
-    <button id="load-btn" type="button">Load leads</button>
+    <input type="text" id="admin-username" placeholder="Username" autocomplete="username" />
+    <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" />
+    <button id="load-btn" type="button">Log in</button>
   </div>
   <div class="filter-row" id="filter-row">
     <button class="filter-chip active" data-status="" type="button">All</button>
@@ -139,7 +141,8 @@
 
 <script>
   var API_BASE_URL = 'https://sorted-api.vercel.app';
-  var keyInput = document.getElementById('admin-key');
+  var usernameInput = document.getElementById('admin-username');
+  var passwordInput = document.getElementById('admin-password');
   var loadBtn = document.getElementById('load-btn');
   var filterRow = document.getElementById('filter-row');
   var statusEl = document.getElementById('status');
@@ -148,9 +151,15 @@
   var emptyEl = document.getElementById('empty');
   var currentFilter = '';
 
+  // Kept in memory only, never localStorage/sessionStorage — same "never
+  // stored, re-enter each visit" posture the old shared admin key had.
+  // See PLAN.md "Admin username/password login".
+  var accessToken = null;
+
   function adminApi(path, opts) {
     opts = opts || {};
-    var headers = { 'Content-Type': 'application/json', 'x-admin-key': keyInput.value };
+    var headers = { 'Content-Type': 'application/json' };
+    if (accessToken) headers.Authorization = 'Bearer ' + accessToken;
     return fetch(API_BASE_URL + path, {
       method: opts.method || 'GET',
       headers: headers,
@@ -164,6 +173,17 @@
         }
         return data;
       });
+    });
+  }
+
+  function ensureLoggedIn() {
+    if (accessToken) return Promise.resolve();
+    if (!usernameInput.value || !passwordInput.value) {
+      return Promise.reject(new Error('Enter your username and password.'));
+    }
+    return adminApi('/admin/login', { method: 'POST', body: { username: usernameInput.value, password: passwordInput.value } }).then(function (data) {
+      accessToken = data.accessToken;
+      passwordInput.value = '';
     });
   }
 
@@ -242,19 +262,18 @@
   }
 
   function load() {
-    if (!keyInput.value) {
-      statusEl.textContent = 'Enter the admin key first.';
-      return;
-    }
     statusEl.textContent = '';
     loadBtn.disabled = true;
-    loadBtn.textContent = 'Loading…';
+    loadBtn.textContent = accessToken ? 'Loading…' : 'Logging in…';
     listEl.innerHTML = '';
     emptyEl.hidden = true;
     countEl.textContent = '';
 
     var query = currentFilter ? '?status=' + encodeURIComponent(currentFilter) : '';
-    adminApi('/admin/leads' + query)
+    ensureLoggedIn()
+      .then(function () {
+        return adminApi('/admin/leads' + query);
+      })
       .then(function (leads) {
         if (leads.length === 0) {
           emptyEl.hidden = false;
@@ -270,13 +289,15 @@
       })
       .finally(function () {
         loadBtn.disabled = false;
-        loadBtn.textContent = 'Load leads';
+        loadBtn.textContent = accessToken ? 'Refresh' : 'Log in';
       });
   }
 
   loadBtn.addEventListener('click', load);
-  keyInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') load();
+  [usernameInput, passwordInput].forEach(function (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') load();
+    });
   });
   filterRow.addEventListener('click', function (e) {
     var chip = e.target.closest('.filter-chip');
@@ -285,7 +306,7 @@
     Array.prototype.forEach.call(filterRow.children, function (c) {
       c.classList.toggle('active', c === chip);
     });
-    if (keyInput.value) load();
+    if (accessToken) load();
   });
 </script>
 </body>

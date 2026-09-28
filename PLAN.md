@@ -2780,6 +2780,103 @@ against mocks, never a real Paystack sandbox.
 
 ---
 
+## Admin username/password login
+
+Every admin route (KYC review, dispute resolution, escrow confirm-release,
+and all four admin dashboards — `dashboard.html`, `leads.html`,
+`kyc-admin.html`, `whatsapp-admin.html`) was gated by one shared secret,
+`ADMIN_API_KEY`, pasted into a `type="password"` input on each page.
+Requested directly: "let's set up the admin account with an actual
+username and password flow."
+
+**Schema:** new `AdminUser { id, username (unique), passwordHash,
+createdAt }` — deliberately its own table, not a flag on `User`: an admin
+operates the platform, they aren't a customer account, and mixing the two
+would put a password hash on a table three other modules already read
+broadly. Meant to stay at one row (single founder-operator, same trust
+model as `manual-pilot.provider.ts`) — enforced at the application layer,
+not the schema.
+
+**Backend (`admin-auth` module, new):**
+- `POST /admin/register` — public, but self-limiting: `AdminAuthService.
+  register` refuses with 409 once any `AdminUser` row exists. Exists
+  purely so the one account can be created over HTTP once this ships —
+  this sandbox can't reach production Postgres directly to seed it, and a
+  permanent open registration endpoint would defeat the point of moving
+  off a shared secret. Password minimum raised to 12 characters (vs. the
+  regular user signup's 8) — this account can review KYC, rule on
+  disputes, and confirm money releases.
+- `POST /admin/login` — bcrypt-checks username/password, issues a JWT
+  carrying `{ sub: adminId, username, kind: 'admin' }`. The `kind` claim
+  is what lets `AdminGuard` tell an admin token apart from a regular
+  user's (`{ sub: userId }`, no `kind`) — same `JWT_SECRET`/`JwtService`,
+  reused rather than standing up a second signing setup.
+- `PATCH /admin/password` — current + new password, `AdminGuard`-gated.
+- **`AdminGuard` rewritten, not replaced** — every controller already
+  wired to it (11 routes across 7 modules) needed zero changes. It now
+  checks, in order: (1) a Bearer token with `kind: 'admin'` — the real
+  login flow, attaches `req.admin` for handlers that need the identity
+  (password change does); (2) the legacy `x-admin-key` shared secret —
+  kept ONLY as a break-glass fallback so a bug in the new JWT path can
+  never fully lock the sole operator out of admin (KYC review and
+  dispute resolution have zero other way in). Doesn't set `req.admin`,
+  so a route needing a real admin identity correctly refuses it. Safe to
+  delete once the login flow has been in use for a while.
+- Module wiring: `AdminGuard` now needs `JwtService`, not just
+  `ConfigService` — three modules that used `AdminGuard` without already
+  importing `AuthModule` (`LeadsModule`, `WhatsappModule`,
+  `AnalyticsModule`) needed it added, caught by the live boot test
+  (`Nest can't resolve dependencies of the AdminGuard`), same
+  verification technique as every other DI change this session.
+
+**Frontend (all four admin HTML pages, identical treatment):** the single
+`type="password"` admin-key input became a username + password pair; the
+page's existing "Load X" button became "Log in" and still does both
+(authenticate, then fetch) in one click, unchanged from the old
+one-field-one-click UX. The access token lives in a plain JS variable,
+never `localStorage`/`sessionStorage` — preserves the pages' existing
+"never stored, re-enter each visit" posture rather than silently
+upgrading it to a persisted session (a deliberate choice, not an
+oversight — flagged here in case lower friction is wanted later). A
+second click (e.g. a filter change) reuses the in-memory token instead of
+re-logging in. `dashboard.html` additionally gets a collapsed "Change
+password" link, since a login you can never change the password on isn't
+a complete flow — the other three pages don't duplicate it (same account
+everywhere).
+
+**A real bug caught by screenshot verification, not just eyeballing the
+source:** the new `.change-password-link`/`.change-password-row` CSS
+rules each unconditionally set `display: inline-block`/`display: flex`.
+An author stylesheet rule beats the browser's own `[hidden] { display:
+none }` UA rule regardless of selector specificity, so both elements
+rendered visible before login despite having the `hidden` attribute.
+Fixed with `:not([hidden])` on the display declaration. Would have
+shipped invisible to a plain code read — only showed up in the actual
+rendered screenshot.
+
+**Verification:** `tsc --noEmit`/`nest build` clean; live boot test
+confirms `/admin/register`, `/admin/login`, `/admin/password` map and
+catches the three missing `AuthModule` imports above via real
+`UnknownDependenciesException` errors (not just passing). Full flow
+driven in headless Chromium against a mocked API on `dashboard.html`:
+wrong password shows the right error, correct login clears the password
+field and reveals the dashboard, a second click reuses the token instead
+of re-authenticating (confirmed via a captured `/admin/login` call count),
+and the change-password form round-trips correctly — screenshots taken
+at each step, which is what caught the CSS bug above.
+
+**Still open:**
+- The one `AdminUser` row still needs creating — `POST /admin/register`
+  hasn't been called against production yet. Do that once this deploys,
+  then the credential exists.
+- No rate-limiting on `/admin/login` — a single-operator, low-QPS internal
+  tool, so not built for v1, but a real gap if this endpoint is ever
+  discoverable/guessable beyond the founder.
+- The legacy `x-admin-key` path is intentionally still live (see
+  `AdminGuard` above) — remove it once the login flow has proven itself.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
