@@ -2229,6 +2229,48 @@ hover), not just eyeballing the source.
 
 ---
 
+## Dashboard "All users" listing — IMPLEMENTED
+
+Follow-up to the analytics dashboard above: `AnalyticsOverview` only ever
+had aggregate counts (total accounts, KYC breakdown by status, etc.) — no
+way to see who any individual user actually is. Requested directly:
+"can we include the name of all users."
+
+**Backend:** new `IdentityService.listAllUsers()` (plain method, not on
+`IdentityPort` — same "admin listing, not something other modules call"
+category as `listPendingKycRequests`) returns every `User` row mapped to a
+new `UserAdminView` (id, name, displayName, email, phone, state, roles,
+accountType, kycStatus, createdAt, lastLoginAt), newest first. Deliberately
+excludes avatarBase64/businessProfile/payout details — this is a scan-and-
+search list, not a per-user detail page. Routed at `GET /admin/users`
+(`IdentityController`, `AdminGuard`-gated, same x-admin-key pattern as
+every other admin route) — kept as its own endpoint rather than folded
+into `/admin/analytics/overview`, since raw per-row data and aggregate
+stats are different concerns with different growth characteristics (the
+overview response shouldn't get bigger as the user base grows).
+
+**`dashboard.html`:** new "All users" section (placed right after
+"Accounts", the section it's the drill-down of) — a sticky-header,
+scrollable table (max-height, so it doesn't dominate the page once there
+are hundreds of rows) with a plain-text search box that filters
+client-side across name/displayName/email/phone as you type. Role and KYC
+status render as small colored badges reusing the existing palette
+(the KYC coloring — mint/verified, amber/pending, red/rejected,
+neutral/unverified — mirrors the badge scheme already established in
+`leads.html`, not a new color decision). Fetched alongside the existing
+overview call (`Promise.all`) on the same "Load dashboard" click — one key
+unlocks everything on the page, same as before this change.
+
+**Verification:** `tsc --noEmit` and `nest build` clean; live boot test
+confirms `GET /admin/users` maps with zero DI errors. Rendered
+`dashboard.html` in headless Chromium against six mocked users spanning
+every role/type/KYC combination — confirmed the table renders correctly
+and the search box narrows results live (screenshots taken of both the
+full table and a filtered result), including the "No matching users."
+empty state.
+
+---
+
 ## WhatsApp intake: capture + human handoff — IMPLEMENTED
 
 The ask: with the flier driving people to the WhatsApp bot as the contact

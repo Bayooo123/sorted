@@ -118,6 +118,42 @@
   .bar-value { flex: 0 0 auto; font-size: 12.5px; color: var(--text-muted); min-width: 34px; text-align: right; }
 
   .two-col-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+
+  .users-search { width: 100%; padding: 10px 14px; border-radius: 11px; border: 1px solid var(--border); background: var(--surface); font-size: 13.5px; margin-bottom: 10px; }
+  .users-count { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+  .users-table-wrap { max-height: 480px; overflow-y: auto; border: 1px solid var(--border); border-radius: 14px; }
+  table.users-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .users-table th {
+    position: sticky; top: 0;
+    background: var(--surface);
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .users-table td { padding: 10px 12px; border-bottom: 1px solid var(--gridline); vertical-align: top; color: var(--text-body); }
+  .users-table tr:last-child td { border-bottom: none; }
+  .users-table .user-name { font-weight: 600; color: var(--text-primary); }
+  .users-table .user-sub { font-size: 11.5px; color: var(--text-muted); }
+  .role-badge {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    margin: 0 4px 2px 0;
+    white-space: nowrap;
+  }
+  .kyc-badge { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+  .kyc-badge.verified { background: var(--green-mint-bg); color: var(--green-deep); }
+  .kyc-badge.pending { background: #FFF3D6; color: #8A6100; }
+  .kyc-badge.rejected { background: #FBE1DF; color: var(--error); }
+  .kyc-badge.unverified { background: var(--bg-app); color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -175,6 +211,29 @@
           <p class="card-sub">All-time</p>
           <div id="chart-kyc"></div>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-title">All users</p>
+      <p class="section-sub">Every account, newest first. Search by name, email, or phone.</p>
+      <input type="text" class="users-search" id="users-search" placeholder="Search name, email, or phone…" />
+      <p class="users-count" id="users-count"></p>
+      <div class="users-table-wrap">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Role</th>
+              <th>Type</th>
+              <th>KYC</th>
+              <th>State</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
       </div>
     </section>
 
@@ -464,6 +523,106 @@
     });
   }
 
+  // ---------- users table ----------
+  var allUsers = [];
+  var usersTbody = document.getElementById('users-tbody');
+  var usersCountEl = document.getElementById('users-count');
+  var usersSearchInput = document.getElementById('users-search');
+
+  var roleLabels = { client: 'Client', professional: 'Professional' };
+  var kycLabels = { verified: 'Verified', pending: 'Pending', rejected: 'Rejected', unverified: 'Unverified' };
+
+  function renderUsersTable(users) {
+    usersTbody.innerHTML = '';
+    usersCountEl.textContent = users.length + (users.length === allUsers.length ? ' total' : ' of ' + allUsers.length);
+
+    if (users.length === 0) {
+      var row = document.createElement('tr');
+      var cell = document.createElement('td');
+      cell.colSpan = 7;
+      cell.className = 'empty-note';
+      cell.textContent = 'No matching users.';
+      row.appendChild(cell);
+      usersTbody.appendChild(row);
+      return;
+    }
+
+    users.forEach(function (u) {
+      var tr = document.createElement('tr');
+
+      var nameTd = document.createElement('td');
+      var nameEl = document.createElement('div');
+      nameEl.className = 'user-name';
+      nameEl.textContent = u.name || u.displayName || '(no name)';
+      nameTd.appendChild(nameEl);
+      if (u.displayName && u.displayName !== u.name) {
+        var subEl = document.createElement('div');
+        subEl.className = 'user-sub';
+        subEl.textContent = u.displayName;
+        nameTd.appendChild(subEl);
+      }
+      tr.appendChild(nameTd);
+
+      var contactTd = document.createElement('td');
+      var emailEl = document.createElement('div');
+      emailEl.textContent = u.email || '—';
+      contactTd.appendChild(emailEl);
+      var phoneEl = document.createElement('div');
+      phoneEl.className = 'user-sub';
+      phoneEl.textContent = u.phone || '—';
+      contactTd.appendChild(phoneEl);
+      tr.appendChild(contactTd);
+
+      var roleTd = document.createElement('td');
+      (u.roles || []).forEach(function (r) {
+        var badge = document.createElement('span');
+        badge.className = 'role-badge';
+        badge.textContent = roleLabels[r] || r;
+        roleTd.appendChild(badge);
+      });
+      if (!u.roles || u.roles.length === 0) roleTd.textContent = '—';
+      tr.appendChild(roleTd);
+
+      var typeTd = document.createElement('td');
+      typeTd.textContent = u.accountType === 'business' ? 'Business' : 'Individual';
+      tr.appendChild(typeTd);
+
+      var kycTd = document.createElement('td');
+      var kycBadge = document.createElement('span');
+      kycBadge.className = 'kyc-badge ' + u.kycStatus;
+      kycBadge.textContent = kycLabels[u.kycStatus] || u.kycStatus;
+      kycTd.appendChild(kycBadge);
+      tr.appendChild(kycTd);
+
+      var stateTd = document.createElement('td');
+      stateTd.textContent = u.state || '—';
+      tr.appendChild(stateTd);
+
+      var joinedTd = document.createElement('td');
+      joinedTd.textContent = new Date(u.createdAt).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
+      tr.appendChild(joinedTd);
+
+      usersTbody.appendChild(tr);
+    });
+  }
+
+  function filterUsers() {
+    var q = usersSearchInput.value.trim().toLowerCase();
+    if (!q) return renderUsersTable(allUsers);
+    renderUsersTable(
+      allUsers.filter(function (u) {
+        return (
+          (u.name && u.name.toLowerCase().indexOf(q) !== -1) ||
+          (u.displayName && u.displayName.toLowerCase().indexOf(q) !== -1) ||
+          (u.email && u.email.toLowerCase().indexOf(q) !== -1) ||
+          (u.phone && u.phone.toLowerCase().indexOf(q) !== -1)
+        );
+      }),
+    );
+  }
+
+  usersSearchInput.addEventListener('input', filterUsers);
+
   // ---------- render ----------
   function render(data) {
     generatedAtEl.textContent = 'Generated ' + new Date(data.generatedAt).toLocaleString();
@@ -549,8 +708,13 @@
     loadBtn.disabled = true;
     loadBtn.textContent = 'Loading…';
 
-    adminApi('/admin/analytics/overview')
-      .then(render)
+    Promise.all([adminApi('/admin/analytics/overview'), adminApi('/admin/users')])
+      .then(function (results) {
+        render(results[0]);
+        allUsers = results[1];
+        usersSearchInput.value = '';
+        renderUsersTable(allUsers);
+      })
       .catch(function (err) {
         statusEl.textContent = err.message;
       })

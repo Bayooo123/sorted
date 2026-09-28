@@ -196,6 +196,27 @@ export interface ReviewKycInput {
 }
 
 /**
+ * Admin-only listing (dashboard.html "All users") — every account, newest
+ * first. Deliberately no avatarBase64/businessProfile/payout details here:
+ * this is a scan-and-search list, not a per-user detail view, and those
+ * fields would bloat a single-page-load response for no benefit the admin
+ * page actually uses.
+ */
+export interface UserAdminView {
+  id: string;
+  name: string | null;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  state: string | null;
+  roles: Role[];
+  accountType: AccountType;
+  kycStatus: KycStatus;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+}
+
+/**
  * PLAN.md "Professional directory" — a client-facing listing of
  * professionals offering a given category, distinct from Gigs' Browse
  * (which lists open jobs, not people). Deliberately thin: no phone/email

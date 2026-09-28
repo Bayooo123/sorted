@@ -103,6 +103,13 @@ export class IdentityController {
     return this.identity.listProfessionalsBySubmarket(query.submarket);
   }
 
+  /** Admin-only (x-admin-key) — dashboard.html "All users". */
+  @UseGuards(AdminGuard)
+  @Get('admin/users')
+  listAllUsers() {
+    return this.identity.listAllUsers();
+  }
+
   /** Admin-only (x-admin-key) — see AdminGuard's doc comment. No web UI in the main app on purpose; reviewed from a separate, unlinked admin page. */
   @UseGuards(AdminGuard)
   @Get('admin/kyc/pending')

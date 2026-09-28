@@ -37,6 +37,7 @@ import {
   SignupInput,
   UpdateAvatarInput,
   UpdateProfileInput,
+  UserAdminView,
 } from './identity.interface';
 
 const BCRYPT_ROUNDS = 12;
@@ -351,6 +352,24 @@ export class IdentityService implements IdentityPort {
       orderBy: { createdAt: 'desc' },
     });
     return request ? toKycRequestView(request) : null;
+  }
+
+  /** Admin-only — dashboard.html "All users". Newest first, matching every other admin listing in this codebase. */
+  async listAllUsers(): Promise<UserAdminView[]> {
+    const users = await this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      displayName: u.displayName,
+      email: u.email,
+      phone: u.phone,
+      state: u.state,
+      roles: u.roleFlags as Role[],
+      accountType: u.accountType as AccountType,
+      kycStatus: u.kycStatus,
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt,
+    }));
   }
 
   /** Admin-only listing — see IdentityController's AdminGuard-gated route. */
