@@ -14,6 +14,18 @@ import { useTheme } from '../theme/ThemeContext';
 const MIN_BOUNTY_NAIRA = 3000; // max(bps×bounty, ₦300) fee floor implies a sane minimum bounty
 
 /**
+ * PLAN.md "Fee waiver for logistics categories" — mirrors
+ * DeliveryService.isDeliveryEligible / DEFAULT_PLATFORM_FEE_BPS
+ * (server/src/modules/delivery/delivery.service.ts,
+ * server/.env.example) so the client sees the real fee before posting,
+ * not just at release time. Keep these two constants in sync with the
+ * server if either one changes — there's no live endpoint to fetch this
+ * from today, so it's duplicated, same as MIN_BOUNTY_NAIRA already was.
+ */
+const DELIVERY_ELIGIBLE_SUBMARKET_KEY = 'laundry-dry-cleaning';
+const PLATFORM_FEE_BPS = 1000;
+
+/**
  * Screen 05 — Post a gig. Client view (handoff §05, mockups 02-05).
  * Implements the two gaps the handoff calls out as "not yet designed":
  * multi-criterion input (a real list, not one free-text box) and the
@@ -75,6 +87,10 @@ export default function PostGigScreen({
 
   const bountyKobo = Math.round(parseFloat(bountyNaira || '0') * 100);
   const validCriteria = criteria.map((c) => c.trim()).filter(Boolean);
+
+  const isLogisticsEligible = submarketKey === DELIVERY_ELIGIBLE_SUBMARKET_KEY;
+  const feeKobo = isLogisticsEligible ? 0 : Math.round((bountyKobo * PLATFORM_FEE_BPS) / 10000);
+  const totalChargeKobo = bountyKobo + feeKobo;
 
   const canSubmit =
     title.trim().length >= 3 &&
@@ -234,6 +250,19 @@ export default function PostGigScreen({
           </Subtext>
         ) : null}
 
+        {bountyNaira && bountyKobo >= MIN_BOUNTY_NAIRA * 100 ? (
+          <View style={styles.feeCard}>
+            <View style={styles.feeRow}>
+              <Subtext>{isLogisticsEligible ? 'Sorted fee (waived — pickup & delivery included)' : 'Sorted fee (10%)'}</Subtext>
+              <Subtext>₦{(feeKobo / 100).toLocaleString()}</Subtext>
+            </View>
+            <View style={styles.feeRow}>
+              <Body style={styles.feeTotalLabel}>You'll pay (once you approve the work)</Body>
+              <Body style={styles.feeTotalLabel}>₦{(totalChargeKobo / 100).toLocaleString()}</Body>
+            </View>
+          </View>
+        ) : null}
+
         {error ? <Banner tone="warning">{error}</Banner> : null}
 
         <Button title="Review & publish" onPress={handlePublish} loading={loading} disabled={!canSubmit} />
@@ -294,6 +323,18 @@ function createStyles(colors: ThemeColors) {
   toggleOptionActive: { borderColor: colors.greenPrimary, backgroundColor: colors.greenMintBg },
   toggleText: { fontFamily: fonts.sans, fontSize: fontSizes.sm, color: colors.textBody },
   toggleTextActive: { color: colors.greenDeep, fontFamily: fonts.sansMedium },
+  feeCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.cardSm,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    marginTop: -4,
+    marginBottom: spacing.lg,
+    gap: 6,
+  },
+  feeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  feeTotalLabel: { fontFamily: fonts.sansSemiBold, color: colors.greenDeep },
   criterionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   removeBtn: { padding: spacing.sm, marginBottom: spacing.lg },
     removeBtnText: { color: colors.textMuted, fontSize: fontSizes.md },

@@ -880,6 +880,10 @@
 
   .modal-error:empty { display: none; }
 
+  .fee-preview { border: 1px solid var(--border); border-radius: 11px; background: var(--surface); padding: 12px 14px; margin: 10px 0 16px; }
+  .fee-preview-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted); padding: 3px 0; }
+  .fee-preview-total { font-weight: 600; color: var(--green-deep); border-top: 1px solid var(--border); margin-top: 4px; padding-top: 8px; }
+
   .field-row { display: flex; gap: 8px; margin-bottom: 4px; }
 
   .field-row input {
@@ -1644,6 +1648,17 @@
         <input type="text" inputmode="decimal" id="post-bounty" placeholder="3000" />
       </div>
 
+      <div class="fee-preview" id="post-fee-preview" hidden>
+        <div class="fee-preview-row">
+          <span id="post-fee-label">Sorted fee (10%)</span>
+          <span id="post-fee-amount"></span>
+        </div>
+        <div class="fee-preview-row fee-preview-total">
+          <span>You&rsquo;ll pay (once you approve the work)</span>
+          <span id="post-fee-total"></span>
+        </div>
+      </div>
+
       <button class="btn btn-block" id="shell-post-submit" type="button">Review & publish</button>
     </div>
 
@@ -2325,6 +2340,13 @@
 
     // ---- app shell (post-login: my gigs / browse / post a gig / profile) ----
     var MIN_BOUNTY_NAIRA = 3000; // matches server's platform-fee floor, see mobile's PostGigScreen
+    // PLAN.md "Fee waiver for logistics categories" — mirrors
+    // DeliveryService.isDeliveryEligible / DEFAULT_PLATFORM_FEE_BPS
+    // (server/src/modules/delivery/delivery.service.ts, server/.env.example).
+    // No live endpoint to fetch this from today, so duplicated client-side
+    // same as MIN_BOUNTY_NAIRA already was — keep in sync if either changes.
+    var DELIVERY_ELIGIBLE_SUBMARKET_KEY = 'laundry-dry-cleaning';
+    var PLATFORM_FEE_BPS = 1000;
     var STATUS_LABEL = {
       draft: 'Draft',
       escrow_pending: 'Awaiting funding',
@@ -3015,6 +3037,7 @@
     var postCriteriaRows = document.getElementById('post-criteria-rows');
     var postError = document.getElementById('shell-post-error');
     var postSubmit = document.getElementById('shell-post-submit');
+    document.getElementById('post-bounty').addEventListener('input', renderFeePreview);
 
     function applyHirePrefill() {
       if (!shellState.hireProfessionalId) return;
@@ -3112,6 +3135,26 @@
           renderPostChips();
         },
       );
+      renderFeePreview();
+    }
+
+    function renderFeePreview() {
+      var previewEl = document.getElementById('post-fee-preview');
+      var bountyNaira = parseFloat(document.getElementById('post-bounty').value || '0');
+      var bountyKobo = Math.round(bountyNaira * 100);
+      if (!bountyNaira || bountyKobo < MIN_BOUNTY_NAIRA * 100) {
+        previewEl.hidden = true;
+        return;
+      }
+      var isLogisticsEligible = shellState.postSubmarket === DELIVERY_ELIGIBLE_SUBMARKET_KEY;
+      var feeKobo = isLogisticsEligible ? 0 : Math.round((bountyKobo * PLATFORM_FEE_BPS) / 10000);
+      var totalKobo = bountyKobo + feeKobo;
+      document.getElementById('post-fee-label').textContent = isLogisticsEligible
+        ? 'Sorted fee (waived — pickup & delivery included)'
+        : 'Sorted fee (10%)';
+      document.getElementById('post-fee-amount').textContent = '₦' + (feeKobo / 100).toLocaleString();
+      document.getElementById('post-fee-total').textContent = '₦' + (totalKobo / 100).toLocaleString();
+      previewEl.hidden = false;
     }
 
     function renderCriteriaRows() {

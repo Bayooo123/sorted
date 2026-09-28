@@ -3017,6 +3017,70 @@ before and after each fix.
 
 ---
 
+## Fee waiver for logistics categories
+
+Requested as "10% commission on transactions between 500-30,000 where
+there is no logistics, integrate it into the product." The fee was
+already flat 10% everywhere (`DEFAULT_PLATFORM_FEE_BPS=1000`) — the real
+ask was making it conditional. Two edge cases the framing left open, both
+asked directly rather than guessed (real money impact either way):
+
+- What applies **outside** ₦500–₦30,000 (below ₦500, above ₦30,000)?
+  → Same 10%.
+- What applies **with** logistics (today: Laundry & Dry Cleaning, the
+  only submarket `DeliveryService` dispatches a courier for)?
+  → No fee — 0%.
+
+**Those two answers collapse the price band to a no-op.** Non-logistics
+is 10% both inside and outside ₦500–₦30,000; logistics is 0% regardless
+of price. The rule that actually needed implementing is just: fee = 0%
+if the submarket is logistics-eligible, else the normal platform fee —
+price never enters the decision. So the ₦500–₦30,000 band doesn't appear
+anywhere in the code; encoding it as a real conditional would have been
+a dead branch that always evaluates the same way, contradicting this
+codebase's own "don't add checks for scenarios that can't happen" rule.
+If a *different* price-scoped rule is ever wanted, this reasoning is
+why one isn't already there.
+
+**Backend (`EscrowService.holdStake`):** `platformFeeBps` now reads
+`DeliveryService.isDeliveryEligible(gig.submarket)` (already a static
+public method, already the exact string check driving courier dispatch)
+before falling back to `DEFAULT_PLATFORM_FEE_BPS`. Frozen at claim time
+same as before — nothing about *when* the rate is fixed changed, only
+*what* it's fixed to. `feeKobo`/`totalChargeKobo` downstream in
+`initiateRelease` derive from `platformFeeBps` already, so a 0 value
+propagates correctly to the actual charge and the ledger's `fee` entry
+(a real ₦0 entry, not skipped — honest bookkeeping, matches how this
+codebase already treats "nothing happened" everywhere else).
+
+**Fee preview, mobile + web (new — nothing showed a fee to the client
+before this at all, anywhere in either posting flow):** `PostGigScreen.
+tsx` and `index.html`'s post-gig form now show a live "Sorted fee" /
+"You'll pay" box once a budget above the minimum is entered, updating
+as the category or budget changes. Necessarily a client-side *estimate*
+using the same rule (no `EscrowRecord` exists yet at posting time to ask
+the server for the real number) — the submarket-key/bps constants are
+duplicated client-side, same as `MIN_BOUNTY_NAIRA` already was, with a
+comment flagging they need to stay in sync if the server-side values
+ever change. The only existing "fee" UI anywhere before this was a
+static, non-interactive marketing illustration on `index.html`'s
+landing page (fixed example numbers, not wired to any input) — this is
+the first real, computed preview in either client.
+
+**Verification:** backend — `tsc --noEmit`/`nest build`/live boot test
+clean; ran the actual `applyBps`/`DeliveryService.isDeliveryEligible`
+functions standalone against sample bounties (₦5,000 logistics vs.
+non-logistics, ₦50,000 non-logistics outside the band) to confirm the
+kobo math, not just that it compiles. Mobile — `tsc --noEmit` clean (no
+simulator in this sandbox, so not visually tested, same disclosed
+limitation as every other mobile UI change this session). Web — driven
+in headless Chromium: entered a budget under a non-logistics category
+(fee shown, correct amount), switched to Laundry & Dry Cleaning (fee
+live-updates to waived, ₦0), dropped the budget below the minimum
+(preview correctly hides) — screenshotted throughout.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

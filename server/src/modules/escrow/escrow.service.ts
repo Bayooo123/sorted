@@ -78,11 +78,21 @@ export class EscrowService implements EscrowPort {
 
     const stakeBps = Number(this.config.get('DEFAULT_STAKE_BPS') ?? 1000);
     const stakeKobo = applyBps(gig.bountyKobo, stakeBps);
-    // PLAN.md "Split payment pivot" — frozen at claim time (the earliest
-    // point an EscrowRecord now exists), not recomputed at release, same
-    // reasoning fundGig used to apply pre-pivot: a mid-flight config
-    // change can't retarget an already-quoted charge.
-    const platformFeeBps = Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
+    // PLAN.md "Fee waiver for logistics categories" — frozen at claim time
+    // (the earliest point an EscrowRecord now exists), not recomputed at
+    // release, same reasoning fundGig used to apply pre-pivot: a
+    // mid-flight config change can't retarget an already-quoted charge.
+    // Waived entirely (0 bps) for a submarket DeliveryService already
+    // dispatches a courier for (Laundry & Dry Cleaning today) — the
+    // founder's rule was "10% commission... where there is no logistics";
+    // asked explicitly what applies outside that, and confirmed both
+    // "outside the price band" and "with logistics" resolve to fixed
+    // answers (10% and 0% respectively) that don't actually depend on
+    // price — so the price band itself doesn't appear here, it would be
+    // a dead branch (see PLAN.md for the full reasoning).
+    const platformFeeBps = DeliveryService.isDeliveryEligible(gig.submarket)
+      ? 0
+      : Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
 
     const record = await this.prisma.$transaction(async (tx) => {
       // staked: false is honest, not a placeholder — no real money moves
