@@ -27,7 +27,14 @@ export type NotificationEvent =
    * owned by GigsService.sendJobMessage rather than moving through this
    * generic port.
    */
-  | { kind: 'professional_invited'; gigDescription: string; locationText: string; bountyKobo: number };
+  | {
+      kind: 'professional_invited';
+      clientName: string;
+      gigDescription: string;
+      submarketLabel: string;
+      locationText: string;
+      bountyKobo: number;
+    };
 
 /**
  * Where to deliver a notification. userId is carried for logging/audit —

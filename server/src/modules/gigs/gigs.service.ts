@@ -199,13 +199,24 @@ export class GigsService implements GigsPort {
     const gig = await this.getGig(gigId);
     if (!gig.restrictedToProfessionalId) return true;
 
-    const professional = await this.identity.getUser(gig.restrictedToProfessionalId);
+    const [professional, client, submarket] = await Promise.all([
+      this.identity.getUser(gig.restrictedToProfessionalId),
+      this.identity.getUser(gig.clientId),
+      this.prisma.submarket.findUnique({ where: { key: gig.submarket } }),
+    ]);
 
     if (professional.email) {
       await this.notifications
         .notify(
           { userId: professional.id, email: professional.email },
-          { kind: 'professional_invited', gigDescription: gig.description, locationText: gig.locationText, bountyKobo: Number(gig.bountyKobo) },
+          {
+            kind: 'professional_invited',
+            clientName: client.name || client.displayName || 'A client',
+            gigDescription: gig.description,
+            submarketLabel: submarket?.label ?? gig.submarket,
+            locationText: gig.locationText,
+            bountyKobo: Number(gig.bountyKobo),
+          },
         )
         .catch((err) => {
           this.logger.warn(`Invite email failed for gig ${gigId}, professional ${professional.id}: ${err instanceof Error ? err.message : err}`);
@@ -227,7 +238,6 @@ export class GigsService implements GigsPort {
     const sent = await this.sendJobMessage(professional.phone, bodyText, templateParams);
     if (sent) return true;
 
-    const client = await this.identity.getUser(gig.clientId);
     if (client.phone) {
       await this.whatsapp.offerReassignment(
         client.phone,

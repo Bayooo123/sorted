@@ -2940,6 +2940,76 @@ not built here.
 
 ---
 
+## Direct-invite email redesign
+
+Follow-up to the section above: the founder had a visual design made
+elsewhere (screenshotted, not code) and said "use this." Reproduced it
+faithfully in `inviteEmailHtml` — green "exclusive invitation" banner,
+big earn amount, a three-row job-details table, primary CTA button, a
+secondary decline link, and a dashed WhatsApp callout box — but with
+three corrections against what's actually true here, not copied verbatim:
+
+1. **Payment copy.** The mock said "[Client] pays through Sorted. We
+   hold the money and pay you once the job is done" — that's the
+   pre-pivot escrow model. Paystack declined that (PLAN.md "Split payment
+   pivot"). Replaced with the same "nothing's charged until approval,
+   paid the same moment" language `index.html` already uses everywhere
+   else, so this email doesn't contradict the rest of the product.
+2. **Company footer.** The mock's footer read "Sorted Innovations
+   Limited · RC 9770241" — fabricated by the design tool, not this
+   company. Replaced with the real registered entity already used in
+   `index.html`'s own footer (Reforma Digital Solutions Limited · RC
+   8801487, 26 Ebun Street, Abule Oja, Yaba, Lagos). Shipping a wrong
+   company registration number in a real business email isn't a
+   cosmetic bug.
+3. **The "When" row.** The mock showed "Pickup Tue 30 Sept, 4–6pm" —
+   `Gig` has no scheduled-time field, so this would have to be
+   fabricated. Swapped for "Category" (the gig's submarket label,
+   real data, already fetched — `GigsService.sendInvite` now looks it
+   up via `prisma.submarket.findUnique`), keeping the three-row layout
+   the design intended.
+
+**Also new:** the invite email now personalizes with the client's first
+name ("Tolu picked you for this job") — `sendInvite` fetches the client
+alongside the professional and submarket in one `Promise.all` (it already
+fetched the client separately, later, only on the WhatsApp-failure path;
+now fetched once up front and reused both places). Both `clientName` and
+`gigDescription`/`locationText` are user-typed text, so `NotificationEvent`
+grew those fields and `inviteEmailHtml` HTML-escapes all of them before
+interpolating — the two older templates in this file don't (`firstName`
+in `welcomeEmailHtml` is a pre-existing gap, not fixed here, out of scope
+for this change).
+
+**Not built — the mock's one-click "Decline here" link.** The design
+shows a bare link that presumably declines with no login. That's a real
+new backend surface (a signed, single-use, expiring token embedded in
+the email URL, verified by a new unauthenticated endpoint) with real
+security tradeoffs to get right — not something to fabricate a
+non-functional link for or build silently without discussing the
+tradeoffs first. Both the primary and secondary CTA currently point at
+`sorted.com.ng` instead. Flagged here as the natural next step if wanted.
+
+**A second, more consequential encoding bug, caught by rendering with
+non-ASCII sample data.** The earlier fix (`&#8358;` entity for ₦) only
+covered literal characters typed directly into the template's own source.
+This redesign interpolates real user text (client name, gig description)
+for the first time — an em dash typed by a user (`Dry cleaning — 6
+shirts...`) rendered as `â€"` mojibake in the same way, because arbitrary
+user text can't practically be entity-escaped character-by-character.
+Root-caused and fixed properly this time: added `<meta charset="utf-8">`
+to the email's `<head>`, which the two older templates also lack (flagged,
+not fixed, since neither interpolates freeform text the way this one
+does — `welcomeEmailHtml`'s `firstName` is closer to it, but out of scope
+here).
+
+**Verification:** `tsc --noEmit`/`nest build` clean, live boot test clean.
+Rendered `inviteEmailHtml` standalone with sample data matching the
+design brief (including an em dash and a Naira amount, specifically to
+re-trigger both encoding bugs) and screenshotted in headless Chromium
+before and after each fix.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
