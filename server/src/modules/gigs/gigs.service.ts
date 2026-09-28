@@ -9,6 +9,7 @@ import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/ima
 import { PrismaTx } from '../../common/prisma-tx';
 import { DeliveryService } from '../delivery/delivery.service';
 import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
+import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
   CreateGigInput,
   GigListFilter,
@@ -66,6 +67,7 @@ export class GigsService implements GigsPort {
     @Inject(MATCHING_STRATEGY) private readonly matchingStrategy: MatchingStrategy,
     private readonly delivery: DeliveryService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
+    @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
 
   async createGig(input: CreateGigInput): Promise<GigRecord> {
@@ -183,18 +185,34 @@ export class GigsService implements GigsPort {
    * No-ops (returns true) for a gig that isn't restricted to anyone —
    * the normal open-claim path has nothing to notify.
    *
-   * Returns whether the professional was actually reached — see
-   * sendJobMessage's doc comment for the free-text/template mechanics.
-   * If BOTH fail, tells the CLIENT honestly instead of the invite
-   * silently vanishing, via WhatsAppPort.offerReassignment (same offer a
-   * decline triggers).
+   * Returns whether the professional was actually reached over WhatsApp —
+   * see sendJobMessage's doc comment for the free-text/template mechanics.
+   * If BOTH WhatsApp attempts fail, tells the CLIENT honestly instead of
+   * the invite silently vanishing, via WhatsAppPort.offerReassignment
+   * (same offer a decline triggers). Email (below) is a separate,
+   * independent channel — PLAN.md "Direct-invite email notification":
+   * previously this method only ever tried WhatsApp, so a professional
+   * with no phone on file, or an inbound-message window that had closed,
+   * could be invited and genuinely never find out.
    */
   async sendInvite(gigId: string): Promise<boolean> {
     const gig = await this.getGig(gigId);
     if (!gig.restrictedToProfessionalId) return true;
 
     const professional = await this.identity.getUser(gig.restrictedToProfessionalId);
-    if (!professional.phone) return true; // nothing reachable to invite — not this method's problem to solve
+
+    if (professional.email) {
+      await this.notifications
+        .notify(
+          { userId: professional.id, email: professional.email },
+          { kind: 'professional_invited', gigDescription: gig.description, locationText: gig.locationText, bountyKobo: Number(gig.bountyKobo) },
+        )
+        .catch((err) => {
+          this.logger.warn(`Invite email failed for gig ${gigId}, professional ${professional.id}: ${err instanceof Error ? err.message : err}`);
+        });
+    }
+
+    if (!professional.phone) return true; // no phone on file — email above already covers this professional if they have one
 
     await this.prisma.whatsAppSession.upsert({
       where: { phone: professional.phone },

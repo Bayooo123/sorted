@@ -18,7 +18,16 @@ export type NotificationEvent =
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }
   | { kind: 'dispute_raised'; gigId: string; disputeId: string }
-  | { kind: 'dispute_ruled'; gigId: string; disputeId: string };
+  | { kind: 'dispute_ruled'; gigId: string; disputeId: string }
+  /**
+   * PLAN.md "Direct-invite email notification" — a client hired this
+   * professional by name (Directory "Hire" flow, GigsService.sendInvite).
+   * Email only; the WhatsApp side of a direct invite is stateful (needs
+   * WhatsAppSession.pendingInviteGigId for the YES/NO reply) and stays
+   * owned by GigsService.sendJobMessage rather than moving through this
+   * generic port.
+   */
+  | { kind: 'professional_invited'; gigDescription: string; locationText: string; bountyKobo: number };
 
 /**
  * Where to deliver a notification. userId is carried for logging/audit —

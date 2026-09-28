@@ -48,6 +48,10 @@ export class NotificationsService implements NotificationsPort {
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendPasswordResetEmail(target.email, event.code);
         return;
+      case 'professional_invited':
+        if (!target.email) return; // no email on this account — caller already checked, but stay defensive
+        await this.sendInviteEmail(target.email, event.gigDescription, event.locationText, event.bountyKobo);
+        return;
       default:
         throw new NotImplementedException(
           `NotificationsService.notify — event kind '${event.kind}' not implemented yet (lands with its owning slice)`,
@@ -95,6 +99,11 @@ export class NotificationsService implements NotificationsPort {
     this.logger.log(`Password reset email sent to ${email}`);
   }
 
+  private async sendInviteEmail(email: string, gigDescription: string, locationText: string, bountyKobo: number): Promise<void> {
+    await this.sendEmail(email, "You've been invited to a job on Sorted", this.inviteEmailHtml(gigDescription, locationText, bountyKobo));
+    this.logger.log(`Direct-invite email sent to ${email}`);
+  }
+
   private welcomeEmailHtml(firstName: string): string {
     // Inline CSS throughout — email clients don't reliably support <style>
     // blocks. Design tokens match HANDOFF.md §6.
@@ -124,6 +133,43 @@ export class NotificationsService implements NotificationsPort {
       <p style="font-size:15px;line-height:1.6;color:#3A4A47;margin:0;">
         Next step: open the Sorted app &mdash; that's where you post a gig or
         start claiming work.
+      </p>
+    </div>
+    <p style="font-size:12.5px;color:#7E8F8D;margin:24px 0 0;text-align:center;">Consider it sorted.</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  private inviteEmailHtml(gigDescription: string, locationText: string, bountyKobo: number): string {
+    // &#8358; (₦), not the literal glyph — every other template here uses
+    // HTML entities for non-ASCII (&mdash;, &ldquo;, ...) rather than
+    // relying on a charset declaration email clients may strip; found via
+    // a rendered screenshot showing "â‚¦" mojibake before this fix.
+    const amountNaira = '&#8358;' + (bountyKobo / 100).toLocaleString('en-NG', { maximumFractionDigits: 0 });
+    return `
+<!doctype html>
+<html>
+<body style="margin:0;padding:0;background:#F4FAF8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:32px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:#C8FFF6;display:inline-block;vertical-align:middle;text-align:center;line-height:26px;color:#027A61;font-weight:700;font-size:14px;">&#10003;</div>
+      <span style="font-family:Georgia,'Times New Roman',serif;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;font-size:17px;color:#0C1F1B;vertical-align:middle;">Sorted</span>
+    </div>
+    <div style="background:#FFFFFF;border:1px solid #E0E6E4;border-radius:20px;padding:36px 32px;">
+      <p style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#0C1F1B;margin:0 0 16px;">You've been invited to a job.</p>
+      <p style="font-size:15px;line-height:1.6;color:#3A4A47;margin:0 0 20px;">
+        A client on Sorted asked for you by name. Nobody else can claim this
+        job while it's reserved for you.
+      </p>
+      <div style="background:#F4FAF8;border-radius:12px;padding:16px 18px;margin:0 0 20px;">
+        <p style="font-size:14.5px;line-height:1.5;color:#0C1F1B;margin:0 0 8px;">${gigDescription}</p>
+        <p style="font-size:13px;color:#7E8F8D;margin:0 0 4px;">&#128205; ${locationText}</p>
+        <p style="font-size:15px;font-weight:700;color:#027A61;margin:0;">${amountNaira}</p>
+      </div>
+      <p style="font-size:15px;line-height:1.6;color:#3A4A47;margin:0;">
+        Open the Sorted app to accept or decline &mdash; if you've messaged
+        our WhatsApp number before, you can also just reply YES or NO there.
       </p>
     </div>
     <p style="font-size:12.5px;color:#7E8F8D;margin:24px 0 0;text-align:center;">Consider it sorted.</p>

@@ -8,6 +8,7 @@ import { AuthModule } from '../../common/auth/auth.module';
 import { DeliveryModule } from '../delivery/delivery.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { ReputationNotificationsModule } from '../reputation-notifications/reputation-notifications.module';
 
 // AuthModule is imported directly (not just via IdentityModule) because
 // GigsController's own routes need JwtAuthGuard — importing shared auth
@@ -27,8 +28,14 @@ import { PaymentsModule } from '../payments/payments.module';
 // imports it — because Nest doesn't re-export a module's own imports by
 // default; TaxonomyController needs PAYMENTS_PROVIDER in its own DI scope
 // (PLAN.md "Bank list endpoint").
+//
+// ReputationNotificationsModule only imports WhatsappModule (itself a
+// leaf) — no path back to GigsModule, so this doesn't reintroduce a cycle
+// either. PLAN.md "Direct-invite email notification": sendInvite needs
+// NOTIFICATIONS_PORT to send the invited professional an email alongside
+// the existing WhatsApp message.
 @Module({
-  imports: [IdentityModule, MatchingModule, AuthModule, DeliveryModule, WhatsappModule, PaymentsModule],
+  imports: [IdentityModule, MatchingModule, AuthModule, DeliveryModule, WhatsappModule, PaymentsModule, ReputationNotificationsModule],
   controllers: [TaxonomyController, GigsController],
   providers: [GigsService],
   exports: [GigsService],

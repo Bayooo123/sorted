@@ -2877,6 +2877,69 @@ at each step, which is what caught the CSS bug above.
 
 ---
 
+## Direct-invite email notification
+
+Asked directly: "does the person get an email and WhatsApp message if I
+hire him — he should." Investigated first (two research subagents, not
+straight to coding): the Directory "Hire" flow (client picks a named
+professional, gig gets created with `restrictedToProfessionalId`) was
+confirmed fully intact on mobile and web after both later pivots — nothing
+to fix there. But the actual invite notification, `GigsService.sendInvite`
+(fires on publish, not creation), turned out to be **WhatsApp-only**, with
+two silent-failure paths: no `phone` on file → no-op with no error; phone
+present but the 24h session window closed and no `WHATSAPP_INVITE_TEMPLATE_
+NAME` configured → also no-op, and only the CLIENT gets told the invite
+failed (`offerReassignment`) — the professional themselves could be
+directly hired and simply never find out, with nothing anywhere logging
+it as a problem.
+
+**Fix:** added `professional_invited` to `NotificationEvent`
+(`notifications.interface.ts`) — email only, deliberately. The WhatsApp
+side stays exactly as it was, owned by `GigsService` (`sendJobMessage`'s
+free-text/template fallback, `WhatsAppSession.pendingInviteGigId` for the
+YES/NO reply) rather than moving through the generic `NotificationsPort`,
+since that stateful reply-handling doesn't belong in a channel-agnostic
+port. `sendInvite` now fires the email **independently** of the phone/
+WhatsApp path — previously it returned early with `if (!professional.
+phone) return true` before anything else ran, which meant a professional
+with no phone on file got skipped entirely rather than falling back to
+whatever channel they did have.
+
+**Module wiring:** `GigsModule` now imports `ReputationNotificationsModule`
+directly for `NOTIFICATIONS_PORT` — checked for a cycle first:
+`ReputationNotificationsModule` only imports `WhatsappModule` (itself a
+leaf module), no path back to `GigsModule`, so this is safe by the same
+reasoning as every other leaf-module import this session.
+
+**A real bug caught by rendering the template, not just reading it:** the
+new email's Naira amount used `toLocaleString(..., { style: 'currency' })`,
+which produces the literal `₦` glyph — but every other email template in
+this file (welcome, password reset) deliberately uses HTML entities
+(`&mdash;`, `&ldquo;`, ...) instead of literal non-ASCII characters,
+specifically to avoid depending on a `<meta charset>` that some email
+clients strip. A screenshot of the rendered template showed `â‚¦12,000`
+(UTF-8 bytes misread as a single-byte encoding) instead of `₦12,000` —
+fixed by switching to the `&#8358;` numeric entity, matching the
+existing convention. Would have shipped broken in real inboxes; only
+showed up in the actual rendered screenshot, not the source.
+
+**Verification:** `tsc --noEmit`/`nest build` clean; live boot test
+confirms the new `GigsModule → ReputationNotificationsModule` edge
+resolves with zero DI errors. Rendered `inviteEmailHtml` standalone
+(instantiating `NotificationsService` and calling the private template
+method directly, since there's no live Resend key in this sandbox to
+send a real email) and screenshotted it in headless Chromium — caught
+the encoding bug above, confirmed the fix.
+
+**Still open:** if the professional has neither an email nor a reachable
+WhatsApp on file, there's still no notification — that's a real gap in
+their profile, not this flow's problem to solve. No in-app push/badge for
+a pending invite either (the professional would need to open the app to
+see it if both external channels miss) — flagged as a natural follow-up,
+not built here.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't
