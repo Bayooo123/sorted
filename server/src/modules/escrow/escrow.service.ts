@@ -93,6 +93,14 @@ export class EscrowService implements EscrowPort {
     const platformFeeBps = DeliveryService.isDeliveryEligible(gig.submarket)
       ? 0
       : Number(this.config.get('DEFAULT_PLATFORM_FEE_BPS') ?? 1000);
+    // Explicit, unconditional log line — commission correctness is exactly
+    // "how the company makes money" (founder's words), so this is verifiable
+    // in production runtime logs on every single claim, not just something
+    // proven once in a sandbox. See initiateRelease for the second log,
+    // at the moment this rate turns into a real Paystack charge.
+    this.logger.log(
+      `Fee locked for gig ${gigId} (submarket=${gig.submarket}): platformFeeBps=${platformFeeBps} (${platformFeeBps === 0 ? 'WAIVED — logistics' : (platformFeeBps / 100) + '%'})`,
+    );
 
     const record = await this.prisma.$transaction(async (tx) => {
       // staked: false is honest, not a placeholder — no real money moves
@@ -184,6 +192,12 @@ export class EscrowService implements EscrowPort {
     const bountyKobo = kobo(Number(existing.bountyKobo));
     const feeKobo = applyBps(bountyKobo, existing.platformFeeBps);
     const totalChargeKobo = addKobo(bountyKobo, feeKobo);
+    // Second half of the fee-verification trail (see holdStake's log) —
+    // this is the moment feeKobo becomes a real Paystack charge, not just
+    // a stored rate. bountyKobo/feeKobo are in kobo (÷100 for naira).
+    this.logger.log(
+      `Charging gig ${gigId}: bountyKobo=${bountyKobo} feeKobo=${feeKobo} (bps=${existing.platformFeeBps}) totalChargeKobo=${totalChargeKobo}`,
+    );
 
     let charge: Awaited<ReturnType<PaymentsProvider['chargeWithSplit']>>;
     try {

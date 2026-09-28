@@ -3079,6 +3079,32 @@ in headless Chromium: entered a budget under a non-logistics category
 live-updates to waived, ₦0), dropped the budget below the minimum
 (preview correctly hides) — screenshotted throughout.
 
+**Follow-up, same day: explicit production logging.** Founder's words:
+"the 10% commission must work now, it shows how the company makes
+money" — a real ask for ongoing verifiability, not just a one-time proof
+that the offline math was right. `EscrowService.holdStake` now logs the
+locked-in rate the moment a claim happens (`Fee locked for gig
+{gigId}... platformFeeBps=... (10%|WAIVED)`), and `initiateRelease` logs
+the real kobo amounts the moment that rate becomes an actual Paystack
+charge (`Charging gig {gigId}: bountyKobo=... feeKobo=... (bps=...)
+totalChargeKobo=...`). Together these make every single commission
+outcome checkable directly from Vercel runtime logs, per gig, without
+needing DB access — which is exactly how the direct-invite email for the
+founder's own test order was confirmed working a few messages earlier in
+this same session (grepped `NotificationsService: Direct-invite email
+sent to...` out of production logs), so this closes the same gap for
+fee correctness.
+
+Simulated both branches against the built `dist` output with a real
+₦10,500 bounty (matching the founder's own test order) before shipping,
+producing exactly the log lines that now appear in production:
+```
+Non-logistics: platformFeeBps=1000 (10%) → feeKobo=105000, totalChargeKobo=1155000
+  Client pays ₦11,550 · Sorted keeps ₦1,050 · Professional gets ₦10,500
+Logistics:     platformFeeBps=0 (WAIVED)  → feeKobo=0, totalChargeKobo=1050000
+  Client pays ₦10,500 · Sorted keeps ₦0   · Professional gets ₦10,500
+```
+
 ---
 
 ## Open items before slices 2–3 can be implemented for real
