@@ -2946,8 +2946,9 @@ Follow-up to the section above: the founder had a visual design made
 elsewhere (screenshotted, not code) and said "use this." Reproduced it
 faithfully in `inviteEmailHtml` — green "exclusive invitation" banner,
 big earn amount, a three-row job-details table, primary CTA button, a
-secondary decline link, and a dashed WhatsApp callout box — but with
-three corrections against what's actually true here, not copied verbatim:
+secondary decline link, and a dashed WhatsApp callout box — but with two
+corrections against what's actually true here, not copied verbatim (a
+third guessed correction turned out to be wrong — see below):
 
 1. **Payment copy.** The mock said "[Client] pays through Sorted. We
    hold the money and pay you once the job is done" — that's the
@@ -2955,19 +2956,25 @@ three corrections against what's actually true here, not copied verbatim:
    pivot"). Replaced with the same "nothing's charged until approval,
    paid the same moment" language `index.html` already uses everywhere
    else, so this email doesn't contradict the rest of the product.
-2. **Company footer.** The mock's footer read "Sorted Innovations
-   Limited · RC 9770241" — fabricated by the design tool, not this
-   company. Replaced with the real registered entity already used in
-   `index.html`'s own footer (Reforma Digital Solutions Limited · RC
-   8801487, 26 Ebun Street, Abule Oja, Yaba, Lagos). Shipping a wrong
-   company registration number in a real business email isn't a
-   cosmetic bug.
-3. **The "When" row.** The mock showed "Pickup Tue 30 Sept, 4–6pm" —
+2. **The "When" row.** The mock showed "Pickup Tue 30 Sept, 4–6pm" —
    `Gig` has no scheduled-time field, so this would have to be
    fabricated. Swapped for "Category" (the gig's submarket label,
    real data, already fetched — `GigsService.sendInvite` now looks it
    up via `prisma.submarket.findUnique`), keeping the three-row layout
    the design intended.
+
+**One guessed "correction" was wrong, caught by the founder, not by any
+verification step here.** The mock's footer — "Sorted Innovations
+Limited · RC 9770241 · Lagos, Nigeria" — was assumed fabricated (design
+tools invent plausible-looking placeholder legal text) and swapped for
+`index.html`'s own footer entity, Reforma Digital Solutions Limited · RC
+8801487. Told directly afterward: the mock had it right — Sorted
+Innovations Limited · RC 9770241 is the real registered entity for this
+product. Reverted to match the mock exactly. **This surfaces a real,
+separate problem**: `index.html`'s live footer currently shows the wrong
+company name and RC number for the product it's the footer of — flagged
+to the founder, not fixed here (out of scope for this task, and a
+decision on the correct address format wasn't asked for).
 
 **Also new:** the invite email now personalizes with the client's first
 name ("Tolu picked you for this job") — `sendInvite` fetches the client

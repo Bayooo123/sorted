@@ -157,18 +157,18 @@ export class NotificationsService implements NotificationsPort {
   /**
    * PLAN.md "Direct-invite email redesign" — visual design supplied by the
    * founder (built elsewhere, handed over as a screenshot), reproduced here
-   * with three corrections against what's actually true of this codebase
-   * rather than copied verbatim:
+   * with two corrections against what's actually true of this codebase
+   * rather than copied verbatim (a third guess — the footer's company
+   * details — turned out to be the mock's own, confirmed correct: "Sorted
+   * Innovations Limited · RC 9770241" is the real entity, not
+   * index.html's "Reforma Digital Solutions Limited" footer, which is
+   * apparently stale/wrong and flagged separately, not fixed here):
    *   1. The mock's "We hold the money and pay you once the job is done"
    *      line describes the pre-pivot escrow model — Paystack declined
    *      that (see PLAN.md "Split payment pivot"). Replaced with the same
    *      "nothing's charged until approval, paid the same moment" language
    *      index.html already uses.
-   *   2. The mock's footer read "Sorted Innovations Limited · RC 9770241"
-   *      — not this company. Replaced with the real registered entity
-   *      already used in index.html's footer (Reforma Digital Solutions
-   *      Limited · RC 8801487, 26 Ebun Street, Abule Oja, Yaba, Lagos).
-   *   3. The mock's "When: Pickup Tue 30 Sept, 4–6pm" row has no backing
+   *   2. The mock's "When: Pickup Tue 30 Sept, 4–6pm" row has no backing
    *      data — Gig has no scheduled-time field. Swapped for "Category"
    *      (the gig's submarket label), which is real and keeps the
    *      three-row layout.
@@ -243,7 +243,7 @@ export class NotificationsService implements NotificationsPort {
     <p style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:15px;color:#027A61;text-align:center;margin:24px 0 6px;">Consider it sorted.</p>
     <p style="font-size:11.5px;color:#7E8F8D;text-align:center;margin:0 0 4px;">You're getting this because a client booked you directly on Sorted.</p>
     <p style="font-size:11.5px;color:#7E8F8D;text-align:center;margin:0 0 14px;"><a href="https://sorted.com.ng" style="color:#7E8F8D;text-decoration:underline;">sorted.com.ng</a></p>
-    <p style="font-size:11px;color:#7E8F8D;text-align:center;margin:0;line-height:1.5;">Reforma Digital Solutions Limited &middot; RC 8801487<br/>26 Ebun Street, Abule Oja, Yaba, Lagos</p>
+    <p style="font-size:11px;color:#7E8F8D;text-align:center;margin:0;line-height:1.5;">Sorted Innovations Limited &middot; RC 9770241 &middot; Lagos, Nigeria</p>
   </div>
 </body>
 </html>`;
