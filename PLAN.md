@@ -3164,6 +3164,82 @@ the (empty, in the test) regular open-gigs list.
 
 ---
 
+## Claim + submit a gig from the web client
+
+**Asked:** "So now if he checks his dashboard should he see the gig and be
+able to accept it" (answer at the time: sees it on web, once deployed;
+cannot claim from web — pre-existing gap, never built), then, explicitly:
+"Build it so that he can claim it from web."
+
+**What existed already, server-side, unchanged:** `POST /gigs/:id/claim`
+(`GigsController` → `EscrowService.holdStake`) and `POST /gigs/:id/submit`
+(→ `GigsService.submitForReview`, `{proofBase64, note}`) — both live,
+both already used by the mobile app's `ClaimWorkScreen`. No backend
+changes were needed.
+
+**What was built:** claim AND submit-for-review together, not claim
+alone — a claim-only button would strand a professional mid-flow with a
+gig they can never mark done from the web. New `#claim-modal` in
+`index.html`, following the existing single-modal pattern
+(`.modal-overlay`/`.modal-card`, `hidden` toggle) already used for
+`#auth-modal`. It's a two-step state machine in one modal, no page
+navigation, mirroring `ClaimWorkScreen` on mobile:
+
+1. **Claim step** — gig summary + a "Claim this gig" button calling
+   `POST /gigs/:id/claim`. On success, the same modal re-renders in place
+   to:
+2. **Submit step** — a file input (run through the existing
+   `resizeImageFileToDataUri(file, 1000, 0.8)` helper, same as the KYC
+   upload) + an optional note, "Submit for review" calling
+   `POST /gigs/:id/submit`. On success, a short confirmation with a
+   "Done" button that closes the modal and reloads the Browse list.
+
+`gigCard(gig, note, invited, onClaim)` gained a 4th parameter: when
+passed, it renders a "Claim this gig" button instead of (or alongside)
+the static note. `loadBrowseList()` now computes
+`isProfessional = (user.roles||[]).indexOf('professional') !== -1` and
+passes `openClaimModal` for any `open`-status gig — both the regular
+open-gigs list and the invited-gigs section from the previous fix, which
+now actually gets a working claim button instead of "use the app or
+WhatsApp instead."
+
+**Bug found and fixed during verification, not before shipping:**
+`#claim-modal` opens on top of an already-visible `#app-shell`, unlike
+`#auth-modal` which only ever shows while the shell is hidden (logged
+out). `#app-shell` has `position:fixed; z-index:60`; the shared
+`.modal-overlay` class only sets `z-index:50`, so the claim modal
+rendered correctly in the DOM (no `hidden` attribute, `display:flex`)
+but sat *behind* the shell and was genuinely unclickable — Playwright's
+own "element intercepts pointer events" check is what caught it, not
+visual inspection. Fixed with a `#claim-modal { z-index: 70; }` override.
+
+**Honesty about the gap this doesn't close:** once claimed, a gig
+disappears from both `/gigs?status=open` and `/gigs/invited` (status is
+no longer `open`), and there is still no "my claimed gigs" list anywhere
+on the web client — a professional's only way to see a claimed gig again
+is to finish the submit step in the same modal session, the mobile app,
+or WhatsApp. The in-modal copy says this plainly rather than promising a
+tracking view that doesn't exist ("if you close this now, this claimed
+gig won't be listed anywhere else on the web yet").
+
+**Verification:** `node --check` on the extracted inline script (clean).
+Full Playwright run against a fresh copy served locally, `sorted-api.
+vercel.app` calls mocked (`/gigs/invited`, `/gigs?status=open`,
+`/auth/login`, `/gigs/:id/claim`, `/gigs/:id/submit`): logged in as a
+professional through the real login form, opened Browse, confirmed both
+the invited and regular open gig show a working "Claim this gig" button,
+clicked through claim → (validation-blocked empty submit, confirmed the
+error shows and no request fires) → attached a real file → submit →
+confirmed the success state, closed the modal, confirmed it's actually
+hidden after close. No page errors. Screenshots taken at each step.
+
+Deliberately not built here (out of scope for this pass, not asked):
+a dedicated in-app decline button on web (WhatsApp reply-NO is still the
+only decline path, unchanged), and a "my claimed gigs" list — the honest
+in-modal copy above is the stopgap until that's asked for.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

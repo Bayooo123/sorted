@@ -829,6 +829,12 @@
 
   .modal-overlay[hidden] { display: none; }
 
+  /* #app-shell (below) sits at z-index 60, above the base 50 modal layer
+     — fine for #auth-modal since the shell is hidden while it's open, but
+     #claim-modal opens ON TOP of an already-visible shell and needs to
+     out-rank it. */
+  #claim-modal { z-index: 70; }
+
   .modal-card {
     position: relative;
     width: 100%;
@@ -1580,6 +1586,14 @@
       <p class="modal-error" id="auth-type-error"></p>
       <button class="btn btn-block" id="auth-type-submit" type="button">Finish setup</button>
     </div>
+  </div>
+</div>
+
+<!-- PLAN.md "Claim + submit a gig from the web client" -->
+<div id="claim-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="claim-modal-title">
+    <button class="modal-close" id="claim-modal-close" type="button" aria-label="Close">&times;</button>
+    <div id="claim-modal-body"></div>
   </div>
 </div>
 
@@ -2428,7 +2442,7 @@
       });
     });
 
-    function gigCard(gig, note, invited) {
+    function gigCard(gig, note, invited, onClaim) {
       var card = document.createElement('div');
       card.className = invited ? 'gig-card gig-card-invited' : 'gig-card';
       var tone = gig.status === 'open' ? 'active' : 'neutral';
@@ -2448,6 +2462,17 @@
         noteEl.className = 'gig-card-note';
         noteEl.textContent = note;
         card.appendChild(noteEl);
+      }
+      // PLAN.md "Claim + submit a gig from the web client" — professional
+      // accounts get a real Claim button instead of the static note above.
+      if (onClaim) {
+        var claimBtn = document.createElement('button');
+        claimBtn.className = 'btn btn-block';
+        claimBtn.type = 'button';
+        claimBtn.style.marginTop = '10px';
+        claimBtn.textContent = 'Claim this gig';
+        claimBtn.addEventListener('click', function () { onClaim(gig); });
+        card.appendChild(claimBtn);
       }
       return card;
     }
@@ -2493,6 +2518,7 @@
     function loadBrowseList() {
       var container = document.getElementById('shell-browse-list');
       container.innerHTML = '<p class="shell-empty">Loading…</p>';
+      var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
       Promise.all([api('/gigs?status=open'), api('/gigs/invited', { auth: true }).catch(function () { return []; })])
         .then(function (results) {
           var gigs = results[0];
@@ -2503,16 +2529,128 @@
             return;
           }
           invitedGigs.forEach(function (gig) {
-            container.appendChild(gigCard(gig, 'Invited to you directly by a client — claiming isn’t available on web yet, use the Sorted app (or reply on WhatsApp if you’ve messaged us before).', true));
+            // PLAN.md "Claim + submit a gig from the web client" — a
+            // professional can now claim straight from this card instead
+            // of being told to go use the app or WhatsApp.
+            var canClaim = isProfessional && gig.status === 'open';
+            var note = canClaim ? 'Invited to you directly by a client.' : 'Invited to you directly by a client — claiming isn’t available on web yet, use the Sorted app (or reply on WhatsApp if you’ve messaged us before).';
+            container.appendChild(gigCard(gig, note, true, canClaim ? openClaimModal : null));
           });
           gigs.forEach(function (gig) {
-            container.appendChild(gigCard(gig, 'Claiming isn’t available yet — coming soon.'));
+            var canClaim = isProfessional && gig.status === 'open';
+            container.appendChild(gigCard(gig, canClaim ? null : 'Claiming isn’t available yet — coming soon.', false, canClaim ? openClaimModal : null));
           });
         })
         .catch(function (err) {
           container.innerHTML = '';
           container.appendChild(Object.assign(document.createElement('p'), { className: 'modal-error', textContent: err.message }));
         });
+    }
+
+    // ---- claim + submit-for-review (PLAN.md "Claim + submit a gig from
+    // the web client") ----
+    //
+    // Mirrors the mobile app's ClaimWorkScreen as a single modal that
+    // walks a professional through two server calls in place, no page
+    // navigation: POST /gigs/:id/claim (already live, used by mobile —
+    // this is the first web caller), then, once claimed, POST
+    // /gigs/:id/submit with a proof photo. Building only the claim button
+    // without also wiring submission would strand a professional who
+    // claims from the web with no way to ever finish the gig.
+    var claimModal = document.getElementById('claim-modal');
+    var claimModalBody = document.getElementById('claim-modal-body');
+    var claimModalCloseBtn = document.getElementById('claim-modal-close');
+
+    function closeClaimModal() {
+      claimModal.hidden = true;
+      claimModalBody.innerHTML = '';
+    }
+    claimModalCloseBtn.addEventListener('click', closeClaimModal);
+    claimModal.addEventListener('click', function (e) {
+      if (e.target === claimModal) closeClaimModal();
+    });
+
+    function openClaimModal(gig) {
+      claimModal.hidden = false;
+      renderClaimStep(gig);
+    }
+
+    function renderClaimStep(gig) {
+      claimModalBody.innerHTML =
+        '<h3 id="claim-modal-title">Claim this gig</h3>' +
+        '<p class="gig-card-title" style="margin:0 0 4px;"></p>' +
+        '<p class="gig-card-meta" style="margin:0 0 4px;"></p>' +
+        '<div class="gig-card-bounty" style="margin:0 0 16px;"></div>' +
+        '<p class="kyc-note">Claiming locks this gig to you — the first credible claim wins, so once you claim it, other professionals can no longer take it.</p>' +
+        '<p class="modal-error" id="claim-error"></p>' +
+        '<button class="btn btn-block" id="claim-confirm-btn" type="button">Claim this gig</button>';
+      claimModalBody.querySelector('.gig-card-title').textContent = gig.title;
+      claimModalBody.querySelector('.gig-card-meta').textContent = gig.locationText;
+      claimModalBody.querySelector('.gig-card-bounty').textContent = formatNaira(gig.bountyKobo);
+
+      document.getElementById('claim-confirm-btn').addEventListener('click', function () {
+        var err = document.getElementById('claim-error');
+        var btn = document.getElementById('claim-confirm-btn');
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Claiming…';
+        api('/gigs/' + gig.id + '/claim', { method: 'POST', auth: true })
+          .then(function () {
+            renderSubmitStep(gig);
+          })
+          .catch(function (e) {
+            err.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Claim this gig';
+          });
+      });
+    }
+
+    function renderSubmitStep(gig) {
+      claimModalBody.innerHTML =
+        '<h3 id="claim-modal-title">Claimed — submit your work</h3>' +
+        '<p class="kyc-note">You’ve claimed <strong>' + escapeHtml(gig.title) + '</strong>. When the work is done, upload a proof photo below to send it for the client’s sign-off. If you close this now, this claimed gig won’t be listed anywhere else on the web yet — finish it here, from the Sorted mobile app, or by messaging us on WhatsApp.</p>' +
+        '<div class="field-row"><input type="file" id="claim-proof-input" accept="image/*" /></div>' +
+        '<div class="field-row"><input type="text" id="claim-note-input" placeholder="Optional note for the client" /></div>' +
+        '<p class="modal-error" id="claim-submit-error"></p>' +
+        '<button class="btn btn-block" id="claim-submit-btn" type="button">Submit for review</button>';
+
+      document.getElementById('claim-submit-btn').addEventListener('click', function () {
+        var fileInput = document.getElementById('claim-proof-input');
+        var noteInput = document.getElementById('claim-note-input');
+        var err = document.getElementById('claim-submit-error');
+        var btn = document.getElementById('claim-submit-btn');
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) { err.textContent = 'Choose a proof photo to upload.'; return; }
+
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+
+        resizeImageFileToDataUri(file, 1000, 0.8)
+          .then(function (dataUri) {
+            return api('/gigs/' + gig.id + '/submit', {
+              method: 'POST',
+              auth: true,
+              body: { proofBase64: dataUri, note: noteInput.value.trim() || undefined },
+            });
+          })
+          .then(function () {
+            claimModalBody.innerHTML =
+              '<h3 id="claim-modal-title">Submitted</h3>' +
+              '<p class="kyc-note">Sent for the client’s sign-off. You’ll be paid once they approve it.</p>' +
+              '<button class="btn btn-block" id="claim-done-btn" type="button">Done</button>';
+            document.getElementById('claim-done-btn').addEventListener('click', function () {
+              closeClaimModal();
+              loadBrowseList();
+            });
+          })
+          .catch(function (e) {
+            err.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Submit for review';
+          });
+      });
     }
 
     var profileStateSelect = document.getElementById('profile-state');
