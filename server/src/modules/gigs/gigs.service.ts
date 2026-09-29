@@ -442,6 +442,26 @@ export class GigsService implements GigsPort {
     return gigs.map((g) => this.toGigRecord(g));
   }
 
+  /**
+   * PLAN.md "Claim + submit a gig from the web client" — once claimed, a
+   * gig drops out of both listGigs (status is no longer 'open') and
+   * listInvitedGigs (same reason), so a professional who claims from the
+   * web had no way to ever see that gig again there — a real gap, not a
+   * hypothetical, flagged in that section and closed here. Claim rows
+   * persist for the whole gig lifecycle (claim.status stays 'active' from
+   * holdStake through release — nothing in this codebase ever sets it to
+   * 'completed' or 'withdrawn'), so querying by professionalId here covers
+   * every gig this professional has ever claimed, at any status.
+   */
+  async listClaimedGigs(professionalId: string): Promise<GigRecord[]> {
+    const claims = await this.prisma.claim.findMany({
+      where: { professionalId, status: { not: 'withdrawn' } },
+      include: { gig: { include: GIG_INCLUDE } },
+      orderBy: { claimedAt: 'desc' },
+    });
+    return claims.map((c) => this.toGigRecord(c.gig));
+  }
+
   async submitForReview(
     gigId: string,
     professionalId: string,

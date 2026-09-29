@@ -3235,8 +3235,69 @@ hidden after close. No page errors. Screenshots taken at each step.
 
 Deliberately not built here (out of scope for this pass, not asked):
 a dedicated in-app decline button on web (WhatsApp reply-NO is still the
-only decline path, unchanged), and a "my claimed gigs" list — the honest
-in-modal copy above is the stopgap until that's asked for.
+only decline path, unchanged).
+
+---
+
+## "My claimed gigs" list — closing the gap from the section above
+
+**Asked:** "Please fix this gap. Users should be perpetually able to view
+all their gigs even after claiming it" — the gap being the one flagged
+above: once claimed, a gig drops out of both `GET /gigs` and
+`GET /gigs/invited` (neither includes non-`open` gigs), so a professional
+who closed the claim modal before submitting proof had no way to find
+that gig again on the web.
+
+**Source of truth used:** the `Claim` model, not `Gig.status`. A `Claim`
+row is created once, in `EscrowService.holdStake`, with `status: 'active'`
+— nothing anywhere in the codebase ever transitions it to `'completed'`
+or `'withdrawn'` (grepped to confirm), so it stays `'active'` for the
+gig's entire lifecycle after that. Querying `Claim` by `professionalId`
+therefore reliably returns every gig a professional has ever claimed, at
+any status, without needing to reconstruct that history from `Gig` alone.
+
+**Built:**
+- `GigsService.listClaimedGigs(professionalId)` — `prisma.claim.findMany`
+  by `professionalId` (excluding `withdrawn`, defensively — never set
+  today, but cheap to guard), joined to the gig, ordered by `claimedAt`
+  desc. Deliberately not added to `GigsPort`, same call as
+  `listInvitedGigs` before it — only `GigsController` calls it.
+- `GET /gigs/claimed` (`JwtAuthGuard`), registered ahead of `:id` for the
+  same reason `mine`/`invited` are.
+- `index.html`'s **My gigs** tab (`loadMineList`) now fetches
+  `/gigs/claimed` alongside the existing `/gigs/mine`, for professional
+  accounts, and renders a "Claimed by you" section above "Posted by
+  you" (new `.shell-section-title` styling — both sections only show a
+  header when both are non-empty, so a professional-only or client-only
+  account sees a plain unlabeled list, unchanged from before). Each
+  claimed gig shows a status pill and, for `claimed`/`in_progress`, a
+  "Submit for review" button that reopens `#claim-modal` directly on its
+  submit step (new `openSubmitModal(gig)`, skips the claim step since
+  it's already claimed) — for every later status (`submitted`,
+  `signed_off`, `disputed`, `released`, `refunded`, `cancelled`) it shows
+  a plain-language status note instead, no dead button.
+- `gigCard()` picked up a 5th parameter (`actionLabel`) so the same
+  function renders either "Claim this gig" or "Submit for review"
+  depending on caller.
+- The claim modal's submit step and "Done" step no longer promise a
+  mobile/WhatsApp-only fallback that isn't true anymore — the submit
+  step now says "You can close this and come back any time from the My
+  gigs tab," and "Done" now refreshes both `loadBrowseList()` and
+  `loadMineList()` so whichever tab the professional lands back on is
+  already current.
+
+**Verification:** `tsc --noEmit` clean on the server. Full Playwright run
+against a fresh copy served locally, `sorted-api.vercel.app` mocked
+(`/auth/login`, `/gigs/mine`, `/gigs/claimed`, `/gigs/invited`,
+`/gigs?status=open`, `/gigs/:id/submit`): logged in as a hybrid account,
+confirmed the My gigs tab (the default landing tab) shows "Claimed by
+you" above "Posted by you" with gigs in the right sections and order,
+confirmed a `claimed`-status gig shows exactly one "Submit for review"
+button and a `submitted`-status gig shows the status note instead of a
+button, clicked "Submit for review" and confirmed the modal opens
+directly on the submit step (not the claim step), completed the
+submission, confirmed the "Done" refresh drops the button once the mock
+gig moved to `submitted`. No page errors. Screenshots taken.
 
 ---
 

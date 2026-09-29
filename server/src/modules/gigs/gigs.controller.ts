@@ -78,6 +78,21 @@ export class GigsController {
     return this.gigs.listInvitedGigs(user.userId);
   }
 
+  /**
+   * Every gig THIS professional has ever claimed, at any status — the
+   * counterpart to `mine` for a professional instead of a client.
+   * Registered ahead of `:id` for the same reason `mine`/`invited` are.
+   * See GigsService.listClaimedGigs's doc comment for why this endpoint
+   * exists: once claimed, a gig drops out of both `GET /gigs` and
+   * `GET /gigs/invited`, so without this there was no way to ever see it
+   * again on the web client.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('claimed')
+  listClaimed(@CurrentUser() user: AuthenticatedUser) {
+    return this.gigs.listClaimedGigs(user.userId);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.gigs.getGig(id);

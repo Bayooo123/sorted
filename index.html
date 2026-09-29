@@ -1174,6 +1174,9 @@
 
   .shell-empty { text-align: center; color: var(--text-muted); font-size: 14px; padding: 40px 20px; }
 
+  .shell-section-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 10px; }
+  .shell-section-title:not(:first-child) { margin-top: 24px; }
+
   .profile-row {
     display: flex;
     justify-content: space-between;
@@ -2442,7 +2445,7 @@
       });
     });
 
-    function gigCard(gig, note, invited, onClaim) {
+    function gigCard(gig, note, invited, onAction, actionLabel) {
       var card = document.createElement('div');
       card.className = invited ? 'gig-card gig-card-invited' : 'gig-card';
       var tone = gig.status === 'open' ? 'active' : 'neutral';
@@ -2464,15 +2467,16 @@
         card.appendChild(noteEl);
       }
       // PLAN.md "Claim + submit a gig from the web client" — professional
-      // accounts get a real Claim button instead of the static note above.
-      if (onClaim) {
-        var claimBtn = document.createElement('button');
-        claimBtn.className = 'btn btn-block';
-        claimBtn.type = 'button';
-        claimBtn.style.marginTop = '10px';
-        claimBtn.textContent = 'Claim this gig';
-        claimBtn.addEventListener('click', function () { onClaim(gig); });
-        card.appendChild(claimBtn);
+      // accounts get a real action button (claim, or resume submitting)
+      // instead of the static note above.
+      if (onAction) {
+        var actionBtn = document.createElement('button');
+        actionBtn.className = 'btn btn-block';
+        actionBtn.type = 'button';
+        actionBtn.style.marginTop = '10px';
+        actionBtn.textContent = actionLabel || 'Claim this gig';
+        actionBtn.addEventListener('click', function () { onAction(gig); });
+        card.appendChild(actionBtn);
       }
       return card;
     }
@@ -2485,23 +2489,68 @@
     // which — like sign-off itself — isn't built on the web client yet,
     // only on mobile (ReviewSignOffScreen). See loadMineList's note below.
 
+    // PLAN.md "Claim + submit a gig from the web client" (follow-up: "Users
+    // should be perpetually able to view all their gigs even after
+    // claiming it") — once claimed, a gig drops out of both the open-gigs
+    // list and the invited-gigs list, so without a dedicated "claimed by
+    // you" view here a professional who claims from the web could lose
+    // track of it the moment they leave the claim modal. GET /gigs/claimed
+    // returns every gig this professional has ever claimed, at any status.
+    function claimedGigNote(gig) {
+      switch (gig.status) {
+        case 'submitted': return 'Submitted — waiting on the client to sign off and release payment.';
+        case 'signed_off': return 'Signed off — payment release is in progress.';
+        case 'disputed': return 'Disputed — check WhatsApp or the Sorted app for updates.';
+        case 'released': return 'Complete — paid out.';
+        case 'refunded': return 'Refunded to the client.';
+        case 'cancelled': return 'Cancelled.';
+        default: return null; // claimed / in_progress get the Submit button instead
+      }
+    }
+
     function loadMineList() {
       var container = document.getElementById('shell-mine-list');
       container.innerHTML = '<p class="shell-empty">Loading…</p>';
-      api('/gigs/mine', { auth: true })
-        .then(function (gigs) {
+      var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
+      Promise.all([
+        api('/gigs/mine', { auth: true }),
+        isProfessional ? api('/gigs/claimed', { auth: true }).catch(function () { return []; }) : Promise.resolve([]),
+      ])
+        .then(function (results) {
+          var posted = results[0];
+          var claimed = results[1];
           container.innerHTML = '';
-          if (gigs.length === 0) {
-            container.innerHTML = '<p class="shell-empty">No gigs posted yet — try the "Post a gig" tab.</p>';
+          if (posted.length === 0 && claimed.length === 0) {
+            container.innerHTML = '<p class="shell-empty">No gigs yet' +
+              (isProfessional ? ' — claim one from the Browse tab, or try the "Post a gig" tab.' : ' — try the "Post a gig" tab.') +
+              '</p>';
             return;
           }
-          gigs.forEach(function (gig) {
-            // Sign-off (and now payment — PLAN.md "Split payment pivot")
-            // isn't built on the web yet, only on the mobile app — say so
-            // plainly rather than showing a dead button.
-            var note = gig.status === 'submitted' ? 'Review, sign off, and pay from the Sorted mobile app.' : null;
-            container.appendChild(gigCard(gig, note));
-          });
+          if (claimed.length > 0) {
+            var claimedTitle = document.createElement('p');
+            claimedTitle.className = 'shell-section-title';
+            claimedTitle.textContent = 'Claimed by you';
+            container.appendChild(claimedTitle);
+            claimed.forEach(function (gig) {
+              var canSubmit = gig.status === 'claimed' || gig.status === 'in_progress';
+              container.appendChild(gigCard(gig, claimedGigNote(gig), false, canSubmit ? openSubmitModal : null, 'Submit for review'));
+            });
+          }
+          if (posted.length > 0) {
+            if (claimed.length > 0) {
+              var postedTitle = document.createElement('p');
+              postedTitle.className = 'shell-section-title';
+              postedTitle.textContent = 'Posted by you';
+              container.appendChild(postedTitle);
+            }
+            posted.forEach(function (gig) {
+              // Sign-off (and now payment — PLAN.md "Split payment pivot")
+              // isn't built on the web yet, only on the mobile app — say so
+              // plainly rather than showing a dead button.
+              var note = gig.status === 'submitted' ? 'Review, sign off, and pay from the Sorted mobile app.' : null;
+              container.appendChild(gigCard(gig, note));
+            });
+          }
         })
         .catch(function (err) {
           container.innerHTML = '';
@@ -2575,6 +2624,12 @@
       renderClaimStep(gig);
     }
 
+    /** Resume submitting proof for a gig that's already claimed — the "Submit for review" button on the My gigs tab's "Claimed by you" section. */
+    function openSubmitModal(gig) {
+      claimModal.hidden = false;
+      renderSubmitStep(gig);
+    }
+
     function renderClaimStep(gig) {
       claimModalBody.innerHTML =
         '<h3 id="claim-modal-title">Claim this gig</h3>' +
@@ -2609,7 +2664,7 @@
     function renderSubmitStep(gig) {
       claimModalBody.innerHTML =
         '<h3 id="claim-modal-title">Claimed — submit your work</h3>' +
-        '<p class="kyc-note">You’ve claimed <strong>' + escapeHtml(gig.title) + '</strong>. When the work is done, upload a proof photo below to send it for the client’s sign-off. If you close this now, this claimed gig won’t be listed anywhere else on the web yet — finish it here, from the Sorted mobile app, or by messaging us on WhatsApp.</p>' +
+        '<p class="kyc-note">You’ve claimed <strong>' + escapeHtml(gig.title) + '</strong>. When the work is done, upload a proof photo below to send it for the client’s sign-off. You can close this and come back any time from the My gigs tab.</p>' +
         '<div class="field-row"><input type="file" id="claim-proof-input" accept="image/*" /></div>' +
         '<div class="field-row"><input type="text" id="claim-note-input" placeholder="Optional note for the client" /></div>' +
         '<p class="modal-error" id="claim-submit-error"></p>' +
@@ -2642,7 +2697,11 @@
               '<button class="btn btn-block" id="claim-done-btn" type="button">Done</button>';
             document.getElementById('claim-done-btn').addEventListener('click', function () {
               closeClaimModal();
+              // Refresh both — whichever tab the professional lands back
+              // on (Browse or My gigs) should reflect the new status
+              // immediately, not just the one they claimed from.
               loadBrowseList();
+              loadMineList();
             });
           })
           .catch(function (e) {
