@@ -65,6 +65,19 @@ export class GigsController {
     return this.gigs.listGigs(query);
   }
 
+  /**
+   * Gigs a client invited THIS professional to directly (Directory "Hire"
+   * flow) that are still open — the only place any of them are visible
+   * anywhere in the app; `GET /gigs` excludes every restricted gig, even
+   * ones restricted to the caller. Registered ahead of `:id` for the same
+   * reason `mine` is. See GigsService.listInvitedGigs's doc comment.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('invited')
+  listInvited(@CurrentUser() user: AuthenticatedUser) {
+    return this.gigs.listInvitedGigs(user.userId);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.gigs.getGig(id);

@@ -3107,6 +3107,63 @@ Logistics:     platformFeeBps=0 (WAIVED)  → feeKobo=0, totalChargeKobo=1050000
 
 ---
 
+## Surface direct invites in the app
+
+A real bug report from the founder's own live test, not a hypothetical:
+he directly hired a professional (a ₦10,500 Laundry & Dry Cleaning job),
+confirmed via production logs that the invite email fired correctly —
+then the professional replied "I got this email notification, but can't
+find the job details on my page," with a screenshot of the actual email.
+
+**Root cause, and it predates the email work:** every gig-listing query
+in the codebase excludes restricted gigs by design — public `GET /gigs`
+(`GigsService.listGigs`'s own doc comment explains why: it's
+unauthenticated, so there's no caller identity to check "is this you"),
+the WhatsApp bot's "jobs" browse command (`showAvailableGigs`), and —
+until now — every authenticated endpoint too. There was no way, anywhere
+in the app, for a professional to see a gig restricted directly to them.
+The only working accept path was replying YES to the bot's own WhatsApp
+message using session state (`WhatsAppSession.pendingInviteGigId`) — no
+HTTP/app-based path existed at all. The invite email's "Open Sorted to
+respond" button was, in effect, a dead end: opening the app logged them
+in but led nowhere, because nothing anywhere queried for this.
+
+**Fix:** `GigsService.listInvitedGigs(professionalId)` — the authenticated
+counterpart `listGigs` deliberately doesn't provide: gigs restricted to
+THIS caller specifically, still `open`. New `GET /gigs/invited`
+(`JwtAuthGuard`), registered ahead of `:id` (same reason `mine` is).
+Deliberately not added to `GigsPort` — only `GigsController` calls it,
+same as `sendInvite`.
+
+- **Mobile:** `BrowseMarketScreen` (the professional's job-browsing
+  screen) now fetches `/gigs/invited` alongside the existing open-gigs
+  list and renders invited gigs in their own mint-highlighted section at
+  the top, each tapping into the **existing** `ClaimWorkScreen` —
+  `POST /gigs/:id/claim` (`EscrowService.holdStake`) already correctly
+  enforces the restriction (`FixedPriceAcceptStrategy` throws if the
+  claimant isn't the invited professional), so no claim-flow changes
+  were needed, only discovery. A dedicated in-app decline button was
+  deliberately NOT built here (scope discipline against an already-urgent
+  fix) — WhatsApp's reply-NO decline still works as the fallback, same as
+  before.
+- **Web:** `index.html`'s Browse tab gets the equivalent section,
+  visually distinguished the same way. Since claiming was never built on
+  the web client at all (pre-existing, unrelated to this bug — every
+  open gig already showed "Claiming isn't available yet — coming soon"),
+  invited gigs get the same honest treatment rather than a claim button
+  that couldn't work: "Invited to you directly... claiming isn't
+  available on web yet, use the Sorted app (or reply on WhatsApp)."
+
+**Verification:** backend — `tsc --noEmit`/`nest build`/live boot test
+confirm `/gigs/invited` maps with zero DI errors. Mobile — `tsc --noEmit`
+clean (no simulator in this sandbox, not visually tested, same disclosed
+limitation as every other mobile UI change this session). Web — driven
+in headless Chromium with a mocked invited gig: confirmed it renders in
+the distinct mint-styled card with the correct explanatory note, above
+the (empty, in the test) regular open-gigs list.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

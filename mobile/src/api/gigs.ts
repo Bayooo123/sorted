@@ -34,6 +34,11 @@ export function listMyGigs(filter?: GigListFilter) {
   return api.get<GigRecord[]>(`gigs/mine${toQuery(filter)}`);
 }
 
+/** Gigs a client invited the signed-in professional to directly (Directory "Hire" flow) that are still open. See gigs.controller.ts's doc comment — listGigs() above deliberately excludes these. */
+export function listInvitedGigs() {
+  return api.get<GigRecord[]>('gigs/invited');
+}
+
 /** Professional-only, must hold the active claim. Whole-gig proof + note, transitions in_progress -> submitted. */
 export function submitForReview(gigId: string, proofBase64: string, note?: string) {
   return api.post<GigRecord>(`gigs/${gigId}/submit`, { proofBase64, note });

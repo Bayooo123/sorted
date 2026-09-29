@@ -422,6 +422,26 @@ export class GigsService implements GigsPort {
     return gigs.map((g) => this.toGigRecord(g));
   }
 
+  /**
+   * Real bug, not a hypothetical: a professional who gets a direct-invite
+   * (email or WhatsApp) had no way to find that gig anywhere in the app —
+   * `listGigs` deliberately excludes every restricted gig (see its own
+   * doc comment), including ones restricted to the very professional
+   * asking, and there was no authenticated alternative that included
+   * them. The only working accept path was replying YES on WhatsApp.
+   * This is that alternative: gigs restricted to THIS professional,
+   * still open (once claimed/expired they're not a pending invite
+   * anymore — they belong on the normal claimed-gig views instead).
+   */
+  async listInvitedGigs(professionalId: string): Promise<GigRecord[]> {
+    const gigs = await this.prisma.gig.findMany({
+      where: { restrictedToProfessionalId: professionalId, status: 'open' },
+      include: GIG_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+    });
+    return gigs.map((g) => this.toGigRecord(g));
+  }
+
   async submitForReview(
     gigId: string,
     professionalId: string,

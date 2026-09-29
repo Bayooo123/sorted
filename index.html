@@ -1128,6 +1128,8 @@
     margin-bottom: 12px;
   }
 
+  .gig-card-invited { border-color: var(--green-bright); background: var(--green-mint-bg); }
+
   .gig-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
 
   .gig-card-title { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 16px; color: var(--text-primary); }
@@ -2426,9 +2428,9 @@
       });
     });
 
-    function gigCard(gig, note) {
+    function gigCard(gig, note, invited) {
       var card = document.createElement('div');
-      card.className = 'gig-card';
+      card.className = invited ? 'gig-card gig-card-invited' : 'gig-card';
       var tone = gig.status === 'open' ? 'active' : 'neutral';
       card.innerHTML =
         '<div class="gig-card-head">' +
@@ -2482,16 +2484,27 @@
         });
     }
 
+    // PLAN.md "Surface direct invites in the app" — GET /gigs deliberately
+    // excludes every restricted gig, even ones restricted to the caller
+    // (see gigs.service.ts's listGigs doc comment), so a directly-invited
+    // professional had no way to find that gig anywhere in the app, web
+    // included — a real bug report, not a hypothetical. GET /gigs/invited
+    // is the authenticated alternative that does include them.
     function loadBrowseList() {
       var container = document.getElementById('shell-browse-list');
       container.innerHTML = '<p class="shell-empty">Loading…</p>';
-      api('/gigs?status=open')
-        .then(function (gigs) {
+      Promise.all([api('/gigs?status=open'), api('/gigs/invited', { auth: true }).catch(function () { return []; })])
+        .then(function (results) {
+          var gigs = results[0];
+          var invitedGigs = results[1];
           container.innerHTML = '';
-          if (gigs.length === 0) {
+          if (gigs.length === 0 && invitedGigs.length === 0) {
             container.innerHTML = '<p class="shell-empty">No open gigs right now.</p>';
             return;
           }
+          invitedGigs.forEach(function (gig) {
+            container.appendChild(gigCard(gig, 'Invited to you directly by a client — claiming isn’t available on web yet, use the Sorted app (or reply on WhatsApp if you’ve messaged us before).', true));
+          });
           gigs.forEach(function (gig) {
             container.appendChild(gigCard(gig, 'Claiming isn’t available yet — coming soon.'));
           });
