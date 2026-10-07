@@ -3379,9 +3379,6 @@ not papered over.
   starved of input.
 
 **Deliberately not built in this pass:**
-- Client UI (web/mobile/WhatsApp) for entering a postcode — server
-  plumbing first, since a live NIPOST endpoint is still unconfirmed and a
-  UI with nothing real behind it would be worse than no UI.
 - Geo-proximity gig ranking/filtering — a real, separate opportunity
   this investigation surfaced (matching has none today), not attempted
   here.
@@ -3398,6 +3395,42 @@ against a real `AppModule`, no DB needed to reach this far) confirms
 `PostcodeModule` resolves with no cycles from both `GigsModule` and
 `IdentityModule` — "BOOT OK" printed before the expected DB-connection
 failure.
+
+### Follow-up: the web field itself ("Got a NIPOST postcode? (optional)")
+
+The founder asked, in simpler terms, how to actually help users take
+advantage of this, and to include the field directly rather than leave
+it server-only. Added to `index.html`'s "Post a gig" form, right under
+Location: a plain text input, a one-line hint explaining what it is and
+that skipping it is fine, and a pure offline format check (mirrors
+`postcode-format.ts`'s grammar exactly, so the same code isn't trusted
+twice) that shows an inline error on blur and blocks submit with a
+specific message — never a network round trip just to catch a typo.
+Wired into the existing `POST /gigs` call as `postcode`, matching what
+`GigsService.createGig` already expects. Mobile and WhatsApp intentionally
+not touched yet — one surface at a time, web is the one both this
+founder's and the earlier PRD conversation called the most current.
+
+Also raised in this conversation: a **separate rider app** is in
+progress. Flagged back to the founder, not yet investigated — this
+session has no visibility into that codebase (not in this repo). The
+postcode-to-coordinates resolution built here is provider-agnostic
+(`PostcodeService.resolve()` just returns lat/lng; nothing about it
+assumes KWIK), so whatever the rider app ends up reading from — this
+same `Gig.postcode`/`locationGeoLat/Lng`, or its own copy of the same
+NIPOST call — needs no rework here to be reused. Confirming that needs
+eyes on the rider app's actual repo/plan once it's accessible.
+
+**Verification (web field):** `node --check` on the extracted inline
+script, clean. Playwright: typed an intentionally invalid postcode
+(`ZZ-00-A03-FK-00`), confirmed the exact segment-level error shows on
+blur with red styling; typed a valid one (`LA-11-W06-TC-10`), confirmed
+the error clears back to the hint text. Screenshot taken of the error
+state. Submitting the full form through to `POST /gigs` wasn't exercised
+end-to-end in this pass (the test's taxonomy-chip mock didn't fully
+match the real endpoint shape) — the format validator, which is the only
+new logic, was confirmed directly; reading the code confirms `postcode`
+is included in the request body exactly like every sibling field.
 
 ---
 
