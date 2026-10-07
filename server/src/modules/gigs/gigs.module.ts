@@ -9,6 +9,7 @@ import { DeliveryModule } from '../delivery/delivery.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ReputationNotificationsModule } from '../reputation-notifications/reputation-notifications.module';
+import { PostcodeModule } from '../postcode/postcode.module';
 
 // AuthModule is imported directly (not just via IdentityModule) because
 // GigsController's own routes need JwtAuthGuard — importing shared auth
@@ -35,7 +36,7 @@ import { ReputationNotificationsModule } from '../reputation-notifications/reput
 // NOTIFICATIONS_PORT to send the invited professional an email alongside
 // the existing WhatsApp message.
 @Module({
-  imports: [IdentityModule, MatchingModule, AuthModule, DeliveryModule, WhatsappModule, PaymentsModule, ReputationNotificationsModule],
+  imports: [IdentityModule, MatchingModule, AuthModule, DeliveryModule, WhatsappModule, PaymentsModule, ReputationNotificationsModule, PostcodeModule],
   controllers: [TaxonomyController, GigsController],
   providers: [GigsService],
   exports: [GigsService],

@@ -10,6 +10,7 @@ import { PrismaTx } from '../../common/prisma-tx';
 import { DeliveryService } from '../delivery/delivery.service';
 import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
+import { PostcodeService } from '../postcode/postcode.service';
 import {
   CreateGigInput,
   GigListFilter,
@@ -68,6 +69,7 @@ export class GigsService implements GigsPort {
     private readonly delivery: DeliveryService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
+    private readonly postcode: PostcodeService,
   ) {}
 
   async createGig(input: CreateGigInput): Promise<GigRecord> {
@@ -109,6 +111,19 @@ export class GigsService implements GigsPort {
       submarket: input.submarket,
     });
 
+    // PLAN.md "NIPOST digital postcode integration" — locationGeo stays
+    // the primary way to supply coordinates (e.g. a map picker, if one is
+    // ever built); postcode is a fallback only used when the caller didn't
+    // already supply coordinates directly. Best-effort: an unresolvable or
+    // unconfigured postcode just means the gig is created with no
+    // coordinates, same as before this existed — DeliveryService already
+    // treats that as "skip dispatch, don't fail the gig."
+    let locationGeo = input.locationGeo;
+    if (!locationGeo && input.postcode) {
+      const resolved = await this.postcode.resolve(input.postcode);
+      if (resolved) locationGeo = { lat: resolved.lat, lng: resolved.lng };
+    }
+
     const gig = await this.prisma.gig.create({
       data: {
         clientId: input.clientId,
@@ -120,8 +135,9 @@ export class GigsService implements GigsPort {
         submarketId: submarket.id,
         clientTypeId: clientType.id,
         locationText: input.locationText,
-        locationGeoLat: input.locationGeo?.lat,
-        locationGeoLng: input.locationGeo?.lng,
+        locationGeoLat: locationGeo?.lat,
+        locationGeoLng: locationGeo?.lng,
+        postcode: input.postcode ?? null,
         materialsMode: input.materialsMode,
         bountyKobo: BigInt(pricing.finalPriceKobo),
         restrictedToProfessionalId: input.restrictedToProfessionalId ?? null,
@@ -519,6 +535,7 @@ export class GigsService implements GigsPort {
       locationText: gig.locationText,
       locationGeoLat: gig.locationGeoLat,
       locationGeoLng: gig.locationGeoLng,
+      postcode: gig.postcode,
       materialsMode: gig.materialsMode as GigRecord['materialsMode'],
       status: gig.status as GigStatus,
       bountyKobo: kobo(Number(gig.bountyKobo)),

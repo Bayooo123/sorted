@@ -29,6 +29,7 @@ export class GigsController {
       clientType: dto.clientType,
       locationText: dto.locationText,
       locationGeo: dto.locationGeo,
+      postcode: dto.postcode,
       materialsMode: dto.materialsMode,
       bountyKobo: kobo(dto.bountyKobo),
       criteria: dto.criteria,

@@ -16,6 +16,7 @@ import { NIGERIAN_STATES } from '../../common/nigerian-states';
 import { isValidImageDataUri, MAX_IMAGE_DATA_URI_LENGTH } from '../../common/image-data-uri';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interface';
+import { PostcodeService } from '../postcode/postcode.service';
 import {
   AccountType,
   ApplyForKycInput,
@@ -135,6 +136,7 @@ export class IdentityService implements IdentityPort {
     private readonly jwt: JwtService,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
     @Inject(PAYMENTS_PROVIDER) private readonly payments: PaymentsProvider,
+    private readonly postcode: PostcodeService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -273,7 +275,16 @@ export class IdentityService implements IdentityPort {
   }
 
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<IdentityUser> {
-    const data: { name?: string; phone?: string; state?: string; displayName?: string | null } = {};
+    const data: {
+      name?: string;
+      phone?: string;
+      state?: string;
+      displayName?: string | null;
+      professionalAddressText?: string;
+      professionalAddressPostcode?: string | null;
+      professionalAddressLat?: number | null;
+      professionalAddressLng?: number | null;
+    } = {};
 
     if (input.name !== undefined) {
       const name = input.name.trim();
@@ -307,6 +318,30 @@ export class IdentityService implements IdentityPort {
         throw new ConflictException('An account with this phone number already exists');
       }
       data.phone = phone;
+    }
+
+    if (input.professionalAddressText !== undefined) {
+      data.professionalAddressText = input.professionalAddressText.trim();
+    }
+
+    // PLAN.md "NIPOST digital postcode integration" — resolving fills
+    // professionalAddressLat/Lng, which is all DeliveryService actually
+    // reads; the postcode itself is stored too so it can be shown back
+    // and re-resolved later if NIPOST's data improves. Best-effort: an
+    // unresolvable or unconfigured postcode is still saved as text, just
+    // without coordinates — same "never fail the real update" discipline
+    // as every other best-effort call in this codebase.
+    if (input.professionalAddressPostcode !== undefined) {
+      const postcode = input.professionalAddressPostcode.trim();
+      data.professionalAddressPostcode = postcode || null;
+      if (postcode) {
+        const resolved = await this.postcode.resolve(postcode);
+        data.professionalAddressLat = resolved?.lat ?? null;
+        data.professionalAddressLng = resolved?.lng ?? null;
+      } else {
+        data.professionalAddressLat = null;
+        data.professionalAddressLng = null;
+      }
     }
 
     if (Object.keys(data).length === 0) return this.getUser(userId);
@@ -443,6 +478,8 @@ export class IdentityService implements IdentityPort {
         : null,
       serviceOfferingSubmarketIds: user.serviceOfferings.map((o) => o.submarketId),
       seekingCategorySubmarketIds: user.seekingCategories.map((c) => c.submarketId),
+      professionalAddressText: user.professionalAddressText,
+      professionalAddressPostcode: user.professionalAddressPostcode,
     };
   }
 

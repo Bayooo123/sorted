@@ -3301,6 +3301,106 @@ gig moved to `submitted`. No page errors. Screenshots taken.
 
 ---
 
+## NIPOST digital postcode integration
+
+**Asked:** the founder read a third-party blog post about Nigeria's new
+National Digital Alphanumeric Postcode System (NIPOST, launched 1 Oct
+2026 — independently confirmed via government press coverage, not just
+the blog) and an open-source Go library wrapping it in an MCP server for
+LLM agents, and asked what this means for Sorted and how to best leverage
+it ("i think its a groundbreaker").
+
+**What investigating the actual codebase turned up, not hypothetical:**
+`DeliveryService` (KWIK courier dispatch for Laundry & Dry Cleaning gigs)
+has always required `Gig.locationGeoLat/Lng` for the client side and
+`User.professionalAddressLat/Lng` for the professional's shop — but
+**nothing anywhere in the app, across web, mobile, or the WhatsApp bot,
+has ever set either pair.** `locationGeo` exists only as an unused type
+in the mobile API client; `professionalAddressText/Lat/Lng` wasn't even
+on the `IdentityUser` interface returned to any client, let alone
+settable via `UpdateProfileDto`. Concretely: every single KWIK dispatch
+call in production has been silently failing closed (logged, a
+`DeliveryTask` row written with a `failureReason`, nothing surfaced to
+anyone) since the feature was built — this is what `DeliveryService`'s
+own "client location has no geocoded coordinates... WhatsApp-originated
+gigs commonly lack this" comment was already flagging. Separately,
+nothing in `matching`/`listGigs`/`listInvitedGigs` does any geo-proximity
+filtering or ranking at all — `locationText` is purely cosmetic display
+text today.
+
+**Why postcodes are the right fix, not just a trend to chase:** the
+missing piece was never geocoding technology — it was that building a
+GPS/map-picker UI across three clients is a real lift nobody had done.
+A NIPOST postcode is just an 11-character string a person can type or
+read out on a WhatsApp call, which turns "add a map picker everywhere"
+into "add one optional text field, resolve it server-side." That's a
+small, bounded lift for a real, already-flagged, previously silent gap.
+
+**What was verified independently before building on it** (web search +
+direct fetch, not taken from the blog alone): Nigeria's National Digital
+Postcode is real government infrastructure — Minister Bosun Tijani's 1
+Oct 2026 launch, NIPOST targeting 90%+ building coverage in large
+population centers (Lagos included) by launch day, full nationwide
+rollout targeted for December 2026. The specific Go library/MCP server
+from the blog, however, is an unofficial, single-developer side project
+(5 GitHub stars, 1 fork) wrapping NIPOST's API — useful as a reference
+for the documented grammar, not something to depend on directly. Several
+news sources covering real-world adoption caveats were blocked by this
+sandbox's egress proxy and could not be read — that gap is disclosed,
+not papered over.
+
+**What was built (server-side, Stage 1 of a staged rollout):**
+- `Gig.postcode` and `User.professionalAddressPostcode` (both nullable,
+  additive — `locationText`/`professionalAddressText` remain the
+  required/primary fields; postcode adoption is one week old nationally,
+  so it's a bonus input, never a requirement).
+- New `PostcodeModule` (`postcode.interface.ts`, `postcode-format.ts`,
+  `nipost-postcode.provider.ts`, `postcode.service.ts`) — a lean leaf
+  module, same shape as `DeliveryModule`/`PaymentsModule`.
+  - `validatePostcodeFormat()` is a pure, offline, zero-network grammar
+    check (State 2 letters / LGA 2 digits ≠00 / District 3 alphanumeric /
+    Area 2 letters / Unit 2 digits ≠00) — confidently implemented from the
+    independently-confirmed structure. Deliberately does NOT validate
+    whether a 2-letter state code is a real state: that needs NIPOST's own
+    states list, which this codebase has no verified copy of.
+  - `NipostPostcodeProvider.resolve()` is the live lookup — written with
+    the same explicit honesty as `KwikDeliveryService`: the exact
+    endpoint path/response shape is an unconfirmed best guess
+    (`docs.postcode.gov.ng` was blocked from this sandbox), configurable
+    via `NIPOST_POSTCODE_API_BASE_URL`/`_API_KEY`/`_PATH_LOOKUP`, fails
+    closed (returns `null`, logs a warning) rather than guessing wrong —
+    exactly the "never silently wrong" discipline KWIK's own adapter
+    documents.
+- `GigsService.createGig` and `IdentityService.updateProfile` both:
+  given a postcode, validate its format, best-effort resolve it, and use
+  the result to fill `locationGeoLat/Lng` / `professionalAddressLat/Lng`
+  — the two columns `DeliveryService` already reads. No change to
+  `DeliveryService` itself was needed; it was already correct, just
+  starved of input.
+
+**Deliberately not built in this pass:**
+- Client UI (web/mobile/WhatsApp) for entering a postcode — server
+  plumbing first, since a live NIPOST endpoint is still unconfirmed and a
+  UI with nothing real behind it would be worse than no UI.
+- Geo-proximity gig ranking/filtering — a real, separate opportunity
+  this investigation surfaced (matching has none today), not attempted
+  here.
+- The MCP/LLM-agent angle from the original blog post — Sorted's
+  WhatsApp bot is deterministic session-state code, not an LLM agent
+  deciding which tools to call; MCP's value is specifically for the
+  latter. Revisit only if/when an LLM-driven conversational layer is
+  actually built — until then, calling NIPOST's API directly (as done
+  here) gets 100% of the value with one fewer unverified dependency.
+
+**Verification:** `npx prisma generate` clean. `tsc --noEmit` clean.
+`nest build` clean. Full DI-graph boot test (`NestFactory.create`
+against a real `AppModule`, no DB needed to reach this far) confirms
+`PostcodeModule` resolves with no cycles from both `GigsModule` and
+`IdentityModule` — "BOOT OK" printed before the expected DB-connection
+failure.
+
+---
+
 ## Open items before slices 2–3 can be implemented for real
 
 1. **`SPEC.md` and `/screens`** (HANDOFF.md's companion artifacts) weren't

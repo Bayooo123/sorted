@@ -93,6 +93,14 @@ model User {
   professionalAddressText String?
   professionalAddressLat  Float?
   professionalAddressLng  Float?
+  // NIPOST National Digital Postcode (11-char, e.g. LA-11-W06-TC-10),
+  // launched Oct 2026 — see PostcodeService. Optional: resolving one
+  // populates professionalAddressLat/Lng automatically, same purpose as
+  // typing them in by hand, just a shorter and more precise input. Kept
+  // separate from professionalAddressText since a postcode and a free-text
+  // address are different kinds of input that both resolve to the same
+  // lat/lng columns.
+  professionalAddressPostcode String?
 
   // PLAN.md "Individual vs business accounts": defaults to individual for
   // every existing and new account. Switching to 'business' is enforced
@@ -341,6 +349,16 @@ model Gig {
   locationText   String
   locationGeoLat Float?
   locationGeoLng Float?
+  // NIPOST National Digital Postcode (11-char, e.g. LA-11-W06-TC-10) for
+  // the client's pickup location — see PostcodeService. Optional and
+  // additive: locationText stays the required field since postcode
+  // adoption is brand new (launched Oct 2026) and most clients won't have
+  // theirs handy yet. Resolving one populates locationGeoLat/Lng, which is
+  // what DeliveryService actually needs for KWIK dispatch — until now
+  // nothing in the app ever set those two columns, so dispatch has been
+  // silently skipping every delivery-eligible gig (see DeliveryService's
+  // own "client location has no geocoded coordinates" branch).
+  postcode String?
 
   materialsMode MaterialsMode
   bountyKobo    BigInt // ★ money — integer kobo, never float

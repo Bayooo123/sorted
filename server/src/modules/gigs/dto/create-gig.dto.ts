@@ -50,6 +50,12 @@ export class CreateGigDto {
   @Type(() => LocationGeoDto)
   locationGeo?: LocationGeoDto;
 
+  /** NIPOST National Digital Postcode (PLAN.md "NIPOST digital postcode integration"), e.g. "LA-11-W06-TC-10" — optional, resolved server-side in GigsService.createGig to fill locationGeo when the client didn't supply coordinates directly. */
+  @IsOptional()
+  @IsString()
+  @Length(5, 20)
+  postcode?: string;
+
   @IsIn(['bounty_covers', 'professional_supplies'])
   materialsMode!: 'bounty_covers' | 'professional_supplies';
 
