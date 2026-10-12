@@ -1,7 +1,7 @@
 // Bump this on any deploy where precached assets change shape (new icon
 // files, renamed assets, etc.) — stale caches under the old name are
 // deleted on activate, so bumping it is how you force a clean slate.
-const CACHE_VERSION = 'sorted-v2';
+const CACHE_VERSION = 'sorted-v3';
 
 const PRECACHE_URLS = [
   '/',

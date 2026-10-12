@@ -10,8 +10,13 @@
 <meta property="og:description" content="Book a trusted dry cleaner in Lagos. Every item counted, every step tracked. Live now in Yaba." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.sorted.com.ng/" />
-<link rel="icon" type="image/svg+xml" href="/favicon-mark.svg" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.json" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Sorted" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -189,6 +194,19 @@
   .contacts a { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; font-size: 18px; }
   .contacts svg { width: 22px; height: 22px; }
 
+  /* Install the app (PWA) */
+  [data-install][hidden] { display: none; }
+  .install-sheet {
+    border: 0; padding: 0; margin: auto auto 0; width: 100%; max-width: 480px;
+    background: var(--cream); color: var(--green); border-radius: 28px 28px 0 0;
+  }
+  .install-sheet::backdrop { background: rgba(15, 42, 36, 0.5); }
+  .install-sheet .inner { padding: 28px 24px 32px; display: grid; gap: 16px; }
+  .install-sheet ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 17px; }
+  .install-sheet .app-row { display: flex; align-items: center; gap: 14px; }
+  .install-sheet .app-row img { width: 56px; height: 56px; border-radius: 14px; }
+  @media (min-width: 561px) { .install-sheet { margin: auto; border-radius: 28px; } }
+
   footer { padding: 40px 0 56px; color: var(--ink-3); font-size: 14px; }
   .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
   .foot a { text-decoration: none; margin-left: 20px; }
@@ -209,6 +227,7 @@
     .tag { width: 270px; }
     .riders-card, .band { padding: 28px 24px; }
     .foot a { margin: 0 20px 0 0; }
+    .nav [data-install] { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn { transition: none; } }
 </style>
@@ -225,6 +244,7 @@
       <a href="#how">How it works</a>
       <a href="#dry-cleaners">For dry cleaners</a>
       <a href="#riders">Riders</a>
+      <button class="btn btn-outline" type="button" data-install style="color:var(--cream);border-color:rgba(242,238,227,0.35)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Install</button>
       <a class="btn btn-lime" href="/app">Open the app</a>
     </nav>
   </div>
@@ -239,6 +259,7 @@
         <p class="lede">Book a trusted dry cleaner near you. Your clothes are collected, every item is counted, and they come back clean.</p>
         <div class="cta-row">
           <a class="btn btn-lime" href="/app">Book a pickup</a>
+          <button class="btn btn-outline" type="button" data-install><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Install the app</button>
           <a class="btn btn-outline" id="wa-hero" href="https://wa.me/2349031812675" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.5A8.4 8.4 0 1 1 21 11.5z"/></svg>
             Chat on WhatsApp
@@ -350,11 +371,23 @@
           <a href="tel:+2349031812675"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>+234 903 181 2675</a>
           <a href="mailto:info@sorted.com.ng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>info@sorted.com.ng</a>
           <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Open the app</a>
+          <a href="#" data-install><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Install the app</a>
         </div>
       </div>
     </div>
   </section>
 </main>
+
+<dialog class="install-sheet" id="install-sheet" aria-labelledby="install-title">
+  <div class="inner">
+    <div class="app-row">
+      <img src="/icons/icon-192.png" alt="" />
+      <div><h3 id="install-title">Install Sorted</h3><p class="label" style="margin-top:4px">Free · works like an app</p></div>
+    </div>
+    <ol id="install-steps"></ol>
+    <form method="dialog"><button class="btn btn-primary" style="width:100%">Got it</button></form>
+  </div>
+</dialog>
 
 <footer>
   <div class="wrap foot">
@@ -384,6 +417,46 @@
       body: JSON.stringify({ path: location.pathname, referrer: document.referrer || undefined }),
     }).catch(function () {});
   } catch (e) {}
+
+  // ---------- Install the app (PWA) ----------
+  // Chrome/Edge/Android offer a real install prompt (beforeinstallprompt). Safari on iPhone has none,
+  // so the button shows the Add to Home Screen steps instead. Hidden once installed.
+  (function () {
+    var buttons = document.querySelectorAll('[data-install]');
+    var sheet = document.getElementById('install-sheet');
+    var steps = document.getElementById('install-steps');
+    var deferred = null;
+    var ua = navigator.userAgent;
+    var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var isAndroid = /Android/.test(ua);
+    var installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    function hide() { buttons.forEach(function (b) { b.hidden = true; }); }
+    if (installed) hide();
+
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; });
+    window.addEventListener('appinstalled', function () { deferred = null; hide(); });
+
+    function show(list) {
+      steps.innerHTML = list.map(function (t) { return '<li>' + t + '</li>'; }).join('');
+      if (sheet.showModal) sheet.showModal(); else alert(list.join('\n'));
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (deferred) {
+          deferred.prompt();
+          deferred.userChoice.then(function (c) { if (c.outcome === 'accepted') hide(); });
+          deferred = null;
+        } else if (isIOS) {
+          show(['Open this page in <strong>Safari</strong>.', 'Tap the <strong>Share</strong> button (the square with an arrow).', 'Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.']);
+        } else if (isAndroid) {
+          show(['Tap your browser\u2019s menu <strong>\u22ee</strong> (top right).', 'Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.', 'Open Sorted from your home screen.']);
+        } else {
+          show(['Click the <strong>install</strong> icon at the right of the address bar,', 'or open the browser menu and choose <strong>Install Sorted</strong>.']);
+        }
+      });
+    });
+  })();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
