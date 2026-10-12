@@ -1,13 +1,14 @@
 // Bump this on any deploy where precached assets change shape (new icon
 // files, renamed assets, etc.) — stale caches under the old name are
 // deleted on activate, so bumping it is how you force a clean slate.
-const CACHE_VERSION = 'sorted-v1';
+const CACHE_VERSION = 'sorted-v2';
 
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.svg',
+  '/favicon-mark.svg',
   '/apple-touch-icon.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -34,6 +35,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // never intercept cross-origin (future API calls)
+  // The app at /app (proxied from its own Vercel project) handles its own caching, and its /app/api
+  // calls must always hit the network — never serve app pages or API responses from this cache.
+  if (url.pathname === '/app' || url.pathname.startsWith('/app/') || url.pathname.startsWith('/api/')) return;
 
   // Network-first for the document itself, so a redeploy shows up
   // immediately for anyone online — offline/flaky-network users still get

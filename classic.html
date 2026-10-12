@@ -1,0 +1,3486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sorted — Consider it sorted.</title>
+<meta name="description" content="Sorted connects you with skilled Nigerian artisans and professionals you can trust — your payment is only released once the job is done right. Live now: dry cleaning &amp; laundry in Yaba, Lagos." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="alternate icon" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#027A61" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Sorted" />
+<style>
+  :root {
+    --green-primary:#027A61;
+    --green-deep:#007B5C;
+    --green-bright:#04C29C;
+    --green-mint-bg:#C8FFF6;
+    --green-mint-pale:#D2FFFD;
+    --bg-app:#F4FAF8;
+    --surface:#FFFFFF;
+    --border:#E0E6E4;
+    --text-primary:#0C1F1B;
+    --text-body:#3A4A47;
+    --text-muted:#7E8F8D;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-app);
+    color: var(--text-body);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+
+  .wrap {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- header ---------- */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 20px 0;
+    background: rgba(244, 250, 248, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .2s ease;
+  }
+
+  header .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    text-decoration: none;
+  }
+
+  .brand svg { display: block; }
+
+  .wordmark {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-size: 19px;
+    color: var(--text-primary);
+  }
+
+  nav a {
+    text-decoration: none;
+    color: var(--text-body);
+    font-size: 14px;
+    font-weight: 600;
+    margin-left: 30px;
+    transition: color .15s ease;
+  }
+
+  nav a:hover { color: var(--green-primary); }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    position: relative;
+    padding: 88px 0 40px;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -220px;
+    right: -160px;
+    width: 620px;
+    height: 620px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--green-mint-bg), transparent 70%);
+    opacity: 0.9;
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    bottom: -260px;
+    left: -220px;
+    width: 520px;
+    height: 520px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 60% 40%, var(--green-mint-pale), transparent 72%);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .hero-grid {
+    position: relative;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px 7px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--green-deep);
+    margin-bottom: 22px;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04);
+  }
+
+  .eyebrow .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  .hero h1 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-size: clamp(38px, 4.6vw, 58px);
+    line-height: 1.08;
+    color: var(--text-primary);
+    margin: 0 0 18px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--green-primary);
+  }
+
+  .subhead {
+    max-width: 480px;
+    margin: 0 0 14px;
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--text-body);
+  }
+
+  .category-line {
+    max-width: 480px;
+    margin: 0 0 28px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+
+  /* ---------- availability marker ---------- */
+
+  .availability {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 11px;
+    background: var(--green-mint-bg);
+    border: 1px solid rgba(2,122,97,0.18);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--green-deep);
+    margin: 0 0 20px;
+    max-width: 480px;
+  }
+
+  .availability .live-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.22);
+  }
+
+  /* ---------- category chips ---------- */
+
+  .category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 480px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-body);
+    cursor: pointer;
+  }
+
+  .chip[data-live="true"] {
+    border-color: rgba(2,122,97,0.3);
+    color: var(--green-deep);
+    background: var(--green-mint-bg);
+    cursor: default;
+  }
+
+  .chip .chip-soon {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .chip[data-live="true"] .chip-soon { display: none; }
+
+  .raise-hand {
+    max-width: 480px;
+    margin: 0 0 22px;
+    padding: 14px 16px;
+    border-radius: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .raise-hand[hidden] { display: none; }
+
+  .raise-hand p {
+    margin: 0 0 10px;
+    font-size: 13.5px;
+    color: var(--text-body);
+  }
+
+  .raise-hand-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .raise-hand input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 11px 13px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .raise-hand input[type="text"]:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  /* ---------- two doors ---------- */
+
+  .doors {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 440px;
+    margin: 0 0 8px;
+  }
+
+  .door {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 13px;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 700;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+
+  .door:hover { transform: translateY(-1px); }
+
+  .door-primary {
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 6px 16px -6px rgba(2,122,97,0.55);
+  }
+
+  .door-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  .door .door-arrow { flex: none; opacity: 0.75; }
+
+  .btn {
+    padding: 14px 24px;
+    border-radius: 11px;
+    border: none;
+    background: linear-gradient(180deg, var(--green-primary), var(--green-deep));
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 6px 16px -6px rgba(2,122,97,0.55);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 10px 22px -8px rgba(2,122,97,0.6); }
+  .btn:active { transform: translateY(0); }
+
+  /* ---------- sections ---------- */
+
+  section { position: relative; }
+
+  .section-head {
+    max-width: 560px;
+    margin: 0 0 44px;
+  }
+
+  .section-head .kicker {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--green-primary);
+    margin: 0 0 10px;
+  }
+
+  .section-head h2 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: clamp(26px, 3vw, 32px);
+    color: var(--text-primary);
+    margin: 0 0 12px;
+    line-height: 1.2;
+  }
+
+  .section-head p {
+    font-size: 15.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* ---------- how it works ---------- */
+
+  .how-it-works { padding: 96px 0 20px; }
+
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    position: relative;
+  }
+
+  @media (max-width: 860px) {
+    .flow { grid-template-columns: 1fr; gap: 16px; }
+    .flow-step::after { display: none; }
+  }
+
+  .flow-step {
+    position: relative;
+    padding: 0 22px 0 0;
+  }
+
+  .flow-step:first-child { padding-left: 0; }
+
+  .flow-step::after {
+    content: "";
+    position: absolute;
+    top: 27px;
+    right: -6px;
+    width: 34px;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 10px);
+  }
+
+  .flow-step:last-child::after { display: none; }
+
+  .flow-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 15px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--green-primary);
+    margin-bottom: 20px;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04);
+  }
+
+  .flow-step h3 {
+    font-size: 16.5px;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+  }
+
+  .flow-step p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    max-width: 300px;
+  }
+
+  /* ---------- math section ---------- */
+
+  .math {
+    padding: 100px 0;
+  }
+
+  .math-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(12,31,27,0.04), 0 30px 60px -30px rgba(12,31,27,0.18);
+  }
+
+  @media (max-width: 860px) {
+    .math-panel { grid-template-columns: 1fr; padding: 28px; }
+  }
+
+  .math-copy .kicker {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--green-primary);
+    margin: 0 0 10px;
+  }
+
+  .math-copy h3 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 26px;
+    color: var(--text-primary);
+    margin: 0 0 14px;
+    line-height: 1.25;
+  }
+
+  .math-copy p {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .receipt {
+    background: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+  }
+
+  .receipt .r-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    padding: 9px 0;
+  }
+
+  .receipt .r-row .k { color: var(--text-body); }
+  .receipt .r-row .v { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .receipt .r-row.sub .k { color: var(--text-muted); padding-left: 14px; font-size: 13.5px; }
+  .receipt .r-row.sub .v { color: var(--text-muted); font-weight: 500; font-size: 13.5px; }
+  .receipt hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+  .receipt .r-row.final .k, .receipt .r-row.final .v { color: var(--green-deep); font-weight: 700; font-size: 15px; }
+
+  /* ---------- trust ---------- */
+
+  .trust {
+    padding: 20px 0 110px;
+  }
+
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  @media (max-width: 760px) {
+    .trust-grid { grid-template-columns: 1fr; }
+  }
+
+  .trust-item {
+    background: var(--surface);
+    padding: 30px 28px;
+  }
+
+  .trust-item .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .trust-item .label {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 15.5px;
+    margin-bottom: 6px;
+  }
+
+  .trust-item .desc {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+  }
+
+  /* ---------- professional pitch ---------- */
+
+  .pro-pitch {
+    padding: 90px 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pro-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px 32px;
+    max-width: 720px;
+    margin: 0 0 36px;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 700px) {
+    .pro-list { grid-template-columns: 1fr; }
+  }
+
+  .pro-list li {
+    display: flex;
+    gap: 12px;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--text-body);
+  }
+
+  .pro-list .pro-check {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+
+  .pro-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: 520px;
+    margin: 0 0 10px;
+  }
+
+  .pro-form input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 13px 15px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 14.5px;
+    color: var(--text-primary);
+  }
+
+  .pro-form input[type="text"]:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 0 0 32px;
+  }
+
+  .legit-strip {
+    padding: 36px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .legit-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: center;
+  }
+
+  @media (max-width: 640px) {
+    .legit-grid { grid-template-columns: 1fr; text-align: center; }
+    .legit-person { justify-content: center; }
+  }
+
+  .legit-person {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .legit-avatar {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--green-primary);
+    color: #fff;
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .legit-person .name { font-weight: 700; color: var(--text-primary); font-size: 14.5px; }
+  .legit-person .role { font-size: 13px; color: var(--text-muted); }
+  .legit-person a { color: var(--green-deep); text-decoration: none; font-weight: 600; }
+
+  .legit-facts {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+
+  .legit-facts strong { color: var(--text-body); font-weight: 600; }
+
+  footer .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 24px;
+  }
+
+  footer .f-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  footer .f-brand .wordmark {
+    font-size: 13px;
+    color: var(--text-body);
+  }
+
+  footer .f-copy {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* ---------- install banner ---------- */
+
+  #install-banner {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--text-primary);
+    color: #fff;
+    border-radius: 14px;
+    padding: 14px 14px 14px 16px;
+    box-shadow: 0 12px 32px -8px rgba(12,31,27,0.4);
+    transform: translateY(120%);
+    opacity: 0;
+    transition: transform .25s ease, opacity .25s ease;
+    pointer-events: none;
+  }
+
+  #install-banner.visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #install-banner .ib-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    flex: none;
+  }
+
+  #install-banner .ib-copy {
+    flex: 1;
+    min-width: 0;
+  }
+
+  #install-banner .ib-title {
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  #install-banner .ib-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.65);
+    margin-top: 1px;
+  }
+
+  #install-banner button {
+    flex: none;
+    border: none;
+    border-radius: 9px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #install-banner .ib-install {
+    background: var(--green-bright);
+    color: var(--text-primary);
+  }
+
+  #install-banner .ib-dismiss {
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    padding: 9px 8px;
+  }
+
+  /* ---------- header auth button ---------- */
+
+  .btn-nav {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 22px;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .btn-nav:hover { box-shadow: none; background: var(--surface); }
+
+  @media (max-width: 560px) {
+    nav a { display: none; }
+    .btn-nav { margin-left: 0; }
+  }
+
+  /* ---------- auth modal ---------- */
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(12,31,27,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay[hidden] { display: none; }
+
+  /* #app-shell (below) sits at z-index 60, above the base 50 modal layer
+     — fine for #auth-modal since the shell is hidden while it's open, but
+     #claim-modal opens ON TOP of an already-visible shell and needs to
+     out-rank it. */
+  #claim-modal { z-index: 70; }
+
+  .modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    box-shadow: 0 24px 60px -20px rgba(12,31,27,0.4);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .modal-card h3 {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+
+  .modal-sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin: 0 0 22px;
+  }
+
+  .modal-error {
+    font-size: 13px;
+    color: #B3261E;
+    font-weight: 600;
+    margin: -8px 0 14px;
+    min-height: 0;
+  }
+
+  .modal-error:empty { display: none; }
+
+  .fee-preview { border: 1px solid var(--border); border-radius: 11px; background: var(--surface); padding: 12px 14px; margin: 10px 0 16px; }
+  .fee-preview-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-muted); padding: 3px 0; }
+  .fee-preview-total { font-weight: 600; color: var(--green-deep); border-top: 1px solid var(--border); margin-top: 4px; padding-top: 8px; }
+
+  .field-row { display: flex; gap: 8px; margin-bottom: 4px; }
+
+  .field-row input {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .field-row select {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+    font-family: inherit;
+  }
+
+  .field-row input:focus, .field-row select:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  .field-row input:disabled { color: var(--text-muted); background: var(--border); }
+
+  .field-row-password { display: flex; gap: 8px; margin-bottom: 4px; }
+
+  .field-row-password input {
+    flex: 1;
+    min-width: 0;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .field-row-password input:focus {
+    outline: none;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px rgba(4,194,156,0.18);
+  }
+
+  .field-toggle {
+    flex: 0 0 auto;
+    padding: 0 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .field-toggle:hover { color: var(--text-primary); }
+
+  .modal-link {
+    font-size: 13px;
+    color: var(--green-deep);
+    text-align: right;
+    cursor: pointer;
+    margin: -2px 0 14px;
+    font-weight: 600;
+  }
+
+  .modal-link:hover { text-decoration: underline; }
+
+  .modal-link-center { text-align: center; margin: 14px 0 0; }
+
+  .modal-success {
+    font-size: 13px;
+    color: var(--green-primary);
+    font-weight: 600;
+    margin: -8px 0 14px;
+    min-height: 0;
+  }
+
+  .modal-success:empty { display: none; }
+
+  .auth-tabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--bg-app); border-radius: 12px; padding: 4px; }
+
+  .auth-tab {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .auth-tab-active { background: var(--surface); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .btn-block { width: 100%; margin-top: 4px; }
+  .btn-block:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .modal-link {
+    text-align: center;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--green-primary);
+    margin: 16px 0 0;
+    cursor: pointer;
+  }
+
+  .type-row { display: flex; gap: 8px; margin-bottom: 20px; }
+
+  .type-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 12px 6px;
+    border-radius: 13px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-body);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .type-card span {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--green-deep);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .type-card-active { border-color: var(--green-primary); background: var(--green-mint-bg); color: var(--green-deep); }
+
+  .cat-section { margin-bottom: 18px; }
+  .cat-section[hidden] { display: none; }
+
+  .cat-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+  }
+
+  .cat-sub {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+  }
+
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .chip {
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 12.5px;
+    color: var(--text-body);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .chip-active { border-color: var(--green-bright); background: var(--green-mint-bg); color: var(--green-deep); font-weight: 600; }
+
+  .done-check {
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 16px;
+  }
+
+  /* ---------- app shell (post-login) ---------- */
+
+  #app-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: var(--bg-app);
+    overflow-y: auto;
+  }
+
+  #app-shell[hidden] { display: none; }
+
+  .shell-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .shell-greeting {
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    color: var(--text-primary);
+  }
+
+  .shell-signout {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .shell-wrap { max-width: 640px; margin: 0 auto; padding: 20px; }
+
+  .shell-tabs { margin-bottom: 20px; }
+
+  .shell-panel[hidden] { display: none; }
+
+  .gig-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+
+  .gig-card-invited { border-color: var(--green-bright); background: var(--green-mint-bg); }
+
+  .gig-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+
+  .gig-card-title { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 16px; color: var(--text-primary); }
+
+  .gig-card-meta { font-size: 12.5px; color: var(--text-muted); margin: 0 0 8px; }
+
+  .gig-card-bounty { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+
+  .gig-card-note { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+  .funding-body { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+
+  .funding-row { display: flex; justify-content: space-between; font-size: 13.5px; margin: 0 0 8px; }
+  .funding-row-muted { color: var(--text-muted); font-size: 12.5px; }
+  .funding-row-bold { font-weight: 700; font-size: 15px; color: var(--text-primary); padding-top: 6px; border-top: 1px dashed var(--border); }
+
+  .funding-transfer { background: var(--bg-app); border-radius: 12px; padding: 14px; margin: 10px 0 12px; }
+  .funding-transfer-label { font-size: 11.5px; color: var(--text-muted); margin: 0 0 4px; }
+  .funding-transfer-account { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 19px; font-weight: 700; color: var(--text-primary); margin: 0; }
+  .funding-transfer-bank { font-size: 13.5px; color: var(--text-body); margin: 4px 0 0; }
+
+  .status-pill {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--bg-app);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .status-pill[data-tone="active"] { background: var(--green-mint-bg); color: var(--green-deep); border-color: var(--green-bright); }
+
+  .shell-empty { text-align: center; color: var(--text-muted); font-size: 14px; padding: 40px 20px; }
+
+  .shell-section-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 10px; }
+  .shell-section-title:not(:first-child) { margin-top: 24px; }
+
+  .profile-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .profile-row:last-child { border-bottom: none; }
+  .profile-row-label { color: var(--text-muted); }
+  .profile-row-value { color: var(--text-primary); font-weight: 600; text-align: right; }
+
+  .field-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
+
+  .avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+
+  .avatar-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    background: var(--green-mint-bg);
+    color: var(--green-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    font-weight: 700;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+  .avatar-upload-label { display: inline-block; margin-bottom: 4px; cursor: pointer; }
+
+  .profile-kyc { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  .kyc-note { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 8px 0 0; }
+
+  .kyc-review-note { font-size: 13px; color: var(--text-body); background: var(--bg-app); border-radius: 10px; padding: 10px 12px; margin: 8px 0 0; }
+
+  textarea.field-row-textarea {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg-app);
+    font-size: 15px;
+    color: var(--text-primary);
+    font-family: inherit;
+    min-height: 80px;
+    resize: vertical;
+    margin-bottom: 4px;
+  }
+
+  .criterion-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .criterion-remove { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 4px 8px; }
+  .add-criterion-link { font-size: 13.5px; font-weight: 600; color: var(--green-primary); cursor: pointer; background: none; border: none; padding: 0; margin-bottom: 18px; font-family: inherit; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="/">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="28" height="28" rx="8" fill="#C8FFF6"/>
+        <path d="M8 14.5L12 18.5L20 9.5" stroke="#027A61" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="wordmark">Sorted</span>
+    </a>
+    <nav>
+      <a href="#how-it-works">How it works</a>
+      <a href="#for-professionals">For professionals</a>
+      <button class="btn btn-nav" id="open-auth-modal" type="button">Log in</button>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow"><span class="dot"></span> Trusted artisans & professionals · Made for Nigeria</span>
+      <h1>Skilled people you can<br><em>trust</em> and rely on.</h1>
+      <p class="subhead">
+        Sorted is a marketplace for skilled artisans and professionals —
+        from plumbing, electrical wiring, and furniture repair to
+        accounting, legal work, and web design. Post the job, and your
+        payment only gets released once it&rsquo;s done right.
+      </p>
+
+      <p class="availability"><span class="live-dot"></span> Live now: dry cleaning &amp; laundry in Yaba, Lagos. More trades and areas opening as we go.</p>
+
+      <ul class="category-chips" id="category-chips">
+        <li class="chip" data-category="Plumbing">Plumbing <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Electrical">Electrical <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Cleaning">Cleaning <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Furniture repair">Furniture repair <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Accounting">Accounting <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Legal">Legal <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Web &amp; digital">Web &amp; digital <span class="chip-soon">soon</span></li>
+        <li class="chip" data-category="Surveying">Surveying <span class="chip-soon">soon</span></li>
+      </ul>
+
+      <div class="raise-hand" id="raise-hand" hidden>
+        <p>Tell us your area and we&rsquo;ll message you when <strong id="raise-hand-category">this trade</strong> opens near you.</p>
+        <div class="raise-hand-row">
+          <input type="text" id="raise-hand-area" placeholder="Your area, e.g. Surulere" aria-label="Your area" />
+          <button class="btn" type="button" id="raise-hand-send">Message us on WhatsApp</button>
+        </div>
+      </div>
+
+      <div class="doors">
+        <a class="door door-primary" id="door-customer" href="#" target="_blank" rel="noopener">
+          I need something done
+          <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="door door-secondary" href="#for-professionals">
+          I&rsquo;m a professional or artisan
+          <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="how-it-works" id="how-it-works">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">How it works</p>
+      <h2>Three steps. Money moves only on the last one.</h2>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 13h6M9 17h4"/></svg>
+        </div>
+        <h3>Post a gig</h3>
+        <p>Describe the job and list exactly what &ldquo;done&rdquo; looks like. Once it&rsquo;s posted, that list can&rsquo;t be changed — so nobody can argue about it later.</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>Professional gets to work</h3>
+        <p>A vetted professional claims your gig and gets it done. Nothing is charged yet — there&rsquo;s nothing to pay until you&rsquo;re satisfied with the result.</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <h3>Sign off, pay, done</h3>
+        <p>The Client checks the work against that list. Only once it&rsquo;s approved does payment happen — the Professional is paid the same moment you pay.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pro-pitch" id="for-professionals">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">For professionals & artisans</p>
+      <h2>Every job here becomes proof — not just a payment.</h2>
+    </div>
+    <p class="subhead" style="margin-bottom:24px;">
+      Every job you finish on Sorted — checked, confirmed, and paid the
+      moment it&rsquo;s approved — adds to your Track Record. Build it up, and it&rsquo;s real
+      proof you can point to: to win the next job, and eventually, to open
+      doors most people never get handed without one.
+    </p>
+    <ul class="pro-list">
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Build a Track Record — every completed job adds real, verifiable proof of your work.</li>
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Get your business registered with CAC — we help you do it.</li>
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Buy materials cheaper, alongside other professionals in your trade.</li>
+      <li><span class="pro-check"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Get paid for your work without chasing anyone.</li>
+    </ul>
+    <p class="subhead" style="margin-bottom:16px;">Tell us your trade and area — we&rsquo;ll message you back on WhatsApp.</p>
+    <div class="pro-form">
+      <input type="text" id="pro-trade" placeholder="Your trade, e.g. Tailoring" aria-label="Your trade" />
+      <input type="text" id="pro-area" placeholder="Your area, e.g. Ikeja" aria-label="Your area" />
+    </div>
+    <a class="door door-primary" id="pro-whatsapp" style="max-width:320px;" href="#" target="_blank" rel="noopener">
+      Message us on WhatsApp
+      <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+</section>
+
+<section class="math" id="math">
+  <div class="wrap">
+    <div class="math-panel">
+      <div class="math-copy">
+        <p class="kicker">Transparent by design</p>
+        <h3>Every naira, fixed before you agree to anything.</h3>
+        <p>No hidden cuts. Sorted&rsquo;s fee is fixed and shown up front,
+        before anyone agrees to anything — the Client sees it, the
+        Professional sees it, and it never changes once the job is posted.
+        Nothing is actually charged until the Client approves the work.</p>
+      </div>
+      <div class="receipt">
+        <div class="r-row"><span class="k">You pay (once you approve the job)</span><span class="v">&#8358;120,000</span></div>
+        <hr>
+        <div class="r-row"><span class="k">Sorted fee (10%)</span><span class="v">&#8358;12,000</span></div>
+        <div class="r-row final"><span class="k">Professional earns</span><span class="v">&#8358;108,000</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="trust">
+  <div class="wrap">
+    <div class="trust-grid">
+      <div class="trust-item">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8.6 8 11 4.5-2.4 8-6 8-11V5l-8-3Z"/></svg>
+        </div>
+        <div class="label">Pay only on approval</div>
+        <div class="desc">Money only moves once the work is checked and approved. Every payment is recorded.</div>
+      </div>
+      <div class="trust-item">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
+        </div>
+        <div class="label">Built for Nigeria</div>
+        <div class="desc">Pay and get paid in naira — no bank card needed to sign up.</div>
+      </div>
+      <div class="trust-item">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4M9 13h6M9 17h6"/></svg>
+        </div>
+        <div class="label">Every gig, on record</div>
+        <div class="desc">Every payment on every job is recorded — and can never be changed or deleted afterward.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pro-pitch" style="padding:60px 0; text-align:center;">
+  <div class="wrap">
+    <h2 style="font-family:'Iowan Old Style',Georgia,serif; font-size:24px; color:var(--text-primary); margin:0 0 18px;">Ready when you are.</h2>
+    <a class="door door-primary" id="door-customer-bottom" href="#" target="_blank" rel="noopener" style="max-width:340px; margin:0 auto; justify-content:center;">
+      Message us on WhatsApp
+      <svg class="door-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="legit-strip">
+    <div class="wrap legit-grid">
+      <div class="legit-person">
+        <div class="legit-avatar">AG</div>
+        <div>
+          <div class="name">Adebayo Gbadebo — Founder</div>
+          <div class="role"><a href="tel:+2349031812675">+234 903 181 2675</a> · <a href="https://wa.me/2349031812675" target="_blank" rel="noopener">WhatsApp</a></div>
+        </div>
+      </div>
+      <div class="legit-facts">
+        <strong>Reforma Digital Solutions Limited</strong> · RC 8801487<br>
+        26 Ebun Street, Abule Oja, Yaba, Lagos
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="f-brand">
+      <svg width="18" height="18" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="28" height="28" rx="8" fill="#C8FFF6"/>
+        <path d="M8 14.5L12 18.5L20 9.5" stroke="#027A61" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="wordmark">Sorted</span>
+    </div>
+    <span class="f-copy">&copy; <span id="year"></span> Sorted. Consider it sorted.</span>
+  </div>
+</footer>
+
+<div id="install-banner" role="dialog" aria-label="Install Sorted">
+  <svg class="ib-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect width="28" height="28" rx="8" fill="#C8FFF6"/>
+    <path d="M8 14.5L12 18.5L20 9.5" stroke="#027A61" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="ib-copy">
+    <div class="ib-title" id="install-banner-title">Install Sorted</div>
+    <div class="ib-sub" id="install-banner-sub">Add it to your home screen for one-tap access.</div>
+  </div>
+  <button class="ib-install" id="install-banner-action" type="button">Install</button>
+  <button class="ib-dismiss" id="install-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>
+</div>
+
+<div id="auth-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <button class="modal-close" id="auth-modal-close" type="button" aria-label="Close">&times;</button>
+
+    <div class="auth-step" data-step="auth">
+      <h3 id="auth-modal-title">Log in or sign up</h3>
+      <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab auth-tab-active" data-mode="login" type="button">Log in</button>
+        <button class="auth-tab" data-mode="signup" type="button">Sign up</button>
+      </div>
+
+      <div id="auth-login-fields">
+        <div class="field-row">
+          <input type="text" id="auth-login-identifier" placeholder="Email or phone number" aria-label="Email or phone number" autocomplete="username" />
+        </div>
+        <div class="field-row-password">
+          <input type="password" id="auth-login-password" placeholder="Password" aria-label="Password" autocomplete="current-password" />
+          <button class="field-toggle" type="button" data-target="auth-login-password" aria-label="Show password">Show</button>
+        </div>
+        <p class="modal-link" id="open-forgot-password">Forgot password?</p>
+      </div>
+
+      <div id="auth-signup-fields" hidden>
+        <div class="field-row">
+          <input type="text" id="auth-signup-name" placeholder="Full name" aria-label="Full name" autocomplete="name" />
+        </div>
+        <div class="field-row">
+          <input type="email" id="auth-signup-email" placeholder="you@email.com" aria-label="Email address" autocomplete="email" />
+        </div>
+        <div class="field-row">
+          <input type="tel" id="auth-signup-phone" placeholder="Phone number" aria-label="Phone number" autocomplete="tel" />
+        </div>
+        <div class="field-row">
+          <input type="text" value="Nigeria" disabled aria-label="Country" />
+        </div>
+        <div class="field-row">
+          <select id="auth-signup-state" aria-label="State">
+            <option value="">Select your state</option>
+          </select>
+        </div>
+        <div class="field-row-password">
+          <input type="password" id="auth-signup-password" placeholder="Password (min. 8 characters)" aria-label="Password" autocomplete="new-password" />
+          <button class="field-toggle" type="button" data-target="auth-signup-password" aria-label="Show password">Show</button>
+        </div>
+      </div>
+
+      <p class="modal-success" id="auth-form-success"></p>
+      <p class="modal-error" id="auth-form-error"></p>
+      <button class="btn btn-block" id="auth-form-submit" type="button">Log in</button>
+    </div>
+
+    <div class="auth-step" data-step="forgot" hidden>
+      <h3>Reset your password</h3>
+      <p class="modal-sub">Enter the email or phone number on your account and we'll send a 6-digit code.</p>
+      <div class="field-row">
+        <input type="text" id="forgot-identifier" placeholder="Email or phone number" aria-label="Email or phone number" autocomplete="username" />
+      </div>
+      <p class="modal-error" id="forgot-error"></p>
+      <button class="btn btn-block" id="forgot-submit" type="button">Send code</button>
+      <p class="modal-link modal-link-center" id="back-to-login-from-forgot">Back to log in</p>
+    </div>
+
+    <div class="auth-step" data-step="reset" hidden>
+      <h3>Enter your code</h3>
+      <p class="modal-sub">We sent a 6-digit code to your email — it expires in 15 minutes. Enter it below with your new password.</p>
+      <div class="field-row">
+        <input type="text" id="reset-code" placeholder="6-digit code" inputmode="numeric" maxlength="6" aria-label="Reset code" autocomplete="one-time-code" />
+      </div>
+      <div class="field-row-password">
+        <input type="password" id="reset-new-password" placeholder="New password (min. 8 characters)" aria-label="New password" autocomplete="new-password" />
+        <button class="field-toggle" type="button" data-target="reset-new-password" aria-label="Show password">Show</button>
+      </div>
+      <p class="modal-error" id="reset-error"></p>
+      <button class="btn btn-block" id="reset-submit" type="button">Reset password</button>
+      <p class="modal-link modal-link-center" id="back-to-login-from-reset">Back to log in</p>
+    </div>
+
+    <div class="auth-step" data-step="account-type" hidden>
+      <h3>What brings you to Sorted?</h3>
+      <p class="modal-sub">Hybrid is recommended — you can post gigs and get hired.</p>
+      <div class="type-row" id="auth-type-row">
+        <button class="type-card" data-type="professional" type="button">Professional</button>
+        <button class="type-card" data-type="client" type="button">Client</button>
+        <button class="type-card" data-type="hybrid" type="button">Hybrid<span>Recommended</span></button>
+      </div>
+      <div class="cat-section" id="auth-offering-section">
+        <p class="cat-label">What services do you offer?</p>
+        <p class="cat-sub">Pick at least one — required.</p>
+        <div class="chip-wrap" id="auth-offering-chips"></div>
+      </div>
+      <div class="cat-section" id="auth-business-section">
+        <p class="cat-label">Are you registering as an individual or a business?</p>
+        <p class="cat-sub">Business is for a registered company (e.g. a dry-cleaning shop) — individual is for a sole operator.</p>
+        <div class="type-row" id="auth-business-type-row">
+          <button class="type-card" data-business="false" type="button">Individual</button>
+          <button class="type-card" data-business="true" type="button">Business</button>
+        </div>
+        <div id="auth-business-fields" hidden>
+          <div class="field-row">
+            <input type="text" id="auth-biz-reg-number" placeholder="Company registration number" aria-label="Company registration number" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="auth-biz-directors" placeholder="Director name(s) — comma-separated if more than one" aria-label="Director name(s)" />
+          </div>
+          <div class="field-row">
+            <input type="email" id="auth-biz-email" placeholder="Business contact email" aria-label="Business contact email" />
+          </div>
+          <div class="field-row">
+            <input type="tel" id="auth-biz-phone" placeholder="Business contact phone" aria-label="Business contact phone" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="auth-biz-address" placeholder="Business address" aria-label="Business address" />
+          </div>
+        </div>
+      </div>
+      <div class="cat-section" id="auth-seeking-section">
+        <p class="cat-label">What are you most likely to post gigs for?</p>
+        <p class="cat-sub">Pick at least one — required.</p>
+        <div class="chip-wrap" id="auth-seeking-chips"></div>
+      </div>
+      <p class="modal-error" id="auth-type-error"></p>
+      <button class="btn btn-block" id="auth-type-submit" type="button">Finish setup</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAN.md "Claim + submit a gig from the web client" -->
+<div id="claim-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="claim-modal-title">
+    <button class="modal-close" id="claim-modal-close" type="button" aria-label="Close">&times;</button>
+    <div id="claim-modal-body"></div>
+  </div>
+</div>
+
+<div id="app-shell" hidden>
+  <div class="shell-header">
+    <span class="shell-greeting" id="shell-greeting"></span>
+    <button class="shell-signout" id="shell-signout" type="button">Sign out</button>
+  </div>
+  <div class="shell-wrap">
+    <div class="auth-tabs shell-tabs" id="shell-tabs">
+      <button class="auth-tab auth-tab-active" data-tab="mine" type="button">My gigs</button>
+      <button class="auth-tab" data-tab="browse" type="button">Browse</button>
+      <button class="auth-tab" data-tab="directory" type="button">Find pros</button>
+      <button class="auth-tab" data-tab="post" type="button">Post a gig</button>
+      <button class="auth-tab" data-tab="profile" type="button">Profile</button>
+    </div>
+
+    <div class="shell-panel" data-panel="mine">
+      <div id="shell-mine-list"></div>
+    </div>
+
+    <div class="shell-panel" data-panel="browse" hidden>
+      <div id="shell-browse-list"></div>
+    </div>
+
+    <div class="shell-panel" data-panel="directory" hidden>
+      <p class="modal-sub">Browse professionals by category, then hire straight into a gig — you only pay once you approve the work.</p>
+      <div class="chip-wrap" id="directory-submarket-chips" style="margin-bottom:16px;"></div>
+      <p class="modal-error" id="directory-error"></p>
+      <div id="directory-list"></div>
+    </div>
+
+    <div class="shell-panel" data-panel="post" hidden>
+      <p class="modal-error" id="shell-post-error"></p>
+      <div id="post-hire-banner" hidden></div>
+
+      <p class="field-label">Title</p>
+      <div class="field-row">
+        <input type="text" id="post-title" placeholder="Fix leaking kitchen pipe" />
+      </div>
+
+      <p class="field-label">Description</p>
+      <textarea id="post-description" class="field-row-textarea" placeholder="What needs doing, and any context a professional should know"></textarea>
+
+      <p class="field-label">Domain</p>
+      <div class="chip-wrap" id="post-domain-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Category</p>
+      <div class="chip-wrap" id="post-submarket-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Posting as</p>
+      <div class="chip-wrap" id="post-clienttype-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Location</p>
+      <div class="field-row">
+        <input type="text" id="post-location" placeholder="Lekki Phase 1, Lagos" />
+      </div>
+
+      <p class="field-label">Who supplies materials?</p>
+      <div class="chip-wrap" id="post-materials-chips" style="margin-bottom:16px;"></div>
+
+      <p class="field-label">Definition of done</p>
+      <div id="post-criteria-rows"></div>
+      <button class="add-criterion-link" id="post-add-criterion" type="button">+ Add another criterion</button>
+
+      <p class="field-label">Budget (&#8358;)</p>
+      <div class="field-row">
+        <input type="text" inputmode="decimal" id="post-bounty" placeholder="3000" />
+      </div>
+
+      <div class="fee-preview" id="post-fee-preview" hidden>
+        <div class="fee-preview-row">
+          <span id="post-fee-label">Sorted fee (10%)</span>
+          <span id="post-fee-amount"></span>
+        </div>
+        <div class="fee-preview-row fee-preview-total">
+          <span>You&rsquo;ll pay (once you approve the work)</span>
+          <span id="post-fee-total"></span>
+        </div>
+      </div>
+
+      <button class="btn btn-block" id="shell-post-submit" type="button">Review & publish</button>
+    </div>
+
+    <div class="shell-panel" data-panel="profile" hidden>
+      <div class="avatar-row">
+        <div class="avatar-preview" id="profile-avatar-preview"></div>
+        <div>
+          <label class="modal-link avatar-upload-label" for="profile-avatar-input">Change photo</label>
+          <input type="file" id="profile-avatar-input" accept="image/*" hidden />
+          <p class="modal-error" id="profile-avatar-error"></p>
+        </div>
+      </div>
+
+      <p class="profile-row"><span class="profile-row-label">Email</span><span class="profile-row-value" id="profile-email"></span></p>
+
+      <p class="field-label">Name</p>
+      <div class="field-row">
+        <input type="text" id="profile-name" />
+      </div>
+
+      <div id="profile-displayname-section" hidden>
+        <p class="field-label">Shop / business name (shown in the professional directory)</p>
+        <div class="field-row">
+          <input type="text" id="profile-displayname" placeholder="Leave blank to show your name instead" />
+        </div>
+      </div>
+
+      <p class="field-label">Phone</p>
+      <div class="field-row">
+        <input type="tel" id="profile-phone" placeholder="0803 123 4567" />
+      </div>
+
+      <p class="field-label">State</p>
+      <div class="field-row">
+        <select id="profile-state">
+          <option value="">Select your state</option>
+        </select>
+      </div>
+
+      <p class="profile-row"><span class="profile-row-label">Roles</span><span class="profile-row-value" id="profile-roles"></span></p>
+
+      <p class="modal-error" id="shell-profile-error"></p>
+      <button class="btn btn-block" id="shell-profile-save" type="button">Save</button>
+
+      <div class="profile-kyc" id="profile-kyc-section" hidden>
+        <p class="field-label">Verification</p>
+        <div id="profile-kyc-status"></div>
+      </div>
+
+      <div class="profile-kyc" id="profile-payout-section" hidden>
+        <p class="field-label">Payout account</p>
+        <div id="profile-payout-view">
+          <p class="cat-sub" id="profile-payout-summary"></p>
+          <button class="btn btn-block" id="profile-payout-edit-btn" type="button">Add payout account</button>
+        </div>
+        <div id="profile-payout-form" hidden>
+          <p class="field-label">Bank</p>
+          <div class="field-row">
+            <select id="profile-payout-bank" aria-label="Bank">
+              <option value="">Select your bank</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <input type="text" inputmode="numeric" maxlength="10" id="profile-payout-account-number" placeholder="10-digit account number" aria-label="Account number" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="profile-payout-account-name" placeholder="Account holder name" aria-label="Account holder name" />
+          </div>
+          <p class="modal-error" id="profile-payout-error"></p>
+          <button class="btn btn-block" id="profile-payout-cancel-btn" type="button">Cancel</button>
+          <button class="btn btn-block" id="profile-payout-save-btn" type="button">Save</button>
+        </div>
+      </div>
+
+      <div class="profile-kyc" id="profile-business-section" hidden>
+        <p class="field-label">Business account</p>
+        <div id="profile-business-view">
+          <p class="cat-sub" id="profile-business-summary"></p>
+          <button class="btn btn-block" id="profile-business-edit-btn" type="button">Convert to business account</button>
+        </div>
+        <div id="profile-business-form" hidden>
+          <div class="field-row">
+            <input type="text" id="profile-biz-reg-number" placeholder="Company registration number" aria-label="Company registration number" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="profile-biz-directors" placeholder="Director name(s) — comma-separated if more than one" aria-label="Director name(s)" />
+          </div>
+          <div class="field-row">
+            <input type="email" id="profile-biz-email" placeholder="Business contact email" aria-label="Business contact email" />
+          </div>
+          <div class="field-row">
+            <input type="tel" id="profile-biz-phone" placeholder="Business contact phone" aria-label="Business contact phone" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="profile-biz-address" placeholder="Business address" aria-label="Business address" />
+          </div>
+          <p class="modal-error" id="profile-business-error"></p>
+          <button class="btn btn-block" id="profile-business-cancel-btn" type="button">Cancel</button>
+          <button class="btn btn-block" id="profile-business-save-btn" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // ---------- WhatsApp CTAs ----------
+  // PLAN.md "Product analytics dashboard" — every WhatsApp CTA routes
+  // through the API's /go/whatsapp redirect instead of a bare wa.me link,
+  // so a click is actually counted (server-side, before the browser
+  // navigates away) rather than invisible. ctaId identifies which button
+  // was clicked on the dashboard; the destination number itself is
+  // server-configured (WHATSAPP_CONTACT_NUMBER), never passed here.
+  var SITE_API_BASE_URL = 'https://sorted-api.vercel.app'; // kept in sync with API_BASE_URL below by hand — this script has no module system to share it through
+
+  function waLink(text, ctaId) {
+    return SITE_API_BASE_URL + '/go/whatsapp?cta=' + encodeURIComponent(ctaId) + '&text=' + encodeURIComponent(text);
+  }
+
+  (function trackPageview() {
+    try {
+      fetch(SITE_API_BASE_URL + '/site-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({ path: location.pathname, referrer: document.referrer || undefined }),
+      }).catch(function () {});
+    } catch (e) {}
+  })();
+
+  // "I need something done" — one tap, no form, straight into WhatsApp
+  // with the only thing that's actually live right now.
+  var customerMessage = "Hi Sorted, I'd like to book a dry cleaning / laundry pickup in Yaba.";
+  document.getElementById('door-customer').href = waLink(customerMessage, 'door_customer_hero');
+  document.getElementById('door-customer-bottom').href = waLink(customerMessage, 'door_customer_bottom');
+
+  // ---------- category chips -> "raise your hand" ----------
+  // Closed-category handoff (PLAN.md-equivalent for the landing page): a
+  // trade/area that isn't live yet is never a dead end — it becomes a
+  // WhatsApp message we actually read, not a hidden or generic
+  // "coming soon." The data lives in that WhatsApp thread; no backend
+  // needed for a single-operator pilot.
+  var raiseHand = document.getElementById('raise-hand');
+  var raiseHandCategory = document.getElementById('raise-hand-category');
+  var raiseHandArea = document.getElementById('raise-hand-area');
+  var selectedCategory = '';
+
+  document.getElementById('category-chips').addEventListener('click', function (e) {
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    selectedCategory = chip.dataset.category;
+    raiseHandCategory.textContent = selectedCategory;
+    raiseHand.hidden = false;
+    raiseHandArea.focus();
+  });
+
+  document.getElementById('raise-hand-send').addEventListener('click', function () {
+    var area = raiseHandArea.value.trim() || 'my area';
+    var message = 'Hi Sorted, I\'m looking for ' + selectedCategory + ' in ' + area +
+      '. I saw dry cleaning is live in Yaba — please let me know when you open in my category/area.';
+    window.open(waLink(message, 'raise_hand'), '_blank', 'noopener');
+  });
+
+  // ---------- professional pitch -> WhatsApp ----------
+  document.getElementById('pro-whatsapp').addEventListener('click', function (e) {
+    e.preventDefault();
+    var trade = document.getElementById('pro-trade').value.trim() || 'a professional';
+    var area = document.getElementById('pro-area').value.trim() || 'my area';
+    var message = "Hi Sorted, I'm " + trade + " in " + area + " — tell me more about joining.";
+    window.open(waLink(message, 'pro_pitch'), '_blank', 'noopener');
+  });
+
+  // ---------- service worker ----------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+
+  // ---------- install banner ----------
+  (function () {
+    var DISMISS_KEY = 'sorted-install-dismissed';
+    var banner = document.getElementById('install-banner');
+    var installBtn = document.getElementById('install-banner-action');
+    var dismissBtn = document.getElementById('install-banner-dismiss');
+    var subEl = document.getElementById('install-banner-sub');
+    var deferredPrompt = null;
+
+    function alreadyInstalled() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+
+    function wasDismissed() {
+      try { return localStorage.getItem(DISMISS_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    function dismiss() {
+      banner.classList.remove('visible');
+      try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
+    }
+
+    dismissBtn.addEventListener('click', dismiss);
+
+    if (alreadyInstalled() || wasDismissed()) {
+      // nothing to do — already installed, or user said no already
+    } else {
+      // Chrome/Edge/Android: real install prompt via beforeinstallprompt
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.classList.add('visible');
+      });
+
+      installBtn.addEventListener('click', function () {
+        if (!deferredPrompt) { dismiss(); return; }
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.finally(function () {
+          deferredPrompt = null;
+          banner.classList.remove('visible');
+        });
+      });
+
+      // iOS Safari never fires beforeinstallprompt — show manual instructions instead.
+      var isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+      if (isIos && !alreadyInstalled()) {
+        subEl.textContent = 'Tap the Share icon, then "Add to Home Screen."';
+        installBtn.style.display = 'none';
+        banner.classList.add('visible');
+      }
+    }
+
+    window.addEventListener('appinstalled', function () {
+      banner.classList.remove('visible');
+      try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
+    });
+  })();
+
+  // ---------- auth modal: real email/phone + password against server/'s Identity API ----------
+  // The actual product's Identity module (server/src/modules/identity) —
+  // unrelated to the WhatsApp CTAs above, which are the primary path now.
+  (function () {
+    var API_BASE_URL = 'https://sorted-api.vercel.app';
+    var TOKEN_KEY = 'sorted_access_token';
+
+    // Keep in sync with server/src/common/nigerian-states.ts.
+    var NIGERIAN_STATES = [
+      'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
+      'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT (Abuja)', 'Gombe',
+      'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+      'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto',
+      'Taraba', 'Yobe', 'Zamfara',
+    ];
+
+    var modal = document.getElementById('auth-modal');
+    var closeBtn = document.getElementById('auth-modal-close');
+    var openBtn = document.getElementById('open-auth-modal');
+    var steps = modal.querySelectorAll('.auth-step');
+
+    var state = {
+      mode: 'login',
+      accessToken: null,
+      submarkets: [], // loaded lazily before the account-type step
+      accountType: 'hybrid',
+      offering: {},
+      seeking: {},
+      isBusiness: false,
+    };
+
+    function showStep(name) {
+      steps.forEach(function (el) {
+        el.hidden = el.getAttribute('data-step') !== name;
+      });
+    }
+
+    function openModal() {
+      modal.hidden = false;
+      showStep('auth');
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+    }
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+
+    Array.prototype.forEach.call(modal.querySelectorAll('.field-toggle'), function (btn) {
+      btn.addEventListener('click', function () {
+        var input = document.getElementById(btn.getAttribute('data-target'));
+        var showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        btn.textContent = showing ? 'Show' : 'Hide';
+        btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+      });
+    });
+
+    function api(path, opts) {
+      opts = opts || {};
+      var headers = { 'Content-Type': 'application/json' };
+      if (opts.auth && state.accessToken) headers.Authorization = 'Bearer ' + state.accessToken;
+      return fetch(API_BASE_URL + path, {
+        method: opts.method || 'GET',
+        headers: headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      }).then(function (res) {
+        return res.text().then(function (text) {
+          var data = text ? JSON.parse(text) : undefined;
+          if (!res.ok) {
+            var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+            throw new Error(Array.isArray(message) ? message.join(', ') : message);
+          }
+          return data;
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    /** Downscales/recompresses an image file client-side before it's sent as a base64 data URI — keeps avatar/KYC uploads well under the server's body-size cap. */
+    function resizeImageFileToDataUri(file, maxDim, quality) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function () { reject(new Error('Could not read that file.')); };
+        reader.onload = function () {
+          var img = new Image();
+          img.onerror = function () { reject(new Error('Could not read that image.')); };
+          img.onload = function () {
+            var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            var w = Math.max(1, Math.round(img.width * scale));
+            var h = Math.max(1, Math.round(img.height * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ---- step: auth (login / signup) ----
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var authTabs = document.getElementById('auth-tabs');
+    var loginFields = document.getElementById('auth-login-fields');
+    var signupFields = document.getElementById('auth-signup-fields');
+    var formError = document.getElementById('auth-form-error');
+    var formSuccess = document.getElementById('auth-form-success');
+    var formSubmit = document.getElementById('auth-form-submit');
+    var stateSelect = document.getElementById('auth-signup-state');
+
+    NIGERIAN_STATES.forEach(function (name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      stateSelect.appendChild(opt);
+    });
+
+    function setMode(mode) {
+      state.mode = mode;
+      Array.prototype.forEach.call(authTabs.children, function (tab) {
+        tab.classList.toggle('auth-tab-active', tab.getAttribute('data-mode') === mode);
+      });
+      loginFields.hidden = mode !== 'login';
+      signupFields.hidden = mode !== 'signup';
+      formSubmit.textContent = mode === 'login' ? 'Log in' : 'Sign up';
+      formError.textContent = '';
+      formSuccess.textContent = '';
+    }
+
+    Array.prototype.forEach.call(authTabs.children, function (tab) {
+      tab.addEventListener('click', function () {
+        setMode(tab.getAttribute('data-mode'));
+      });
+    });
+
+    function afterAuth(res) {
+      state.accessToken = res.accessToken;
+      try { localStorage.setItem(TOKEN_KEY, res.accessToken); } catch (e) {}
+
+      if (!res.user.roles || res.user.roles.length === 0) {
+        loadSubmarketsAndShowAccountType();
+      } else {
+        closeModal();
+        openAppShell(res.user);
+      }
+    }
+
+    function submitLogin() {
+      var identifier = document.getElementById('auth-login-identifier').value.trim();
+      var password = document.getElementById('auth-login-password').value;
+      if (!identifier || !password) {
+        formError.textContent = 'Enter your email or phone number and password.';
+        return;
+      }
+      formError.textContent = '';
+      formSuccess.textContent = '';
+      formSubmit.disabled = true;
+      formSubmit.textContent = 'Logging in…';
+
+      api('/auth/login', { method: 'POST', body: { identifier: identifier, password: password } })
+        .then(afterAuth)
+        .catch(function (err) {
+          formError.textContent = err.message;
+        })
+        .finally(function () {
+          formSubmit.disabled = false;
+          formSubmit.textContent = 'Log in';
+        });
+    }
+
+    function submitSignup() {
+      var name = document.getElementById('auth-signup-name').value.trim();
+      var email = document.getElementById('auth-signup-email').value.trim();
+      var phone = document.getElementById('auth-signup-phone').value.trim();
+      var stateName = stateSelect.value;
+      var password = document.getElementById('auth-signup-password').value;
+
+      if (!name) { formError.textContent = 'Enter your full name.'; return; }
+      if (!EMAIL_RE.test(email)) { formError.textContent = 'Enter a valid email address.'; return; }
+      if (!phone) { formError.textContent = 'Enter your phone number.'; return; }
+      if (!stateName) { formError.textContent = 'Select your state.'; return; }
+      if (password.length < 8) { formError.textContent = 'Password must be at least 8 characters.'; return; }
+
+      formError.textContent = '';
+      formSuccess.textContent = '';
+      formSubmit.disabled = true;
+      formSubmit.textContent = 'Signing up…';
+
+      api('/auth/signup', { method: 'POST', body: { name: name, email: email, phone: phone, state: stateName, password: password } })
+        .then(afterAuth)
+        .catch(function (err) {
+          formError.textContent = err.message;
+        })
+        .finally(function () {
+          formSubmit.disabled = false;
+          formSubmit.textContent = 'Sign up';
+        });
+    }
+
+    formSubmit.addEventListener('click', function () {
+      if (state.mode === 'login') submitLogin();
+      else submitSignup();
+    });
+
+    // ---- step: forgot password / reset password ----
+    var forgotIdentifier = document.getElementById('forgot-identifier');
+    var forgotError = document.getElementById('forgot-error');
+    var forgotSubmit = document.getElementById('forgot-submit');
+    var resetCode = document.getElementById('reset-code');
+    var resetNewPassword = document.getElementById('reset-new-password');
+    var resetError = document.getElementById('reset-error');
+    var resetSubmit = document.getElementById('reset-submit');
+    var resetIdentifier = ''; // carried over from the forgot step
+
+    document.getElementById('open-forgot-password').addEventListener('click', function () {
+      forgotIdentifier.value = document.getElementById('auth-login-identifier').value.trim();
+      forgotError.textContent = '';
+      showStep('forgot');
+    });
+    document.getElementById('back-to-login-from-forgot').addEventListener('click', function () { showStep('auth'); });
+    document.getElementById('back-to-login-from-reset').addEventListener('click', function () { showStep('auth'); });
+
+    forgotSubmit.addEventListener('click', function () {
+      var identifier = forgotIdentifier.value.trim();
+      if (!identifier) { forgotError.textContent = 'Enter your email or phone number.'; return; }
+
+      forgotError.textContent = '';
+      forgotSubmit.disabled = true;
+      forgotSubmit.textContent = 'Sending…';
+
+      api('/auth/forgot-password', { method: 'POST', body: { identifier: identifier } })
+        .then(function () {
+          resetIdentifier = identifier;
+          resetCode.value = '';
+          resetNewPassword.value = '';
+          resetError.textContent = '';
+          showStep('reset');
+        })
+        .catch(function (err) {
+          forgotError.textContent = err.message;
+        })
+        .finally(function () {
+          forgotSubmit.disabled = false;
+          forgotSubmit.textContent = 'Send code';
+        });
+    });
+
+    resetSubmit.addEventListener('click', function () {
+      var code = resetCode.value.trim();
+      var newPassword = resetNewPassword.value;
+      if (!/^\d{6}$/.test(code)) { resetError.textContent = 'Enter the 6-digit code from your email.'; return; }
+      if (newPassword.length < 8) { resetError.textContent = 'Password must be at least 8 characters.'; return; }
+
+      resetError.textContent = '';
+      resetSubmit.disabled = true;
+      resetSubmit.textContent = 'Resetting…';
+
+      api('/auth/reset-password', { method: 'POST', body: { identifier: resetIdentifier, code: code, newPassword: newPassword } })
+        .then(function () {
+          showStep('auth');
+          setMode('login');
+          document.getElementById('auth-login-identifier').value = resetIdentifier;
+          document.getElementById('auth-login-password').value = '';
+          formSuccess.textContent = 'Password updated — log in with your new password.';
+        })
+        .catch(function (err) {
+          resetError.textContent = err.message;
+        })
+        .finally(function () {
+          resetSubmit.disabled = false;
+          resetSubmit.textContent = 'Reset password';
+        });
+    });
+
+    // ---- step: account-type ----
+    var ROLES_BY_TYPE = {
+      professional: ['professional'],
+      client: ['client'],
+      hybrid: ['client', 'professional'],
+    };
+    var typeRow = document.getElementById('auth-type-row');
+    var offeringSection = document.getElementById('auth-offering-section');
+    var seekingSection = document.getElementById('auth-seeking-section');
+    var offeringChips = document.getElementById('auth-offering-chips');
+    var seekingChips = document.getElementById('auth-seeking-chips');
+    var businessSection = document.getElementById('auth-business-section');
+    var businessTypeRow = document.getElementById('auth-business-type-row');
+    var businessFields = document.getElementById('auth-business-fields');
+    var bizRegNumber = document.getElementById('auth-biz-reg-number');
+    var bizDirectors = document.getElementById('auth-biz-directors');
+    var bizEmail = document.getElementById('auth-biz-email');
+    var bizPhone = document.getElementById('auth-biz-phone');
+    var bizAddress = document.getElementById('auth-biz-address');
+    var typeError = document.getElementById('auth-type-error');
+    var typeSubmit = document.getElementById('auth-type-submit');
+
+    function loadSubmarketsAndShowAccountType() {
+      showStep('account-type');
+      setAccountType('hybrid');
+      if (state.submarkets.length > 0) {
+        renderChips();
+        return;
+      }
+      offeringChips.textContent = 'Loading…';
+      seekingChips.textContent = 'Loading…';
+      api('/taxonomy/submarkets')
+        .then(function (submarkets) {
+          state.submarkets = submarkets;
+          renderChips();
+        })
+        .catch(function (err) {
+          typeError.textContent = err.message;
+        });
+    }
+
+    function renderChips() {
+      offeringChips.innerHTML = '';
+      seekingChips.innerHTML = '';
+      state.submarkets.forEach(function (s) {
+        offeringChips.appendChild(makeChip(s, state.offering, offeringChips));
+        seekingChips.appendChild(makeChip(s, state.seeking, seekingChips));
+      });
+    }
+
+    function makeChip(submarket, selectionMap) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = submarket.label;
+      chip.addEventListener('click', function () {
+        selectionMap[submarket.id] = !selectionMap[submarket.id];
+        chip.classList.toggle('chip-active', !!selectionMap[submarket.id]);
+      });
+      return chip;
+    }
+
+    function setAccountType(type) {
+      state.accountType = type;
+      Array.prototype.forEach.call(typeRow.children, function (btn) {
+        btn.classList.toggle('type-card-active', btn.getAttribute('data-type') === type);
+      });
+      var roles = ROLES_BY_TYPE[type];
+      offeringSection.hidden = roles.indexOf('professional') === -1;
+      seekingSection.hidden = roles.indexOf('client') === -1;
+      businessSection.hidden = roles.indexOf('professional') === -1;
+    }
+
+    Array.prototype.forEach.call(typeRow.children, function (btn) {
+      btn.addEventListener('click', function () {
+        setAccountType(btn.getAttribute('data-type'));
+      });
+    });
+
+    function setIsBusiness(isBusiness) {
+      state.isBusiness = isBusiness;
+      Array.prototype.forEach.call(businessTypeRow.children, function (btn) {
+        btn.classList.toggle('type-card-active', (btn.getAttribute('data-business') === 'true') === isBusiness);
+      });
+      businessFields.hidden = !isBusiness;
+    }
+    setIsBusiness(false);
+
+    Array.prototype.forEach.call(businessTypeRow.children, function (btn) {
+      btn.addEventListener('click', function () {
+        setIsBusiness(btn.getAttribute('data-business') === 'true');
+      });
+    });
+
+    typeSubmit.addEventListener('click', function () {
+      var roles = ROLES_BY_TYPE[state.accountType];
+      var offeringIds = Object.keys(state.offering).filter(function (id) { return state.offering[id]; });
+      var seekingIds = Object.keys(state.seeking).filter(function (id) { return state.seeking[id]; });
+
+      if (roles.indexOf('professional') !== -1 && offeringIds.length === 0) {
+        typeError.textContent = 'Pick at least one service you offer.';
+        return;
+      }
+      if (roles.indexOf('client') !== -1 && seekingIds.length === 0) {
+        typeError.textContent = 'Pick at least one category you’re posting gigs for.';
+        return;
+      }
+      var wantsBusiness = roles.indexOf('professional') !== -1 && state.isBusiness;
+      var directorNames = bizDirectors.value.split(',').map(function (n) { return n.trim(); }).filter(Boolean);
+      if (wantsBusiness && (!bizRegNumber.value.trim() || directorNames.length === 0 || !bizEmail.value.trim() || !bizPhone.value.trim() || !bizAddress.value.trim())) {
+        typeError.textContent = 'All business fields are required.';
+        return;
+      }
+
+      typeError.textContent = '';
+      typeSubmit.disabled = true;
+      typeSubmit.textContent = 'Finishing…';
+
+      var roleProfileBody = {
+        roles: roles,
+        serviceOfferingSubmarketIds: offeringIds,
+        seekingCategorySubmarketIds: seekingIds,
+      };
+      if (wantsBusiness) {
+        roleProfileBody.accountType = 'business';
+        roleProfileBody.businessProfile = {
+          companyRegistrationNumber: bizRegNumber.value.trim(),
+          directorNames: directorNames,
+          businessEmail: bizEmail.value.trim(),
+          businessPhone: bizPhone.value.trim(),
+          businessAddress: bizAddress.value.trim(),
+        };
+      }
+
+      api('/me/role-profile', {
+        method: 'POST',
+        auth: true,
+        body: roleProfileBody,
+      })
+        .then(function (updatedUser) {
+          closeModal();
+          openAppShell(updatedUser);
+        })
+        .catch(function (err) {
+          typeError.textContent = err.message;
+        })
+        .finally(function () {
+          typeSubmit.disabled = false;
+          typeSubmit.textContent = 'Finish setup';
+        });
+    });
+
+    // ---- app shell (post-login: my gigs / browse / post a gig / profile) ----
+    var MIN_BOUNTY_NAIRA = 3000; // matches server's platform-fee floor, see mobile's PostGigScreen
+    // PLAN.md "Fee waiver for logistics categories" — mirrors
+    // DeliveryService.isDeliveryEligible / DEFAULT_PLATFORM_FEE_BPS
+    // (server/src/modules/delivery/delivery.service.ts, server/.env.example).
+    // No live endpoint to fetch this from today, so duplicated client-side
+    // same as MIN_BOUNTY_NAIRA already was — keep in sync if either changes.
+    var DELIVERY_ELIGIBLE_SUBMARKET_KEY = 'laundry-dry-cleaning';
+    var PLATFORM_FEE_BPS = 1000;
+    var STATUS_LABEL = {
+      draft: 'Draft',
+      escrow_pending: 'Awaiting funding',
+      open: 'Open — matching',
+      claimed: 'Claimed',
+      in_progress: 'In progress',
+      submitted: 'Awaiting sign-off',
+      signed_off: 'Signed off',
+      disputed: 'Disputed',
+      released: 'Complete',
+      refunded: 'Refunded',
+      cancelled: 'Cancelled',
+    };
+
+    var shell = document.getElementById('app-shell');
+    var shellGreeting = document.getElementById('shell-greeting');
+    var shellSignout = document.getElementById('shell-signout');
+    var shellTabs = document.getElementById('shell-tabs');
+    var shellPanels = shell.querySelectorAll('.shell-panel');
+    var shellState = {
+      user: null,
+      taxonomyLoaded: false,
+      domains: [],
+      submarkets: [],
+      clientTypes: [],
+      postDomain: null,
+      postSubmarket: null,
+      postClientType: null,
+      postMaterials: 'bounty_covers',
+      postCriteria: [''],
+      directorySubmarket: null,
+      hireSubmarketKey: null,
+      hireProfessionalId: null,
+      hireProfessionalName: null,
+    };
+
+    function formatNaira(kobo) {
+      return (kobo / 100).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 });
+    }
+
+    function openAppShell(user) {
+      shellState.user = user;
+      shellGreeting.textContent = 'Hi, ' + (user.name || user.email || user.phone || 'there');
+      shell.hidden = false;
+      showShellTab('mine');
+    }
+
+    function closeAppShell() {
+      shell.hidden = true;
+    }
+
+    function signOut() {
+      state.accessToken = null;
+      shellState.user = null;
+      try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+      closeAppShell();
+    }
+    shellSignout.addEventListener('click', signOut);
+
+    function showShellTab(name) {
+      Array.prototype.forEach.call(shellTabs.children, function (tab) {
+        tab.classList.toggle('auth-tab-active', tab.getAttribute('data-tab') === name);
+      });
+      shellPanels.forEach(function (panel) {
+        panel.hidden = panel.getAttribute('data-panel') !== name;
+      });
+      if (name === 'mine') loadMineList();
+      else if (name === 'browse') loadBrowseList();
+      else if (name === 'directory') loadDirectory();
+      else if (name === 'post') loadPostForm();
+      else if (name === 'profile') renderProfile();
+    }
+
+    Array.prototype.forEach.call(shellTabs.children, function (tab) {
+      tab.addEventListener('click', function () {
+        showShellTab(tab.getAttribute('data-tab'));
+      });
+    });
+
+    function gigCard(gig, note, invited, onAction, actionLabel) {
+      var card = document.createElement('div');
+      card.className = invited ? 'gig-card gig-card-invited' : 'gig-card';
+      var tone = gig.status === 'open' ? 'active' : 'neutral';
+      card.innerHTML =
+        '<div class="gig-card-head">' +
+          '<span class="gig-card-title"></span>' +
+          '<span class="status-pill" data-tone="' + tone + '"></span>' +
+        '</div>' +
+        '<p class="gig-card-meta"></p>' +
+        '<div class="gig-card-bounty"></div>';
+      card.querySelector('.gig-card-title').textContent = gig.title;
+      card.querySelector('.status-pill').textContent = STATUS_LABEL[gig.status] || gig.status;
+      card.querySelector('.gig-card-meta').textContent = gig.locationText;
+      card.querySelector('.gig-card-bounty').textContent = formatNaira(gig.bountyKobo);
+      if (note) {
+        var noteEl = document.createElement('p');
+        noteEl.className = 'gig-card-note';
+        noteEl.textContent = note;
+        card.appendChild(noteEl);
+      }
+      // PLAN.md "Claim + submit a gig from the web client" — professional
+      // accounts get a real action button (claim, or resume submitting)
+      // instead of the static note above.
+      if (onAction) {
+        var actionBtn = document.createElement('button');
+        actionBtn.className = 'btn btn-block';
+        actionBtn.type = 'button';
+        actionBtn.style.marginTop = '10px';
+        actionBtn.textContent = actionLabel || 'Claim this gig';
+        actionBtn.addEventListener('click', function () { onAction(gig); });
+        card.appendChild(actionBtn);
+      }
+      return card;
+    }
+
+    // PLAN.md "Split payment pivot" — the funding card that used to live
+    // here (fundingCard/renderRequest/renderInstructions, wired to the
+    // now-deleted POST /gigs/:id/fund) is gone: publishing a gig goes
+    // straight to 'open' now, no funding step in between. Payment moves
+    // to the submitted -> released step instead (POST /gigs/:id/release),
+    // which — like sign-off itself — isn't built on the web client yet,
+    // only on mobile (ReviewSignOffScreen). See loadMineList's note below.
+
+    // PLAN.md "Claim + submit a gig from the web client" (follow-up: "Users
+    // should be perpetually able to view all their gigs even after
+    // claiming it") — once claimed, a gig drops out of both the open-gigs
+    // list and the invited-gigs list, so without a dedicated "claimed by
+    // you" view here a professional who claims from the web could lose
+    // track of it the moment they leave the claim modal. GET /gigs/claimed
+    // returns every gig this professional has ever claimed, at any status.
+    function claimedGigNote(gig) {
+      switch (gig.status) {
+        case 'submitted': return 'Submitted — waiting on the client to sign off and release payment.';
+        case 'signed_off': return 'Signed off — payment release is in progress.';
+        case 'disputed': return 'Disputed — check WhatsApp or the Sorted app for updates.';
+        case 'released': return 'Complete — paid out.';
+        case 'refunded': return 'Refunded to the client.';
+        case 'cancelled': return 'Cancelled.';
+        default: return null; // claimed / in_progress get the Submit button instead
+      }
+    }
+
+    function loadMineList() {
+      var container = document.getElementById('shell-mine-list');
+      container.innerHTML = '<p class="shell-empty">Loading…</p>';
+      var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
+      Promise.all([
+        api('/gigs/mine', { auth: true }),
+        isProfessional ? api('/gigs/claimed', { auth: true }).catch(function () { return []; }) : Promise.resolve([]),
+      ])
+        .then(function (results) {
+          var posted = results[0];
+          var claimed = results[1];
+          container.innerHTML = '';
+          if (posted.length === 0 && claimed.length === 0) {
+            container.innerHTML = '<p class="shell-empty">No gigs yet' +
+              (isProfessional ? ' — claim one from the Browse tab, or try the "Post a gig" tab.' : ' — try the "Post a gig" tab.') +
+              '</p>';
+            return;
+          }
+          if (claimed.length > 0) {
+            var claimedTitle = document.createElement('p');
+            claimedTitle.className = 'shell-section-title';
+            claimedTitle.textContent = 'Claimed by you';
+            container.appendChild(claimedTitle);
+            claimed.forEach(function (gig) {
+              var canSubmit = gig.status === 'claimed' || gig.status === 'in_progress';
+              container.appendChild(gigCard(gig, claimedGigNote(gig), false, canSubmit ? openSubmitModal : null, 'Submit for review'));
+            });
+          }
+          if (posted.length > 0) {
+            if (claimed.length > 0) {
+              var postedTitle = document.createElement('p');
+              postedTitle.className = 'shell-section-title';
+              postedTitle.textContent = 'Posted by you';
+              container.appendChild(postedTitle);
+            }
+            posted.forEach(function (gig) {
+              // Sign-off (and now payment — PLAN.md "Split payment pivot")
+              // isn't built on the web yet, only on the mobile app — say so
+              // plainly rather than showing a dead button.
+              var note = gig.status === 'submitted' ? 'Review, sign off, and pay from the Sorted mobile app.' : null;
+              container.appendChild(gigCard(gig, note));
+            });
+          }
+        })
+        .catch(function (err) {
+          container.innerHTML = '';
+          container.appendChild(Object.assign(document.createElement('p'), { className: 'modal-error', textContent: err.message }));
+        });
+    }
+
+    // PLAN.md "Surface direct invites in the app" — GET /gigs deliberately
+    // excludes every restricted gig, even ones restricted to the caller
+    // (see gigs.service.ts's listGigs doc comment), so a directly-invited
+    // professional had no way to find that gig anywhere in the app, web
+    // included — a real bug report, not a hypothetical. GET /gigs/invited
+    // is the authenticated alternative that does include them.
+    function loadBrowseList() {
+      var container = document.getElementById('shell-browse-list');
+      container.innerHTML = '<p class="shell-empty">Loading…</p>';
+      var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
+      Promise.all([api('/gigs?status=open'), api('/gigs/invited', { auth: true }).catch(function () { return []; })])
+        .then(function (results) {
+          var gigs = results[0];
+          var invitedGigs = results[1];
+          container.innerHTML = '';
+          if (gigs.length === 0 && invitedGigs.length === 0) {
+            container.innerHTML = '<p class="shell-empty">No open gigs right now.</p>';
+            return;
+          }
+          invitedGigs.forEach(function (gig) {
+            // PLAN.md "Claim + submit a gig from the web client" — a
+            // professional can now claim straight from this card instead
+            // of being told to go use the app or WhatsApp.
+            var canClaim = isProfessional && gig.status === 'open';
+            var note = canClaim ? 'Invited to you directly by a client.' : 'Invited to you directly by a client — claiming isn’t available on web yet, use the Sorted app (or reply on WhatsApp if you’ve messaged us before).';
+            container.appendChild(gigCard(gig, note, true, canClaim ? openClaimModal : null));
+          });
+          gigs.forEach(function (gig) {
+            var canClaim = isProfessional && gig.status === 'open';
+            container.appendChild(gigCard(gig, canClaim ? null : 'Claiming isn’t available yet — coming soon.', false, canClaim ? openClaimModal : null));
+          });
+        })
+        .catch(function (err) {
+          container.innerHTML = '';
+          container.appendChild(Object.assign(document.createElement('p'), { className: 'modal-error', textContent: err.message }));
+        });
+    }
+
+    // ---- claim + submit-for-review (PLAN.md "Claim + submit a gig from
+    // the web client") ----
+    //
+    // Mirrors the mobile app's ClaimWorkScreen as a single modal that
+    // walks a professional through two server calls in place, no page
+    // navigation: POST /gigs/:id/claim (already live, used by mobile —
+    // this is the first web caller), then, once claimed, POST
+    // /gigs/:id/submit with a proof photo. Building only the claim button
+    // without also wiring submission would strand a professional who
+    // claims from the web with no way to ever finish the gig.
+    var claimModal = document.getElementById('claim-modal');
+    var claimModalBody = document.getElementById('claim-modal-body');
+    var claimModalCloseBtn = document.getElementById('claim-modal-close');
+
+    function closeClaimModal() {
+      claimModal.hidden = true;
+      claimModalBody.innerHTML = '';
+    }
+    claimModalCloseBtn.addEventListener('click', closeClaimModal);
+    claimModal.addEventListener('click', function (e) {
+      if (e.target === claimModal) closeClaimModal();
+    });
+
+    function openClaimModal(gig) {
+      claimModal.hidden = false;
+      renderClaimStep(gig);
+    }
+
+    /** Resume submitting proof for a gig that's already claimed — the "Submit for review" button on the My gigs tab's "Claimed by you" section. */
+    function openSubmitModal(gig) {
+      claimModal.hidden = false;
+      renderSubmitStep(gig);
+    }
+
+    function renderClaimStep(gig) {
+      claimModalBody.innerHTML =
+        '<h3 id="claim-modal-title">Claim this gig</h3>' +
+        '<p class="gig-card-title" style="margin:0 0 4px;"></p>' +
+        '<p class="gig-card-meta" style="margin:0 0 4px;"></p>' +
+        '<div class="gig-card-bounty" style="margin:0 0 16px;"></div>' +
+        '<p class="kyc-note">Claiming locks this gig to you — the first credible claim wins, so once you claim it, other professionals can no longer take it.</p>' +
+        '<p class="modal-error" id="claim-error"></p>' +
+        '<button class="btn btn-block" id="claim-confirm-btn" type="button">Claim this gig</button>';
+      claimModalBody.querySelector('.gig-card-title').textContent = gig.title;
+      claimModalBody.querySelector('.gig-card-meta').textContent = gig.locationText;
+      claimModalBody.querySelector('.gig-card-bounty').textContent = formatNaira(gig.bountyKobo);
+
+      document.getElementById('claim-confirm-btn').addEventListener('click', function () {
+        var err = document.getElementById('claim-error');
+        var btn = document.getElementById('claim-confirm-btn');
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Claiming…';
+        api('/gigs/' + gig.id + '/claim', { method: 'POST', auth: true })
+          .then(function () {
+            renderSubmitStep(gig);
+          })
+          .catch(function (e) {
+            err.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Claim this gig';
+          });
+      });
+    }
+
+    function renderSubmitStep(gig) {
+      claimModalBody.innerHTML =
+        '<h3 id="claim-modal-title">Claimed — submit your work</h3>' +
+        '<p class="kyc-note">You’ve claimed <strong>' + escapeHtml(gig.title) + '</strong>. When the work is done, upload a proof photo below to send it for the client’s sign-off. You can close this and come back any time from the My gigs tab.</p>' +
+        '<div class="field-row"><input type="file" id="claim-proof-input" accept="image/*" /></div>' +
+        '<div class="field-row"><input type="text" id="claim-note-input" placeholder="Optional note for the client" /></div>' +
+        '<p class="modal-error" id="claim-submit-error"></p>' +
+        '<button class="btn btn-block" id="claim-submit-btn" type="button">Submit for review</button>';
+
+      document.getElementById('claim-submit-btn').addEventListener('click', function () {
+        var fileInput = document.getElementById('claim-proof-input');
+        var noteInput = document.getElementById('claim-note-input');
+        var err = document.getElementById('claim-submit-error');
+        var btn = document.getElementById('claim-submit-btn');
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) { err.textContent = 'Choose a proof photo to upload.'; return; }
+
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+
+        resizeImageFileToDataUri(file, 1000, 0.8)
+          .then(function (dataUri) {
+            return api('/gigs/' + gig.id + '/submit', {
+              method: 'POST',
+              auth: true,
+              body: { proofBase64: dataUri, note: noteInput.value.trim() || undefined },
+            });
+          })
+          .then(function () {
+            claimModalBody.innerHTML =
+              '<h3 id="claim-modal-title">Submitted</h3>' +
+              '<p class="kyc-note">Sent for the client’s sign-off. You’ll be paid once they approve it.</p>' +
+              '<button class="btn btn-block" id="claim-done-btn" type="button">Done</button>';
+            document.getElementById('claim-done-btn').addEventListener('click', function () {
+              closeClaimModal();
+              // Refresh both — whichever tab the professional lands back
+              // on (Browse or My gigs) should reflect the new status
+              // immediately, not just the one they claimed from.
+              loadBrowseList();
+              loadMineList();
+            });
+          })
+          .catch(function (e) {
+            err.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Submit for review';
+          });
+      });
+    }
+
+    var profileStateSelect = document.getElementById('profile-state');
+    var profileStateOptionsBuilt = false;
+    var profileError = document.getElementById('shell-profile-error');
+    var profileSave = document.getElementById('shell-profile-save');
+
+    function renderProfile() {
+      if (!profileStateOptionsBuilt) {
+        NIGERIAN_STATES.forEach(function (name) {
+          var opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          profileStateSelect.appendChild(opt);
+        });
+        profileStateOptionsBuilt = true;
+      }
+      var user = shellState.user;
+      document.getElementById('profile-email').textContent = user.email || '—';
+      document.getElementById('profile-name').value = user.name || '';
+      var isProfessional = (user.roles || []).indexOf('professional') !== -1;
+      document.getElementById('profile-displayname-section').hidden = !isProfessional;
+      document.getElementById('profile-displayname').value = user.displayName || '';
+      document.getElementById('profile-phone').value = user.phone || '';
+      profileStateSelect.value = user.state || '';
+      document.getElementById('profile-roles').textContent = (user.roles || []).join(', ') || '—';
+      profileError.textContent = '';
+      renderAvatar(user);
+      renderKycSection();
+      renderPayoutSection();
+      renderBusinessSection();
+    }
+
+    // ---- business account (PLAN.md "Individual vs business accounts") ----
+    // Conversion path for an ALREADY-registered account — the account-type
+    // modal step only covers the choice at initial signup. Reuses
+    // /me/role-profile with the account's existing roles/submarket picks
+    // preserved, same as the mobile app's ProfileScreen equivalent.
+    var businessSectionEl = document.getElementById('profile-business-section');
+    var businessViewEl = document.getElementById('profile-business-view');
+    var businessFormEl = document.getElementById('profile-business-form');
+    var businessSummaryEl = document.getElementById('profile-business-summary');
+    var businessErrorEl = document.getElementById('profile-business-error');
+    var bizEditBtn = document.getElementById('profile-business-edit-btn');
+    var bizCancelBtn = document.getElementById('profile-business-cancel-btn');
+    var bizSaveBtn = document.getElementById('profile-business-save-btn');
+    var profileBizRegNumber = document.getElementById('profile-biz-reg-number');
+    var profileBizDirectors = document.getElementById('profile-biz-directors');
+    var profileBizEmail = document.getElementById('profile-biz-email');
+    var profileBizPhone = document.getElementById('profile-biz-phone');
+    var profileBizAddress = document.getElementById('profile-biz-address');
+
+    function renderBusinessSection() {
+      var user = shellState.user;
+      var isProfessional = (user.roles || []).indexOf('professional') !== -1;
+      businessSectionEl.hidden = !isProfessional;
+      if (!isProfessional) return;
+
+      businessFormEl.hidden = true;
+      businessViewEl.hidden = false;
+      businessErrorEl.textContent = '';
+
+      if (user.accountType === 'business' && user.businessProfile) {
+        businessSummaryEl.textContent =
+          'Business — Reg. ' + user.businessProfile.companyRegistrationNumber +
+          ' · Director(s): ' + user.businessProfile.directorNames.join(', ') +
+          ' · ' + user.businessProfile.businessEmail + ' · ' + user.businessProfile.businessPhone +
+          ' · ' + user.businessProfile.businessAddress;
+        bizEditBtn.textContent = 'Edit business details';
+        profileBizRegNumber.value = user.businessProfile.companyRegistrationNumber;
+        profileBizDirectors.value = user.businessProfile.directorNames.join(', ');
+        profileBizEmail.value = user.businessProfile.businessEmail;
+        profileBizPhone.value = user.businessProfile.businessPhone;
+        profileBizAddress.value = user.businessProfile.businessAddress;
+      } else {
+        businessSummaryEl.textContent =
+          'Registered as an individual. If you run a registered business (e.g. a dry-cleaning shop), convert here.';
+        bizEditBtn.textContent = 'Convert to business account';
+        profileBizRegNumber.value = '';
+        profileBizDirectors.value = '';
+        profileBizEmail.value = '';
+        profileBizPhone.value = '';
+        profileBizAddress.value = '';
+      }
+    }
+
+    bizEditBtn.addEventListener('click', function () {
+      businessViewEl.hidden = true;
+      businessFormEl.hidden = false;
+      businessErrorEl.textContent = '';
+    });
+
+    bizCancelBtn.addEventListener('click', function () {
+      businessFormEl.hidden = true;
+      businessViewEl.hidden = false;
+    });
+
+    bizSaveBtn.addEventListener('click', function () {
+      var directorNames = profileBizDirectors.value.split(',').map(function (n) { return n.trim(); }).filter(Boolean);
+      if (!profileBizRegNumber.value.trim() || directorNames.length === 0 || !profileBizEmail.value.trim() || !profileBizPhone.value.trim() || !profileBizAddress.value.trim()) {
+        businessErrorEl.textContent = 'All business fields are required.';
+        return;
+      }
+      businessErrorEl.textContent = '';
+      bizSaveBtn.disabled = true;
+      bizSaveBtn.textContent = 'Saving…';
+
+      var user = shellState.user;
+      api('/me/role-profile', {
+        method: 'POST',
+        auth: true,
+        body: {
+          roles: user.roles,
+          serviceOfferingSubmarketIds: user.serviceOfferingSubmarketIds,
+          seekingCategorySubmarketIds: user.seekingCategorySubmarketIds,
+          accountType: 'business',
+          businessProfile: {
+            companyRegistrationNumber: profileBizRegNumber.value.trim(),
+            directorNames: directorNames,
+            businessEmail: profileBizEmail.value.trim(),
+            businessPhone: profileBizPhone.value.trim(),
+            businessAddress: profileBizAddress.value.trim(),
+          },
+        },
+      })
+        .then(function (updatedUser) {
+          shellState.user = updatedUser;
+          renderBusinessSection();
+        })
+        .catch(function (err) {
+          businessErrorEl.textContent = err.message;
+        })
+        .finally(function () {
+          bizSaveBtn.disabled = false;
+          bizSaveBtn.textContent = 'Save';
+        });
+    });
+
+    // ---- payout account — professional only; PLAN.md "Bank list endpoint + payout account screen" ----
+    var payoutSectionEl = document.getElementById('profile-payout-section');
+    var payoutViewEl = document.getElementById('profile-payout-view');
+    var payoutFormEl = document.getElementById('profile-payout-form');
+    var payoutSummaryEl = document.getElementById('profile-payout-summary');
+    var payoutErrorEl = document.getElementById('profile-payout-error');
+    var payoutEditBtn = document.getElementById('profile-payout-edit-btn');
+    var payoutCancelBtn = document.getElementById('profile-payout-cancel-btn');
+    var payoutSaveBtn = document.getElementById('profile-payout-save-btn');
+    var payoutBankSelect = document.getElementById('profile-payout-bank');
+    var payoutAccountNumberInput = document.getElementById('profile-payout-account-number');
+    var payoutAccountNameInput = document.getElementById('profile-payout-account-name');
+    var payoutBanks = []; // fetched once and cached — doesn't change within a session, same as NIGERIAN_STATES
+    var payoutBanksLoaded = false;
+    var payoutDestination = null; // null once we know there's genuinely nothing saved; undefined until the fetch resolves
+
+    function bankNameForCode(code) {
+      var match = payoutBanks.filter(function (b) { return b.code === code; })[0];
+      return match ? match.name : code;
+    }
+
+    function fillPayoutForm(dest) {
+      payoutAccountNumberInput.value = dest ? dest.accountNumber : '';
+      payoutAccountNameInput.value = dest ? dest.accountName : '';
+      if (!payoutBankSelect.querySelector('option[value="' + (dest ? dest.bankCode : '') + '"]')) {
+        payoutBankSelect.value = '';
+      } else {
+        payoutBankSelect.value = dest ? dest.bankCode : '';
+      }
+    }
+
+    function ensurePayoutBanksLoaded() {
+      if (payoutBanksLoaded) return Promise.resolve();
+      return api('/taxonomy/banks').then(function (banks) {
+        payoutBanks = banks;
+        payoutBanksLoaded = true;
+        banks.forEach(function (b) {
+          var opt = document.createElement('option');
+          opt.value = b.code;
+          opt.textContent = b.name;
+          payoutBankSelect.appendChild(opt);
+        });
+      });
+    }
+
+    function renderPayoutViewState() {
+      payoutFormEl.hidden = true;
+      payoutViewEl.hidden = false;
+      payoutErrorEl.textContent = '';
+
+      if (payoutDestination) {
+        payoutSummaryEl.textContent =
+          bankNameForCode(payoutDestination.bankCode) + ' · ' +
+          payoutDestination.accountNumber + ' · ' + payoutDestination.accountName;
+        payoutEditBtn.textContent = 'Edit payout account';
+      } else {
+        payoutSummaryEl.textContent =
+          'Add the bank account you want to be paid into when a client approves your work.';
+        payoutEditBtn.textContent = 'Add payout account';
+      }
+    }
+
+    function renderPayoutSection() {
+      var user = shellState.user;
+      var isProfessional = (user.roles || []).indexOf('professional') !== -1;
+      payoutSectionEl.hidden = !isProfessional;
+      if (!isProfessional) return;
+
+      payoutSummaryEl.textContent = 'Loading…';
+      payoutViewEl.hidden = false;
+      payoutFormEl.hidden = true;
+
+      api('/me/payout-destination', { auth: true })
+        .then(function (dest) {
+          payoutDestination = dest;
+          renderPayoutViewState();
+        })
+        .catch(function () {
+          payoutSummaryEl.textContent = 'Could not load your payout account — try again.';
+        });
+    }
+
+    payoutEditBtn.addEventListener('click', function () {
+      payoutErrorEl.textContent = '';
+      payoutViewEl.hidden = true;
+      payoutFormEl.hidden = false;
+      ensurePayoutBanksLoaded()
+        .then(function () { fillPayoutForm(payoutDestination); })
+        .catch(function () { payoutErrorEl.textContent = 'Could not load the bank list — try again.'; });
+    });
+
+    payoutCancelBtn.addEventListener('click', function () {
+      payoutFormEl.hidden = true;
+      payoutViewEl.hidden = false;
+    });
+
+    payoutSaveBtn.addEventListener('click', function () {
+      var bankCode = payoutBankSelect.value;
+      var accountNumber = payoutAccountNumberInput.value.trim();
+      var accountName = payoutAccountNameInput.value.trim();
+      if (!bankCode) { payoutErrorEl.textContent = 'Choose a bank.'; return; }
+      if (accountNumber.length !== 10) { payoutErrorEl.textContent = 'Enter a 10-digit account number.'; return; }
+      if (!accountName) { payoutErrorEl.textContent = 'Enter the account holder name.'; return; }
+
+      payoutErrorEl.textContent = '';
+      payoutSaveBtn.disabled = true;
+      payoutSaveBtn.textContent = 'Saving…';
+
+      api('/me/payout-destination', {
+        method: 'PATCH',
+        auth: true,
+        body: { bankCode: bankCode, accountNumber: accountNumber, accountName: accountName },
+      })
+        .then(function (saved) {
+          payoutDestination = saved;
+          renderPayoutViewState();
+        })
+        .catch(function (err) {
+          payoutErrorEl.textContent = err.message;
+        })
+        .finally(function () {
+          payoutSaveBtn.disabled = false;
+          payoutSaveBtn.textContent = 'Save';
+        });
+    });
+
+    // ---- profile photo (any role) ----
+    var avatarPreview = document.getElementById('profile-avatar-preview');
+    var avatarInput = document.getElementById('profile-avatar-input');
+    var avatarError = document.getElementById('profile-avatar-error');
+
+    function renderAvatar(user) {
+      if (user.avatarBase64) {
+        avatarPreview.innerHTML = '';
+        var img = document.createElement('img');
+        img.src = user.avatarBase64;
+        img.alt = '';
+        avatarPreview.appendChild(img);
+      } else {
+        var initial = (user.name || user.email || user.phone || '?').trim().charAt(0).toUpperCase();
+        avatarPreview.textContent = initial || '?';
+      }
+    }
+
+    avatarInput.addEventListener('change', function () {
+      var file = avatarInput.files && avatarInput.files[0];
+      if (!file) return;
+      avatarError.textContent = '';
+
+      resizeImageFileToDataUri(file, 480, 0.75)
+        .then(function (dataUri) {
+          return api('/me/avatar', { method: 'PATCH', auth: true, body: { avatarBase64: dataUri } });
+        })
+        .then(function (updatedUser) {
+          shellState.user = updatedUser;
+          renderAvatar(updatedUser);
+        })
+        .catch(function (err) {
+          avatarError.textContent = err.message;
+        })
+        .finally(function () {
+          avatarInput.value = '';
+        });
+    });
+
+    // ---- verification (KYC) — professional only, manual pilot; see PLAN.md "Profile photo + KYC apply flow" ----
+    function renderKycStatusUi(kycStatus, request) {
+      var el = document.getElementById('profile-kyc-status');
+
+      if (kycStatus === 'verified') {
+        el.innerHTML =
+          '<span class="status-pill" data-tone="active">Verified</span>' +
+          '<p class="kyc-note">Verified professionals are more likely to be picked for gigs.</p>';
+        return;
+      }
+
+      if (request && request.status === 'pending') {
+        el.innerHTML =
+          '<span class="status-pill" data-tone="neutral">Application under review</span>' +
+          '<p class="kyc-note">We’ll update this once it’s reviewed — usually within a few days.</p>';
+        return;
+      }
+
+      var rejectedNote = '';
+      if (request && request.status === 'rejected') {
+        rejectedNote =
+          '<p class="kyc-review-note">Not approved' +
+          (request.reviewNote ? ': ' + escapeHtml(request.reviewNote) : '.') +
+          ' You can apply again below.</p>';
+      }
+
+      el.innerHTML =
+        rejectedNote +
+        '<p class="kyc-note">Verified professionals are more likely to be picked for gigs. Upload a clear photo of a government ID or yourself for manual review.</p>' +
+        '<div class="field-row"><input type="file" id="kyc-document-input" accept="image/*" /></div>' +
+        '<div class="field-row"><input type="text" id="kyc-note-input" placeholder="Optional note" /></div>' +
+        '<p class="modal-error" id="kyc-apply-error"></p>' +
+        '<button class="btn btn-block" id="kyc-apply-submit" type="button">Apply for verification</button>';
+
+      document.getElementById('kyc-apply-submit').addEventListener('click', function () {
+        var fileInput = document.getElementById('kyc-document-input');
+        var noteInput = document.getElementById('kyc-note-input');
+        var err = document.getElementById('kyc-apply-error');
+        var btn = document.getElementById('kyc-apply-submit');
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) { err.textContent = 'Choose a photo to upload.'; return; }
+
+        err.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+
+        resizeImageFileToDataUri(file, 1000, 0.8)
+          .then(function (dataUri) {
+            return api('/me/kyc/apply', {
+              method: 'POST',
+              auth: true,
+              body: { documentBase64: dataUri, note: noteInput.value.trim() || undefined },
+            });
+          })
+          .then(function () {
+            shellState.user.kycStatus = 'pending';
+            renderKycSection();
+          })
+          .catch(function (e) {
+            err.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = 'Apply for verification';
+          });
+      });
+    }
+
+    function renderKycSection() {
+      var section = document.getElementById('profile-kyc-section');
+      var user = shellState.user;
+      if (!user.roles || user.roles.indexOf('professional') === -1) {
+        section.hidden = true;
+        return;
+      }
+      section.hidden = false;
+      document.getElementById('profile-kyc-status').innerHTML = '<p class="kyc-note">Loading…</p>';
+      api('/me/kyc', { auth: true })
+        .then(function (request) {
+          renderKycStatusUi(user.kycStatus, request);
+        })
+        .catch(function () {
+          document.getElementById('profile-kyc-status').innerHTML = '<p class="modal-error">Could not load verification status.</p>';
+        });
+    }
+
+    profileSave.addEventListener('click', function () {
+      var name = document.getElementById('profile-name').value.trim();
+      var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
+      var displayName = document.getElementById('profile-displayname').value.trim();
+      var phone = document.getElementById('profile-phone').value.trim();
+      var stateName = profileStateSelect.value;
+
+      profileError.textContent = '';
+      profileSave.disabled = true;
+      profileSave.textContent = 'Saving…';
+
+      api('/me/profile', {
+        method: 'PATCH',
+        auth: true,
+        body: {
+          name: name || undefined,
+          displayName: isProfessional ? displayName : undefined,
+          phone: phone || undefined,
+          state: stateName || undefined,
+        },
+      })
+        .then(function (updatedUser) {
+          shellState.user = updatedUser;
+          shellGreeting.textContent = 'Hi, ' + (updatedUser.name || updatedUser.email || updatedUser.phone || 'there');
+          renderProfile();
+        })
+        .catch(function (err) {
+          profileError.textContent = err.message;
+        })
+        .finally(function () {
+          profileSave.disabled = false;
+          profileSave.textContent = 'Save';
+        });
+    });
+
+    // ---- professional directory (PLAN.md "Professional directory") ----
+    var directorySubmarketChips = document.getElementById('directory-submarket-chips');
+    var directoryError = document.getElementById('directory-error');
+    var directoryList = document.getElementById('directory-list');
+
+    function loadDirectory() {
+      directoryError.textContent = '';
+      if (shellState.submarkets.length > 0) {
+        if (!shellState.directorySubmarket) shellState.directorySubmarket = shellState.submarkets[0].key;
+        renderDirectorySubmarketChips();
+        renderDirectoryList();
+        return;
+      }
+      directoryList.innerHTML = '<p class="shell-empty">Loading…</p>';
+      api('/taxonomy/submarkets')
+        .then(function (submarkets) {
+          shellState.submarkets = submarkets;
+          if (submarkets[0]) shellState.directorySubmarket = submarkets[0].key;
+          renderDirectorySubmarketChips();
+          renderDirectoryList();
+        })
+        .catch(function (err) {
+          directoryList.innerHTML = '';
+          directoryError.textContent = err.message;
+        });
+    }
+
+    function renderDirectorySubmarketChips() {
+      directorySubmarketChips.innerHTML = '';
+      shellState.submarkets.forEach(function (s) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.textContent = s.label;
+        if (s.key === shellState.directorySubmarket) chip.classList.add('chip-active');
+        chip.addEventListener('click', function () {
+          shellState.directorySubmarket = s.key;
+          renderDirectorySubmarketChips();
+          renderDirectoryList();
+        });
+        directorySubmarketChips.appendChild(chip);
+      });
+    }
+
+    function renderDirectoryList() {
+      if (!shellState.directorySubmarket) return;
+      directoryList.innerHTML = '<p class="shell-empty">Loading…</p>';
+      directoryError.textContent = '';
+      api('/professionals?submarket=' + encodeURIComponent(shellState.directorySubmarket))
+        .then(function (professionals) {
+          directoryList.innerHTML = '';
+          if (professionals.length === 0) {
+            directoryList.innerHTML = '<p class="shell-empty">No professionals in this category yet.</p>';
+            return;
+          }
+          professionals.forEach(function (p) {
+            directoryList.appendChild(directoryCard(p));
+          });
+        })
+        .catch(function (err) {
+          directoryList.innerHTML = '';
+          directoryError.textContent = err.message;
+        });
+    }
+
+    function directoryCard(p) {
+      var card = document.createElement('div');
+      card.className = 'gig-card';
+
+      var head = document.createElement('div');
+      head.className = 'gig-card-head';
+      var title = document.createElement('span');
+      title.className = 'gig-card-title';
+      title.textContent = p.displayName;
+      head.appendChild(title);
+      if (p.kycStatus === 'verified') {
+        var pill = document.createElement('span');
+        pill.className = 'status-pill';
+        pill.setAttribute('data-tone', 'active');
+        pill.textContent = 'Verified';
+        head.appendChild(pill);
+      }
+      card.appendChild(head);
+
+      if (p.accountType === 'business') {
+        var meta = document.createElement('p');
+        meta.className = 'gig-card-meta';
+        meta.textContent = 'Business';
+        card.appendChild(meta);
+      }
+
+      var hireBtn = document.createElement('button');
+      hireBtn.type = 'button';
+      hireBtn.className = 'btn btn-block';
+      hireBtn.style.marginTop = '10px';
+      hireBtn.textContent = 'Hire';
+      hireBtn.addEventListener('click', function () {
+        shellState.hireProfessionalId = p.id;
+        shellState.hireProfessionalName = p.displayName;
+        shellState.hireSubmarketKey = shellState.directorySubmarket;
+        showShellTab('post');
+      });
+      card.appendChild(hireBtn);
+
+      return card;
+    }
+
+    // ---- post-a-gig form ----
+    var postDomainChips = document.getElementById('post-domain-chips');
+    var postSubmarketChips = document.getElementById('post-submarket-chips');
+    var postClientTypeChips = document.getElementById('post-clienttype-chips');
+    var postMaterialsChips = document.getElementById('post-materials-chips');
+    var postCriteriaRows = document.getElementById('post-criteria-rows');
+    var postError = document.getElementById('shell-post-error');
+    var postSubmit = document.getElementById('shell-post-submit');
+    document.getElementById('post-bounty').addEventListener('input', renderFeePreview);
+
+    function applyHirePrefill() {
+      if (!shellState.hireProfessionalId) return;
+      var sm = shellState.submarkets.find(function (s) { return s.key === shellState.hireSubmarketKey; });
+      if (sm) {
+        shellState.postSubmarket = sm.key;
+        if (sm.domain) shellState.postDomain = sm.domain.key;
+      }
+    }
+
+    function renderPostHireBanner() {
+      var el = document.getElementById('post-hire-banner');
+      if (!shellState.hireProfessionalId) {
+        el.hidden = true;
+        el.innerHTML = '';
+        return;
+      }
+      el.hidden = false;
+      el.innerHTML =
+        '<p style="background:var(--green-mint-bg);border:1px solid var(--green-bright);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-body);margin-bottom:16px;">' +
+        'Inviting <strong>' + escapeHtml(shellState.hireProfessionalName || 'this professional') + '</strong> directly — only they can claim this gig once it is published. ' +
+        '<a href="#" id="post-hire-clear" style="color:var(--green-deep);">Remove</a></p>';
+      document.getElementById('post-hire-clear').addEventListener('click', function (e) {
+        e.preventDefault();
+        shellState.hireProfessionalId = null;
+        shellState.hireProfessionalName = null;
+        renderPostHireBanner();
+      });
+    }
+
+    function loadPostForm() {
+      if (shellState.taxonomyLoaded) {
+        applyHirePrefill();
+        renderPostChips();
+        renderPostHireBanner();
+        return;
+      }
+      Promise.all([api('/taxonomy/domains'), api('/taxonomy/submarkets'), api('/taxonomy/client-types')])
+        .then(function (results) {
+          shellState.domains = results[0];
+          shellState.submarkets = results[1];
+          shellState.clientTypes = results[2];
+          shellState.taxonomyLoaded = true;
+          if (results[0][0]) shellState.postDomain = results[0][0].key;
+          if (results[2][0]) shellState.postClientType = results[2][0].key;
+          applyHirePrefill();
+          renderPostChips();
+          renderCriteriaRows();
+          renderPostHireBanner();
+        })
+        .catch(function (err) {
+          postError.textContent = err.message;
+        });
+    }
+
+    function singleSelectChips(container, items, selectedKey, onSelect) {
+      container.innerHTML = '';
+      items.forEach(function (item) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.textContent = item.label;
+        if (item.key === selectedKey) chip.classList.add('chip-active');
+        chip.addEventListener('click', function () { onSelect(item.key); });
+        container.appendChild(chip);
+      });
+    }
+
+    function renderPostChips() {
+      singleSelectChips(postDomainChips, shellState.domains, shellState.postDomain, function (key) {
+        shellState.postDomain = key;
+        shellState.postSubmarket = null;
+        renderPostChips();
+      });
+      var visibleSubmarkets = shellState.submarkets.filter(function (s) {
+        return !shellState.postDomain || (s.domain && s.domain.key === shellState.postDomain);
+      });
+      singleSelectChips(postSubmarketChips, visibleSubmarkets, shellState.postSubmarket, function (key) {
+        shellState.postSubmarket = key;
+        renderPostChips();
+      });
+      singleSelectChips(postClientTypeChips, shellState.clientTypes, shellState.postClientType, function (key) {
+        shellState.postClientType = key;
+        renderPostChips();
+      });
+      singleSelectChips(
+        postMaterialsChips,
+        [
+          { key: 'bounty_covers', label: 'Bounty covers materials' },
+          { key: 'professional_supplies', label: 'Professional supplies' },
+        ],
+        shellState.postMaterials,
+        function (key) {
+          shellState.postMaterials = key;
+          renderPostChips();
+        },
+      );
+      renderFeePreview();
+    }
+
+    function renderFeePreview() {
+      var previewEl = document.getElementById('post-fee-preview');
+      var bountyNaira = parseFloat(document.getElementById('post-bounty').value || '0');
+      var bountyKobo = Math.round(bountyNaira * 100);
+      if (!bountyNaira || bountyKobo < MIN_BOUNTY_NAIRA * 100) {
+        previewEl.hidden = true;
+        return;
+      }
+      var isLogisticsEligible = shellState.postSubmarket === DELIVERY_ELIGIBLE_SUBMARKET_KEY;
+      var feeKobo = isLogisticsEligible ? 0 : Math.round((bountyKobo * PLATFORM_FEE_BPS) / 10000);
+      var totalKobo = bountyKobo + feeKobo;
+      document.getElementById('post-fee-label').textContent = isLogisticsEligible
+        ? 'Sorted fee (waived — pickup & delivery included)'
+        : 'Sorted fee (10%)';
+      document.getElementById('post-fee-amount').textContent = '₦' + (feeKobo / 100).toLocaleString();
+      document.getElementById('post-fee-total').textContent = '₦' + (totalKobo / 100).toLocaleString();
+      previewEl.hidden = false;
+    }
+
+    function renderCriteriaRows() {
+      postCriteriaRows.innerHTML = '';
+      shellState.postCriteria.forEach(function (text, i) {
+        var row = document.createElement('div');
+        row.className = 'criterion-row';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Criterion ' + (i + 1);
+        input.value = text;
+        input.style.cssText = 'flex:1;padding:13px 14px;border-radius:11px;border:1px solid var(--border);background:var(--bg-app);font-size:15px;color:var(--text-primary);';
+        input.addEventListener('input', function () {
+          shellState.postCriteria[i] = input.value;
+        });
+        row.appendChild(input);
+        if (shellState.postCriteria.length > 1) {
+          var removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'criterion-remove';
+          removeBtn.textContent = '✕';
+          removeBtn.addEventListener('click', function () {
+            shellState.postCriteria.splice(i, 1);
+            renderCriteriaRows();
+          });
+          row.appendChild(removeBtn);
+        }
+        postCriteriaRows.appendChild(row);
+      });
+    }
+
+    document.getElementById('post-add-criterion').addEventListener('click', function () {
+      shellState.postCriteria.push('');
+      renderCriteriaRows();
+    });
+
+    postSubmit.addEventListener('click', function () {
+      var title = document.getElementById('post-title').value.trim();
+      var description = document.getElementById('post-description').value.trim();
+      var locationText = document.getElementById('post-location').value.trim();
+      var bountyNaira = parseFloat(document.getElementById('post-bounty').value || '0');
+      var bountyKobo = Math.round(bountyNaira * 100);
+      var criteria = shellState.postCriteria.map(function (c) { return c.trim(); }).filter(Boolean);
+
+      if (title.length < 3) { postError.textContent = 'Enter a title (at least 3 characters).'; return; }
+      if (!description) { postError.textContent = 'Enter a description.'; return; }
+      if (!locationText) { postError.textContent = 'Enter a location.'; return; }
+      if (!shellState.postDomain || !shellState.postSubmarket || !shellState.postClientType) {
+        postError.textContent = 'Pick a domain, category, and posting-as type.';
+        return;
+      }
+      if (criteria.length === 0) { postError.textContent = 'Add at least one criterion.'; return; }
+      if (bountyKobo < MIN_BOUNTY_NAIRA * 100) {
+        postError.textContent = 'Minimum budget is ₦' + MIN_BOUNTY_NAIRA.toLocaleString() + ' (platform fee floor).';
+        return;
+      }
+
+      postError.textContent = '';
+      postSubmit.disabled = true;
+      postSubmit.textContent = 'Publishing…';
+
+      api('/gigs', {
+        method: 'POST',
+        auth: true,
+        body: {
+          title: title,
+          description: description,
+          domain: shellState.postDomain,
+          submarket: shellState.postSubmarket,
+          clientType: shellState.postClientType,
+          locationText: locationText,
+          materialsMode: shellState.postMaterials,
+          bountyKobo: bountyKobo,
+          criteria: criteria,
+          restrictedToProfessionalId: shellState.hireProfessionalId || undefined,
+        },
+      })
+        .then(function (draft) {
+          return api('/gigs/' + draft.id + '/publish', { method: 'POST', auth: true });
+        })
+        .then(function () {
+          // Reset the form for next time.
+          document.getElementById('post-title').value = '';
+          document.getElementById('post-description').value = '';
+          document.getElementById('post-location').value = '';
+          document.getElementById('post-bounty').value = '';
+          shellState.postCriteria = [''];
+          shellState.hireProfessionalId = null;
+          shellState.hireProfessionalName = null;
+          renderCriteriaRows();
+          showShellTab('mine');
+        })
+        .catch(function (err) {
+          postError.textContent = err.message;
+        })
+        .finally(function () {
+          postSubmit.disabled = false;
+          postSubmit.textContent = 'Review & publish';
+        });
+    });
+
+    // ---- restore a session on page load ----
+    (function restoreSession() {
+      var token;
+      try { token = localStorage.getItem(TOKEN_KEY); } catch (e) { token = null; }
+      if (!token) return;
+      state.accessToken = token;
+      api('/me', { auth: true })
+        .then(openAppShell)
+        .catch(function () {
+          state.accessToken = null;
+          try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+        });
+    })();
+  })();
+</script>
+
+</body>
+</html>

@@ -30,25 +30,18 @@ Start here:
 - [`mobile/README.md`](./mobile/README.md) — what's actually built:
   screen-by-screen, which ones are wired to the real API vs. mocked.
 
-## Landing page
+## Website (sorted.com.ng)
 
-`index.html` at the repo root. No dependencies, no build. Edit it directly.
+Plain static files at the repo root, no build step:
 
-It's an installable PWA: `manifest.json`, `sw.js` (network-first for the
-page, cache-first for static assets), and icons in `icons/` +
-`apple-touch-icon.png`. Note this is a deviation from `HANDOFF.md` §2,
-which specifies React Native (Expo) for the actual product — PWA was
-chosen for the landing page specifically to ship an installable "front
-door" without an app-store review cycle. The real transacting app (post a
-gig, escrow, sign-off) still doesn't exist as a frontend anywhere yet;
-this is marketing/waitlist only.
+| Path | What |
+|---|---|
+| `/` (`index.html`) | Landing page for Sorted dry cleaning, in the mobile app's design (cream / deep green / lime, Bricolage Grotesque + IBM Plex Mono). |
+| `/app` | The Sorted mobile app's web build. `vercel.json` proxies it from the `sorted-app-preview` Vercel project (repo Bayooo123/AFRICA, `sorted-app/`), so the app deploys on its own. `/app/api/*` goes to the API. |
+| `/classic` (`classic.html`) | The previous landing page and web client for all job categories (post a gig, claim, pay). The installable PWA (`manifest.json`) opens here. |
+| `/dashboard`, `/kyc-admin`, `/leads`, `/whatsapp-admin` | Admin pages, unchanged. |
 
-The waitlist form is live: it inserts into `public.waitlist` in a
-dedicated Supabase project (org REFORMA, project `sorted`) via PostgREST,
-using a publishable key that's safe to expose client-side. RLS on that
-table allows INSERT only for `anon` — no SELECT policy exists, so the
-signup list isn't readable through the public key, only via the Supabase
-dashboard or service-role key.
+`sw.js` never touches `/app` or `/api` requests, so the app always gets fresh data.
 
 ## API
 
