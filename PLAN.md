@@ -3450,5 +3450,75 @@ is included in the request body exactly like every sibling field.
 
 ---
 
+## Daily founder briefing email
+
+**Asked:** a daily email to the founders covering everything that
+happened the previous day — site visits, orders placed, total
+transactions (count + ₦ volume) — plus "what else should it include."
+
+**What else it includes, and why each one:** reused exactly the tables
+`AnalyticsService`'s existing 30-day dashboard overview already reads
+(`dashboard.html`), just rescoped to the previous full UTC calendar day,
+rather than inventing new metrics:
+- **New signups**, split client vs. professional — which side of the
+  marketplace is actually growing day to day.
+- **Fee revenue** (not just transaction volume) — the one number that
+  answers "did Sorted make money yesterday," surfaced first/largest in
+  the email rather than buried under traffic stats.
+- **Disputes opened** — money-at-risk, worth knowing same-day rather than
+  only when checking the dashboard.
+- **KYC applications submitted** — the professional trust pipeline, a
+  manual bottleneck already flagged in the Refinex360 PRD conversation.
+- **Delivery dispatch failures** — directly the metric for the KWIK
+  silent-failure bug found and fixed in "NIPOST digital postcode
+  integration" above; this is how the founders would actually notice if
+  it (or something like it) regresses, instead of the bug sitting
+  invisible for weeks again.
+
+Deliberately left out: anything not already tracked anywhere (no
+estimating/approximating — same discipline `AnalyticsOverview`'s own doc
+comment states).
+
+**What was built:**
+- `NotificationEvent` gained a `founder_daily_digest` kind
+  (`notifications.interface.ts`) and `NotificationsService` a matching
+  `sendFounderDigestEmail`/`founderDigestEmailHtml` — same visual
+  language as the direct-invite email (same colors/fonts/footer), a KPI
+  table per section instead of a job summary, fee revenue shown
+  largest/first.
+- New `DigestService` (`analytics/digest.service.ts`) computes the
+  previous full UTC day's window and calls the notifications port once
+  per address in `FOUNDER_DIGEST_RECIPIENTS` (comma-separated, sequential
+  sends — a Resend outage shouldn't fan out retries across every
+  recipient at once).
+- New `GET /cron/daily-digest` (`digest-cron.controller.ts`) — NOT an
+  admin route (no logged-in session involved; Vercel's own cron
+  infrastructure calls it directly), gated by its own `CRON_SECRET`
+  bearer check instead of `AdminGuard`. Unlike most optional secrets in
+  this codebase, this one does NOT soft-enforce when unset — rejects
+  everything instead, since an unauthenticated trigger on this endpoint
+  means someone can spam the founders' inbox, not just skip a feature.
+- `server/vercel.json` gained a `crons` entry (`0 6 * * *` — 06:00 UTC /
+  07:00 WAT daily, adjustable) that Vercel's own cron infrastructure hits
+  on schedule, attaching the matching `Authorization: Bearer
+  ${CRON_SECRET}` header automatically once that env var is set on the
+  project.
+
+**Verification:** `tsc --noEmit` clean, `nest build` clean. Full
+`app.init()` boot test (not just `NestFactory.create()` — route mapping
+only logs at `.init()`) confirms `GET /cron/daily-digest` maps correctly
+and the whole DI graph still resolves with `AnalyticsModule` now also
+importing `ReputationNotificationsModule` (no cycle — same reasoning
+`GigsModule` already relies on for the same import).
+
+**Not yet confirmed:** nobody has set `FOUNDER_DIGEST_RECIPIENTS` or
+`CRON_SECRET` in production yet — the cron will fire on schedule once
+deployed but no-ops (logs a warning, sends nothing) until
+`FOUNDER_DIGEST_RECIPIENTS` is set, and the endpoint itself rejects every
+call until `CRON_SECRET` is set to match what's configured on the Vercel
+project.
+
+---
+
 *Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
 Escrow funding) does not start until this plan is approved.*

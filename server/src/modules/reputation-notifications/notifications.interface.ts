@@ -34,6 +34,30 @@ export type NotificationEvent =
       submarketLabel: string;
       locationText: string;
       bountyKobo: number;
+    }
+  /**
+   * PLAN.md "Daily founder briefing email" — one email per recipient in
+   * FOUNDER_DIGEST_RECIPIENTS, sent by a daily cron (see
+   * digest.service.ts). All figures cover the previous full UTC calendar
+   * day. Not tied to a specific User — DigestCronController passes a
+   * synthetic NotifyTarget per recipient (see that controller's own
+   * comment for why).
+   */
+  | {
+      kind: 'founder_daily_digest';
+      periodLabel: string; // e.g. "Monday, 13 October 2026"
+      pageviews: number;
+      whatsappClicks: number;
+      newClientSignups: number;
+      newProfessionalSignups: number;
+      ordersPlacedCount: number;
+      ordersPlacedValueKobo: number;
+      transactionsCompletedCount: number;
+      transactionsCompletedValueKobo: number;
+      feeRevenueKobo: number;
+      disputesOpened: number;
+      kycApplicationsSubmitted: number;
+      deliveryFailures: number;
     };
 
 /**
