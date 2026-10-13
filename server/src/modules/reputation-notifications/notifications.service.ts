@@ -52,6 +52,10 @@ export class NotificationsService implements NotificationsPort {
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendInviteEmail(target.email, event.clientName, event.gigDescription, event.submarketLabel, event.locationText, event.bountyKobo);
         return;
+      case 'founder_daily_digest':
+        if (!target.email) return; // no email on this account — caller already checked, but stay defensive
+        await this.sendFounderDigestEmail(target.email, event);
+        return;
       default:
         throw new NotImplementedException(
           `NotificationsService.notify — event kind '${event.kind}' not implemented yet (lands with its owning slice)`,
@@ -97,6 +101,11 @@ export class NotificationsService implements NotificationsPort {
   private async sendPasswordResetEmail(email: string, code: string): Promise<void> {
     await this.sendEmail(email, 'Your Sorted password reset code', this.passwordResetEmailHtml(code));
     this.logger.log(`Password reset email sent to ${email}`);
+  }
+
+  private async sendFounderDigestEmail(email: string, event: Extract<NotificationEvent, { kind: 'founder_daily_digest' }>): Promise<void> {
+    await this.sendEmail(email, `Sorted daily briefing — ${event.periodLabel}`, this.founderDigestEmailHtml(event));
+    this.logger.log(`Founder daily digest sent to ${email} for ${event.periodLabel}`);
   }
 
   private async sendInviteEmail(
@@ -243,6 +252,78 @@ export class NotificationsService implements NotificationsPort {
     <p style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:15px;color:#027A61;text-align:center;margin:24px 0 6px;">Consider it sorted.</p>
     <p style="font-size:11.5px;color:#7E8F8D;text-align:center;margin:0 0 4px;">You're getting this because a client booked you directly on Sorted.</p>
     <p style="font-size:11.5px;color:#7E8F8D;text-align:center;margin:0 0 14px;"><a href="https://sorted.com.ng" style="color:#7E8F8D;text-decoration:underline;">sorted.com.ng</a></p>
+    <p style="font-size:11px;color:#7E8F8D;text-align:center;margin:0;line-height:1.5;">Sorted Innovations Limited &middot; RC 9770241 &middot; Lagos, Nigeria</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * PLAN.md "Daily founder briefing email" — same visual language as
+   * inviteEmailHtml (same colors/fonts), a KPI table per section instead
+   * of a job summary. Every number here is server-computed from data the
+   * product already writes (digest.service.ts) — nothing estimated.
+   */
+  private founderDigestEmailHtml(event: Extract<NotificationEvent, { kind: 'founder_daily_digest' }>): string {
+    const naira = (kobo: number) => '&#8358;' + (kobo / 100).toLocaleString('en-NG', { maximumFractionDigits: 0 });
+    const row = (label: string, value: string, isLast?: boolean) => `
+          <tr>
+            <td style="padding:12px 14px;font-size:13px;color:#3A4A47;${isLast ? '' : 'border-bottom:1px solid #E0E6E4;'}">${label}</td>
+            <td style="padding:12px 14px;font-size:14px;font-weight:700;color:#0C1F1B;text-align:right;${isLast ? '' : 'border-bottom:1px solid #E0E6E4;'}">${value}</td>
+          </tr>`;
+    const section = (title: string, rowsHtml: string) => `
+      <div style="padding:0 28px 22px;">
+        <p style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#7E8F8D;margin:0 0 8px;">${title}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#F4FAF8;border-radius:12px;">${rowsHtml}
+        </table>
+      </div>`;
+
+    return `
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:0;background:#F4FAF8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:24px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:#C8FFF6;display:inline-block;vertical-align:middle;text-align:center;line-height:26px;color:#027A61;font-weight:700;font-size:14px;">&#10003;</div>
+      <span style="font-family:Georgia,'Times New Roman',serif;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;font-size:17px;color:#0C1F1B;vertical-align:middle;">Sorted</span>
+    </div>
+
+    <div style="background:#FFFFFF;border:1px solid #E0E6E4;border-radius:20px;overflow:hidden;">
+      <div style="background:#027A61;padding:22px 28px 18px;">
+        <span style="display:inline-block;background:rgba(255,255,255,0.18);color:#FFFFFF;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border-radius:999px;margin:0 0 12px;">Daily briefing</span>
+        <p style="font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:#FFFFFF;margin:4px 0 0;line-height:1.3;">${event.periodLabel}</p>
+      </div>
+
+      <div style="padding:22px 28px 4px;">
+        <p style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#7E8F8D;margin:0 0 6px;">Fee revenue</p>
+        <p style="font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:700;color:#027A61;margin:0 0 4px;">${naira(event.feeRevenueKobo)}</p>
+        <p style="font-size:12px;line-height:1.5;color:#7E8F8D;margin:0 0 18px;">From ${event.transactionsCompletedCount} completed transaction${event.transactionsCompletedCount === 1 ? '' : 's'} worth ${naira(event.transactionsCompletedValueKobo)} total.</p>
+      </div>
+
+      ${section('Traffic', row('Site visits', String(event.pageviews)) + row('WhatsApp clicks', String(event.whatsappClicks), true))}
+      ${section(
+        'New signups',
+        row('Clients', String(event.newClientSignups)) + row('Professionals', String(event.newProfessionalSignups), true),
+      )}
+      ${section(
+        'Orders & money',
+        row('Orders placed', `${event.ordersPlacedCount} &middot; ${naira(event.ordersPlacedValueKobo)}`) +
+          row('Transactions completed', `${event.transactionsCompletedCount} &middot; ${naira(event.transactionsCompletedValueKobo)}`, true),
+      )}
+      ${section(
+        'Trust & ops',
+        row('Disputes opened', String(event.disputesOpened)) +
+          row('KYC applications submitted', String(event.kycApplicationsSubmitted)) +
+          row('Delivery dispatch failures', String(event.deliveryFailures), true),
+      )}
+
+      <div style="padding:4px 28px 24px;">
+        <a href="https://sorted.com.ng/dashboard.html" style="display:block;text-align:center;background:#027A61;color:#FFFFFF;font-size:14px;font-weight:700;padding:14px 0;border-radius:12px;text-decoration:none;">Open the full dashboard &rarr;</a>
+      </div>
+    </div>
+
+    <p style="font-size:11.5px;color:#7E8F8D;text-align:center;margin:24px 0 4px;">Automated daily briefing &mdash; not sent to clients or professionals.</p>
     <p style="font-size:11px;color:#7E8F8D;text-align:center;margin:0;line-height:1.5;">Sorted Innovations Limited &middot; RC 9770241 &middot; Lagos, Nigeria</p>
   </div>
 </body>
