@@ -3387,5 +3387,149 @@ project.
 
 ---
 
+## Bachs payment integration
+
+**What was asked:** the founder shared a screenshot of Bachs' (an African
+Stripe/Paystack-Connect-style payments platform) API-key scope-selection
+screen asking what to pick, which turned into a long architecture
+discovery conversation (the founder pasting ~10 real Bachs documentation
+pages over many messages: Overview, Authentication, payouts, automatic
+payouts, webhooks, Connect/sub-accounts, split payments, the full doc
+index, marketplaces/SaaS platforms, refunds and disputes, create an
+account). Two things were explicitly confirmed by the founder before any
+code was written: "i have confirmed its compliant" (Destination charges
+with Sorted as merchant of record don't trigger the same custody
+objection Paystack raised — see below) and "sorteds approach is that
+money is paid out immediately to the business or individual after our
+commission is deducted" (instant payout at settlement, not a delayed
+separate-transfer). Then: "okay go."
+
+**Why this is a second provider, not a replacement:** same SEAM Paystack
+already sits behind — `PaymentsProvider` (`payments.interface.ts`), swapped
+via `PAYMENTS_PROVIDER_KEY` in `payments.module.ts`'s factory. Nothing in
+`EscrowService` changed except passing one new optional field through
+(see below) — the whole point of the SEAM from "Split payment pivot" is
+that a second provider is a new class plus one factory branch.
+
+**What was built:**
+- `server/src/modules/payments/providers/bachs.provider.ts` — new
+  `BachsProvider implements PaymentsProvider`, structured identically to
+  `PaystackProvider` (same `name`/`secretKey()`/`call<T>()` shape). Key
+  architecture decisions baked into it, all confirmed with the founder
+  first:
+  - **Destination charges, not Direct** — Sorted stays merchant of
+    record, refunds/disputes hit Sorted's own Bachs balance, matching
+    Sorted's actual client relationship. (I initially reasoned toward
+    Direct charges by analogy to Stripe Connect's general custody-
+    avoidance pattern before the founder pasted Bachs' actual "Split
+    payments" page — corrected course once I had the real page, told the
+    founder so explicitly at the time.)
+  - **Recipient-only connected accounts** — `createSubaccount` creates a
+    Bachs account via `POST /v1/accounts` with only `transfers`/`payouts`
+    capabilities requested, no merchant/payment-acceptance capability (a
+    professional never accepts a Bachs charge themselves, only receives a
+    transfer) — keeps onboarding short, per Bachs' own stated guidance.
+  - **Instant payout at settlement** — `chargeWithSplit` names the
+    professional's account directly in `transfer_data.destination` on the
+    checkout session itself (not a delayed separate-transfer call), so
+    Bachs moves the professional's share the moment the charge settles.
+    Bachs' own docs warn against this in general ("don't transfer a
+    seller's share the instant a charge settles if you might need it
+    back") — reasoned through with the founder that this is lower-risk
+    for Sorted specifically because the client approves submitted work
+    BEFORE this charge ever runs (unlike ordinary e-commerce, where a
+    buyer can request a refund after an instant-shipped item), narrowing
+    residual risk to stolen-card-style chargebacks rather than buyer's-
+    remorse refunds. Founder accepted this with "okay go" after the
+    compliance question was separately confirmed.
+  - Money conversion at the provider boundary only: Bachs takes/returns
+    decimal naira strings ("9000.00"), the opposite convention from this
+    codebase's `Kobo` integers everywhere else — `nairaString`/
+    `koboFromNairaString` convert at this file's edge; nothing outside it
+    ever sees a Bachs decimal string.
+  - `verifyWebhook` implements the full `X-Bachs-Signature-V2` scheme
+    confirmed from the "Setting Up Webhooks" page: header shape
+    `t={timestamp},v1={signature}[,v1={signature2}...]` (multiple `v1=`
+    values during a secret-rotation overlap window — any match is valid),
+    `HMAC-SHA256(secret, "{timestamp}.{rawBody}")` as hex; falls back to
+    the legacy plain-digest `X-Bachs-Signature` header if V2 is absent.
+- `server/src/modules/escrow/bachs-webhook.controller.ts` — Bachs'
+  counterpart to `PaystackWebhookController`, identical structure and
+  non-negotiables (no auth guard, verified by signature instead;
+  idempotency via `EscrowService.confirmRelease`'s existing state-guard;
+  always 200s once the signature check runs, same reasoning — Bachs
+  retries non-2xx responses for ~80 minutes, auto-disables the endpoint
+  after 72h of consecutive failures).
+- `payments.module.ts` — registered `BachsProvider`, extended the
+  factory: `PAYMENTS_PROVIDER_KEY=bachs` now selects it (alongside the
+  existing `paystack`/`manual_pilot` default).
+- `payments.interface.ts` — `SubaccountDestination` gained an optional
+  `contactEmail?: string`, read only by `BachsProvider.createSubaccount`
+  (Bachs' account-creation call needs a contact email; `PaystackProvider`
+  ignores the new field, so this is backward compatible).
+- `escrow.service.ts`'s `getOrCreateSubaccount` now fetches the
+  professional's own `User.email` and passes it through as
+  `contactEmail` — the only change to escrow logic itself.
+- **No migration** — `User.paystackSubaccountCode` is reused as-is for
+  Bachs' connected-account id too (only one provider is ever active at a
+  time via `PAYMENTS_PROVIDER_KEY`, so a rename wasn't worth a migration);
+  updated its schema comment to say so explicitly.
+- `server/.env.example` — `BACHS_SECRET_KEY`, `BACHS_API_BASE_URL`
+  (defaults to Bachs' sandbox if unset), `BACHS_WEBHOOK_SECRET` (required,
+  does NOT soft-enforce — unset means every webhook is rejected, same
+  discipline as `CRON_SECRET`), and `PAYMENTS_PROVIDER_KEY` documented to
+  include `'bachs'`.
+
+**What was verified and how:** `tsc --noEmit` clean, `nest build` clean.
+Full `app.init()` boot test against a fake `DATABASE_URL` with
+`PAYMENTS_PROVIDER_KEY=bachs` — confirmed the whole DI graph resolves
+(including the new `BachsProvider` injection into `PAYMENTS_PROVIDER`'s
+factory and `BachsWebhookController`'s own dependencies), and that
+`POST /webhooks/bachs` maps correctly (`RouterExplorer: Mapped
+{/webhooks/bachs, POST} route`), alongside the pre-existing
+`/webhooks/paystack` route unaffected. Boot then hits
+`PrismaClientInitializationError: Can't reach database server` —
+expected, the same "no local Postgres in this sandbox" limitation every
+earlier boot test this session has hit, unrelated to this change.
+
+**What's deliberately deferred, not fabricated:**
+- **Bachs identity/KYC onboarding.** Bachs' `POST /v1/accounts` response
+  carries `requirements.currently_due` fields (e.g.
+  `persons.*.first_name`, `persons.*.id_document`) that must be satisfied
+  via a separate Persons API call before `transfers`/`payouts`
+  capabilities actually activate — the account `createSubaccount` creates
+  will likely sit "restricted" until that follow-up exists.
+  `SubaccountDestination` doesn't carry identity/ID-document data, and
+  nothing here submits it. Sorted's existing `KycRequest` flow (photo ID,
+  manual review) is the natural source for that data, but wiring it
+  through to Bachs' Persons API is its own follow-up — flagged in the
+  provider's own doc comment, not built in this pass.
+- **Several request/response field names are inferred, not confirmed
+  against a live call** — flagged individually in `bachs.provider.ts`'s
+  and `bachs-webhook.controller.ts`'s doc comments (the checkout-session
+  response's exact `id`/`url` field names, the `collection.succeeded`
+  webhook event's exact `data.reference`/`data.id` field names, the
+  refund/resolve-account body field names, `disburse`/`confirmFunding`'s
+  endpoints — the last two are legacy/unused methods on the interface,
+  same as `PaystackProvider`'s own copies, since the real payout path is
+  entirely `chargeWithSplit`). Same discipline as every other third-party
+  integration in this codebase written from pasted/partial docs (KWIK,
+  NIPOST) — each flagged spot needs confirming against a real Bachs
+  sandbox call before this carries live money.
+- **Not deployed/activated** — no Bachs credentials exist anywhere yet;
+  `PAYMENTS_PROVIDER_KEY` stays `manual_pilot`/`paystack` in production
+  until the founder has real sandbox credentials to test against and
+  decides to switch over.
+- **One-off checkout product / ad-hoc pricing mechanics** — not resolved
+  in this pass; Bachs' "Ad-hoc pricing" guide implies a reusable catalog
+  product with a per-session price override, which `chargeWithSplit`'s
+  request body doesn't yet reflect (it sends `amount` directly on the
+  checkout session, matching the quickstart's simpler shape, which may or
+  may not be the field Bachs actually expects once a catalog product is
+  involved) — confirm against Bachs' real checkout-session schema before
+  relying on this.
+
+---
+
 *Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
 Escrow funding) does not start until this plan is approved.*
