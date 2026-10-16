@@ -75,13 +75,19 @@ model User {
   payoutBankCode      String?
   payoutAccountNumber String?
   payoutAccountName   String?
-  // PLAN.md "Split payment pivot" — a Paystack Subaccount wrapping the
-  // payout details above, created automatically once
-  // PaystackProvider.createSubaccount is wired into
-  // IdentityService.setPayoutDestination. Lets a gig's payment split
-  // straight to this professional at Paystack's end, so Sorted's own
-  // balance never receives money that belongs to them — see
-  // PaymentsProvider.chargeWithSplit. Null until that wiring lands.
+  // PLAN.md "Split payment pivot" — a provider-side subaccount/connected-
+  // account wrapping the payout details above, created lazily the first
+  // time a gig actually reaches release (see EscrowService.
+  // getOrCreateSubaccount). Lets a gig's payment split straight to this
+  // professional at the provider's end, so Sorted's own balance never
+  // receives money that belongs to them — see PaymentsProvider.
+  // chargeWithSplit. Null until that wiring lands for a given professional.
+  //
+  // Named for Paystack (the first provider) but reused AS-IS for any
+  // PaymentsProvider — Bachs' connected-account id goes in this same
+  // column (PLAN.md "Bachs payment integration"); not worth a rename
+  // migration since only one provider is ever active at a time
+  // (PAYMENTS_PROVIDER_KEY).
   paystackSubaccountCode String?
   createdAt           DateTime  @default(now())
 

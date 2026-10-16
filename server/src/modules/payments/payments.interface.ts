@@ -55,6 +55,8 @@ export interface SubaccountDestination {
   bankCode: string;
   accountNumber: string;
   accountName: string;
+  /** BachsProvider-only (PLAN.md "Bachs payment integration") — Bachs' account-creation call needs a contact email; PaystackProvider ignores it. EscrowService.getOrCreateSubaccount fills this from the professional's own User.email. */
+  contactEmail?: string;
 }
 
 export interface Subaccount {

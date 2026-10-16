@@ -245,14 +245,22 @@ export class EscrowService implements EscrowPort {
    * time a professional's gig actually reaches release, not on every
    * payout-destination edit (IdentityService.setPayoutDestination doesn't
    * call this — see its own doc comment). Persists the result so a
-   * professional only ever gets one Paystack subaccount no matter how
-   * many gigs they complete.
+   * professional only ever gets one subaccount no matter how many gigs
+   * they complete, no matter which provider is active (the
+   * paystackSubaccountCode column is reused as-is for Bachs too — see its
+   * schema comment, PLAN.md "Bachs payment integration").
+   *
+   * contactEmail is only ever read by BachsProvider.createSubaccount
+   * (PaystackProvider ignores it) — fetched here, not threaded through
+   * setPayoutDestination, since it's the professional's own User.email,
+   * not something they re-enter per bank detail.
    */
   private async getOrCreateSubaccount(professionalId: string, destination: PayoutDestination): Promise<string> {
     const existing = await this.identity.getPaystackSubaccountCode(professionalId);
     if (existing) return existing;
 
-    const subaccount = await this.payments.createSubaccount(destination);
+    const professional = await this.identity.getUser(professionalId);
+    const subaccount = await this.payments.createSubaccount({ ...destination, contactEmail: professional.email ?? undefined });
     await this.identity.setPaystackSubaccountCode(professionalId, subaccount.subaccountCode);
     return subaccount.subaccountCode;
   }
