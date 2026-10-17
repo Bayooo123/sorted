@@ -3563,14 +3563,19 @@ correct. Fixed by stripping both corrupted data URIs via a regex script
 "your plan" section) — rather than silently leaving broken images in a
 shipped page.
 
+**Follow-up (same page):** the founder re-sent the page as an actual file
+upload rather than pasted chat text. A real file on disk can be copied
+byte-for-byte (`cp`) instead of regenerated through chat, which sidesteps
+the corruption risk entirely — verified both embedded images decode to
+complete, valid JPEGs (77KB and 85KB, correct magic bytes and EOI
+markers) straight from the uploaded file before copying it over
+`enough.html` wholesale. The two image-file placeholders from the first
+pass are gone; the real screenshots are back inline as originally
+designed. Everything else below (waitlist endpoint, bracketed
+placeholders, not linked from nav) is unchanged from the first pass,
+since the re-sent file is otherwise identical.
+
 **What's deferred, not fabricated:**
-- **The two screenshot image files don't exist yet.** `enough.html`
-  references `enough-screenshot-1.jpg`/`enough-screenshot-2.jpg`, which
-  need to be added to the repo root (or wherever they're hosted) before
-  those two `<img>` tags render anything. Large images like these are
-  better served as real files than inline base64 anyway (the inline
-  version would have bloated every page load by the image size on every
-  visit, with no browser caching benefit).
 - **The waitlist form doesn't save anywhere.** Its `WAITLIST_ENDPOINT`
   JS variable is empty (as pasted) — submitting just shows the "You're
   on the list" success message locally, with nothing persisted. Contrast
