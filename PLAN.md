@@ -3531,5 +3531,72 @@ earlier boot test this session has hit, unrelated to this change.
 
 ---
 
+## "Enough by Sorted" landing page
+
+**What was asked:** the founder pasted a complete, already-designed static
+HTML landing page for a new, separate product — "Enough" (a salary-
+budgeting/spend-planning app) — prefixed with the destination URL
+`Sorted.com.ng/enough`, asking for it to live at that path.
+
+**What was built:**
+- `enough.html` (repo root) — the page as pasted, self-contained (inline
+  CSS/SVG/JS, no build step), matching this repo's existing static-page
+  pattern (`index.html`, `dashboard.html`, etc. — see README.md
+  "Landing page").
+- `vercel.json` (repo root, new — none existed before) — `{"cleanUrls":
+  true}`, so `/enough` resolves to `enough.html` without the extension,
+  matching the literal URL given. This also makes `/dashboard`,
+  `/leads`, `/kyc-admin`, `/whatsapp-admin` resolve without `.html` as a
+  side effect — harmless, since nothing currently depends on the `.html`
+  suffix being required.
+
+**A real problem caught and fixed, not shipped silently:** the pasted
+page embedded two phone-mockup screenshots as inline base64 JPEGs
+(tens of thousands of characters each). Reproducing that exact byte
+content through generation is NOT reliable — the first write corrupted
+both images (decoded to ~1.4KB of garbage instead of real JPEG data,
+failing base64 padding validation entirely). Caught by actually
+decoding and validating the embedded images after writing, not assumed
+correct. Fixed by stripping both corrupted data URIs via a regex script
+(no manual retyping) and replacing them with plain file references —
+`enough-screenshot-1.jpg` (hero) and `enough-screenshot-2.jpg` (the
+"your plan" section) — rather than silently leaving broken images in a
+shipped page.
+
+**What's deferred, not fabricated:**
+- **The two screenshot image files don't exist yet.** `enough.html`
+  references `enough-screenshot-1.jpg`/`enough-screenshot-2.jpg`, which
+  need to be added to the repo root (or wherever they're hosted) before
+  those two `<img>` tags render anything. Large images like these are
+  better served as real files than inline base64 anyway (the inline
+  version would have bloated every page load by the image size on every
+  visit, with no browser caching benefit).
+- **The waitlist form doesn't save anywhere.** Its `WAITLIST_ENDPOINT`
+  JS variable is empty (as pasted) — submitting just shows the "You're
+  on the list" success message locally, with nothing persisted. Contrast
+  `index.html`'s waitlist, which is wired to a real Supabase table (see
+  README.md "Landing page"). Wiring Enough's waitlist to a real
+  destination (new Supabase table? Lead model? a dedicated service?) is
+  a product decision not made here — flagged, not assumed.
+- **Bracketed placeholders are still literal text** — `[Partner bank]`,
+  `[Company name]`, `RC [number]`, `[privacy-url]`, `[terms-url]`,
+  `[hello@sorted.com.ng]` all appear verbatim in the shipped page (in
+  the Security section and footer), exactly as pasted. Not filled in
+  here since the real values weren't given.
+- **Not linked from anywhere** — `index.html`'s nav has no link to
+  `/enough`, and nothing in `dashboard.html`/admin pages references it.
+  Purely additive: the new page exists at the given path and nothing
+  else changed.
+
+**Verification:** every embedded image decoded and checked against real
+JPEG magic bytes/EOI markers after the fix (both now absent, replaced by
+file references — nothing left to validate there). Confirmed the file
+parses as complete HTML (correct `<!doctype>`/`</html>` close, no
+truncation) via a line/byte count sanity check. Not opened in a browser
+from this sandbox (no running Vercel preview to point one at) — visual
+layout as shipped is unverified beyond the HTML/CSS being well-formed.
+
+---
+
 *Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
 Escrow funding) does not start until this plan is approved.*
