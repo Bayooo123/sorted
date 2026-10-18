@@ -3916,5 +3916,58 @@ URL, but nothing links to it either.
 
 ---
 
-*Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
-Escrow funding) does not start until this plan is approved.*
+## Terms of Service + Privacy Policy — IMPLEMENTED (draft, needs legal review)
+
+**What was asked:** real Terms of Service and Privacy Policy pages for
+Sorted (the gig marketplace — not Enough, which has its own, not yet
+written).
+
+**What was built:** `terms.html` and `privacy.html` at the repo root,
+served at `/terms` and `/privacy` via `vercel.json`'s existing
+`cleanUrls: true` (same mechanism that already serves `/delete-account`
+and `/classic` — no rewrite needed). Both reuse `delete-account.html`'s
+real, live design system (`--green`/`--lime`/`--cream` tokens, Bricolage
+Grotesque + IBM Plex Mono, same header/footer shell) rather than a new
+template.
+
+Every substantive clause is grounded in this codebase's actual, already-
+built behavior, not generic boilerplate:
+- **Terms** — how a gig actually moves (post → claim/hire → submit →
+  approve/dispute); the real split-payment escrow architecture (Paystack
+  and/or Bachs charge the client and split at the payment partner's end,
+  so client funds never sit in Sorted's own account); the documented
+  limitation that a dispute resolved in the professional's favor can't
+  force a client's bank to pay (Nigerian rails don't allow that); the
+  real up-to-10%-of-bounty fee, waived for logistics categories with
+  arranged delivery (KWIK); professional ID verification before payouts;
+  WhatsApp/Meta as a primary coordination channel; cross-reference to
+  `/delete-account` for account closure.
+- **Privacy** — what's actually collected per integration (Paystack/
+  Bachs for payments — no card data stored by Sorted; KWIK for delivery —
+  address + phone, only for arranged-delivery categories, only for the
+  delivery's duration; Meta/WhatsApp Business Platform for messaging;
+  the existing first-party `SiteEvent` pageview/click log — not a third-
+  party ad tracker); Nigeria's Data Protection Act 2023 / NDPC as the
+  governing framework; retention language kept consistent with
+  `delete-account.html`'s existing commitment ("we may keep records of
+  completed and paid orders where the law requires it or to resolve a
+  dispute").
+
+**Real legal details used** (found in `classic.html`'s existing footer,
+not invented): operating entity **Reforma Digital Solutions Limited, RC
+8801487**; governing-law jurisdiction **Lagos State, Nigeria**. No new
+entity details were fabricated.
+
+**What was verified:** both files checked for leftover placeholder text
+(`[Company name]`, `RC [number]`, `[date]`, `[state]` — none remain),
+valid `<!doctype html>`...`</html>` structure, and that `vercel.json`'s
+`cleanUrls` already resolves `/terms`/`/privacy` without any rewrite
+change. Footer links added on `index.html` and `classic.html` pointing to
+both pages.
+
+**What's still deliberately not done:** no actual legal review — both
+pages are explicitly marked in-page as a draft, not legal advice, pending
+a lawyer's review before being relied on. Enough's own Terms/Privacy
+(covering BVN/KYC and money movement, materially more sensitive than the
+marketplace's) are not written yet and are called out as separate in both
+pages' opening paragraph.
