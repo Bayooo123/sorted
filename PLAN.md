@@ -3736,6 +3736,94 @@ layout as shipped is unverified beyond the HTML/CSS being well-formed.
 
 ---
 
+## Merging accumulated work to main
+
+**What was asked:** "Merge to main," asked right after the Enough landing
+page work. Before doing it, checked `origin/main` first — it had moved on
+since this feature branch was created: three new commits landed directly
+on `main` elsewhere (a dry-cleaning landing-page rewrite replacing
+`index.html` and moving the old site to `classic.html`, new PWA icons/
+install button, and `delete-account.html` for Google Play). Both of those
+changed files this branch had also touched, so a plain merge wasn't safe
+to do silently — confirmed with the founder on two specific points before
+proceeding:
+
+1. **The NIPOST postcode migration has NOT been run against production**
+   (confirmed directly) — so its commit stays OFF `main` for now. Pushing
+   the schema change without the migration having run would risk
+   breaking any query Prisma generates against `User`/`Gig` (e.g.
+   `getUser()`, called on every authenticated request) the moment the
+   server redeploys with the new Prisma Client expecting columns the
+   live database doesn't have yet.
+2. **The postcode UI field** (added to the gig-posting form earlier this
+   session) should move to **`classic.html`** — since `index.html` now
+   serves a completely different page and the old gig-posting form lives
+   at `classic.html` instead.
+
+**What was merged to `main`** (cherry-picked individually, in order, onto
+a fresh branch from `origin/main` — not a blind `git merge` of the whole
+feature branch, specifically so the postcode migration commit could be
+left out):
+- "Add a daily founder briefing email" — one conflict, in
+  `server/.env.example` (context lines assumed the NIPOST env-var block
+  this merge intentionally excludes was already there); resolved by
+  keeping only the digest-related vars.
+- "Add Bachs payment provider integration" — merged clean, no conflicts.
+- "Add Enough by Sorted landing page at /enough" — one conflict, in root
+  `vercel.json`: this branch had added a new `vercel.json` with just
+  `{"cleanUrls": true}`, assuming none existed (true when that commit was
+  made); `main`'s own new `vercel.json` (from the dry-cleaning rewrite)
+  already includes `cleanUrls: true` alongside its `/app` rewrite rules,
+  so it already covered what this branch needed — kept `main`'s version
+  as-is, dropped this branch's addition entirely rather than merging two
+  overlapping configs.
+- "Restore real screenshots on the Enough landing page" — merged clean.
+
+**What was deliberately NOT merged, and why:**
+- **"Lay the groundwork for NIPOST digital postcode support"** (the
+  schema/migration/`PostcodeService`/backend-wiring commit) — held back
+  per the confirmed migration status above. Still sits on
+  `claude/product-understanding-nw3yaw`, ready to merge once the
+  migration has actually been run against the production database.
+- **"Add the 'Got a NIPOST postcode?' field to the web post-a-gig form"**
+  — not cherry-picked as a commit (its target, the old `index.html`, no
+  longer exists in that form), but its exact diff was manually re-applied
+  to `classic.html` instead: same CSS (`.field-hint`/`.field-hint-error`),
+  same `<input id="post-postcode">` + hint text under Location, same
+  `postcodeFormatError()` offline validator, same wiring into the
+  `POST /gigs` body and form-reset-on-success — line-for-line identical
+  logic, just retargeted at `classic.html`'s copy of the same form
+  (confirmed `classic.html` has the exact same field IDs/structure as the
+  old `index.html`, since it's that same page moved wholesale by the
+  dry-cleaning-rewrite commit).
+
+**A deliberate, currently-inert field, not a bug:** `classic.html`'s
+`postSubmit` handler now sends `postcode: postcode || undefined` to
+`POST /gigs`, but the live `CreateGigDto` doesn't have a `postcode`
+property yet (that lands with the held-back backend commit). Confirmed
+this is harmless, not a silent failure: `main.ts` sets
+`ValidationPipe({ whitelist: true, ... })` *without*
+`forbidNonWhitelisted`, so NestJS strips unknown body properties rather
+than rejecting the request — gig posting keeps working exactly as before,
+the postcode value is just quietly dropped, until the backend commit
+lands and the DTO picks it up. No client-side change will be needed at
+that point.
+
+**Verification:** every cherry-pick's conflict resolution re-read before
+resolving the conflict (not blindly accepted). The re-applied
+`classic.html` diff was character-for-character diffed against the
+original commit's `index.html` diff to confirm it's identical logic, not
+re-derived from memory. Confirmed `classic.html`'s inline `<script>`
+block still parses as valid JS after the edit (`node -e new Function(...)`
+on the extracted script content) — not just "looks right," actually
+parsed. Both `enough.html` screenshot images re-verified as complete,
+valid JPEGs (77KB/85KB) after all the cherry-picks landed. Did not run
+`tsc`/`nest build` again for the Bachs/digest server commits here since
+neither touched by this merge's conflict resolutions — their own prior
+verification stands.
+
+---
+
 ## Enough mobile screens (design reference)
 
 **What was asked:** "Let's start designing the screens for enough mobile
