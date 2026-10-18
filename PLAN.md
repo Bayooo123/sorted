@@ -3736,5 +3736,97 @@ layout as shipped is unverified beyond the HTML/CSS being well-formed.
 
 ---
 
+## Enough mobile screens (design reference)
+
+**What was asked:** "Let's start designing the screens for enough mobile
+version" — a design-review pass covering every screen an individual needs
+on Enough, built as rendered phone mockups (not Figma, per the founder's
+explicit choice) extending the exact visual language already established
+by the two screenshots on `enough.html`. Built in three rounds in the same
+claude.ai Artifact, then explicitly asked to be committed into this repo:
+"take the totality of screens and push them into the main."
+
+**What's in `design/enough-mobile-screens.html`** — 16 screens, four
+groups, in the order a real user hits them:
+
+1. **Registration** — Sign up → Verify your identity (BVN + DOB + ID) →
+   Your Enough account. This ordering is a specific, explicit correction
+   from the founder, not my own design choice: identity verification
+   (BVN) has to be part of registration itself, not a step deferred to
+   later — because the BVN check is literally what gets a professional
+   partner to issue the user's personal virtual account number, which the
+   whole rest of the product (funding, paying) depends on existing. The
+   "Your Enough account" screen shows that account number issued
+   immediately, with a "Verifying your identity" status pill — the
+   founder's own words: funding/paying should wait on verification, but
+   the user should be able to carry on elsewhere in the app (continue
+   into the planning flow) while it clears.
+2. **Onboarding** — Describe yourself → Choose your level → Building your
+   plan → Approve your plan (the last of these is one of the two screens
+   already live on the landing page).
+3. **Steady state** — Home (already live on the landing page) → Pay from
+   a purpose → Over the usual limit → Payment sent → Finish verifying to
+   continue.
+4. **Rest of the bottom nav** — Fund your plan, Plan tab, Payees tab,
+   Profile tab.
+
+**Two more founder corrections baked into this pass, not invented here:**
+- **Account-number resolution is explicit, not implied.** Screen 9 (Pay
+  from a purpose) already had a resolved-account-name line from the first
+  pass; tightened its copy ("— resolved automatically") specifically
+  because the founder called out that typing an account number must
+  visibly pull back the real account name before a payment can proceed —
+  this is that interaction made unambiguous, not a new mechanic.
+- **The over-limit warning is a specific mechanic, not a hard block.**
+  Screen 10 implements exactly what the founder described: a purpose
+  (e.g. Food) has a per-payment limit; going over it doesn't fail the
+  payment, it offers to cover the difference from Free to spend, shown as
+  a visible split (₦15,000 from Food / ₦7,000 from Free to spend) so
+  nothing is silently overspent. This is also exactly the Balanced-level
+  mechanic the landing page itself already promises ("Over a cap? Top up
+  from free money") — not a new invention, just the first screen to
+  actually show it happening.
+- **Screen 12 (Finish verifying to continue)** is the other half of the
+  registration correction: whatever gated action (Fund, Pay) an
+  unverified user taps shows this instead of failing silently or letting
+  the action through.
+
+**What was verified, concretely, not assumed:**
+- Both embedded screenshots (the same two already live on `enough.html`)
+  decoded and checked as complete, valid JPEGs after every edit pass —
+  copied via `cp`/Python byte-for-byte at every step, never regenerated
+  through the model, for the same reason flagged earlier this session
+  (large base64 blobs silently corrupt when retyped).
+- Every new/changed screen rendered headlessly (Playwright against the
+  pre-installed Chromium in this sandbox) and checked programmatically
+  for horizontal overflow (`scrollWidth` per element) before being
+  screenshotted or shipped — caught and fixed one real bug this way (a
+  bezel-padding/scale-factor mismatch that was clipping text and the
+  step-dots at the right edge of several phones) rather than shipping it
+  unnoticed.
+- The 16-screen renumber (after inserting the two new registration/gate
+  screens) was done by extracting each screen's HTML as an opaque text
+  block via a Python script and reassembling in the new order — not by
+  manually re-typing or re-numbering 16 screens' markup by hand, which
+  would have risked exactly the kind of silent corruption the embedded
+  images already demonstrated once this session.
+
+**What's still deliberately not built:** Enough for Business (tax
+set-aside, payroll, suppliers, reserve, owner's pay — a different persona
+entirely, explicitly deferred by the founder: "let's prioritize enough
+for individuals first"). The individual flow above is now closed as far
+as screens go — nothing about implementation (no real React Native code,
+no backend wiring) exists yet; this is reference design only.
+
+**Deliberately not wired into production routing** — this file isn't
+linked from `index.html`, `classic.html`, or any admin page, and isn't
+referenced by `vercel.json`. It sits at `design/enough-mobile-screens.html`
+purely as a version-controlled reference for whoever builds Enough's real
+mobile app next, the same role `PRD.md`/`HANDOFF.md` play for Sorted's own
+mobile app. Nothing prevents it being opened directly if someone has the
+URL, but nothing links to it either.
+
+---
+
 *Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
 Escrow funding) does not start until this plan is approved.*
