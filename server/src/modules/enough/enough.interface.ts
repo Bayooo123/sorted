@@ -19,6 +19,8 @@ export interface EnoughAccountView {
   bankCode: string | null;
   /** Running total of confirmed deposits, in kobo — not a full ledger. */
   availableBalanceKobo: string;
+  /** Whether a transaction PIN has been set — never the PIN or its hash. */
+  hasTransactionPin: boolean;
 }
 
 /** A named bucket money's been pushed into from the landing spot. See EnoughPurposesService. */

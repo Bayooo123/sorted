@@ -814,6 +814,13 @@ model EnoughAccount {
   virtualAccountBankName String?
   virtualAccountBankCode String?
 
+  // 4-digit transaction PIN, bcrypt-hashed, never the plaintext digits —
+  // same hashing discipline as User.passwordHash. Gates money-movement-OUT
+  // actions once those exist; setting/changing it is its own slice (see
+  // EnoughAccountsService.setTransactionPin) ahead of any payment feature
+  // actually needing it.
+  transactionPinHash String?
+
   // The "landing spot" — every deposit credits this balance first,
   // regardless of what the money is for (salary, side income, anything).
   // Not every deposit is salary to auto-split, so nothing here is

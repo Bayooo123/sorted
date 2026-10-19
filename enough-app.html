@@ -83,6 +83,9 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 .new-purpose-form{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
 .new-purpose-form input{margin-bottom:0}
 .empty-purposes{color:var(--muted);font-size:14px;margin:0}
+.tabbar{display:flex;gap:4px;background:var(--sun-pale);border-radius:16px;padding:4px;margin-bottom:16px}
+.tab-btn{flex:1;border:0;background:transparent;height:44px;border-radius:12px;font-family:var(--body);font-weight:700;font-size:13px;color:var(--amber);cursor:pointer;padding:0 4px}
+.tab-btn.active{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(43,27,14,.1)}
 </style>
 </head>
 <body>
@@ -342,21 +345,91 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     loadActivePanel(view);
   }
 
-  // ---------- active panel: landing spot + purposes ----------
+  // ---------- active panel: tabbed nav (Home / Savings / Make Payment / Profile) ----------
 
-  var activeUi = { allocatingPurposeId: null, showCreateForm: false };
+  var activeTab = 'home';
+  var activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null };
+
+  var TABS = [['home', 'Home'], ['savings', 'Savings'], ['payment', 'Make Payment'], ['profile', 'Profile']];
 
   function loadActivePanel(view) {
+    render(
+      '<div class="tabbar">' +
+      TABS.map(function (t) {
+        return '<button type="button" class="tab-btn' + (activeTab === t[0] ? ' active' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') +
+      '</div>' +
+      '<div id="tab-content"></div>'
+    );
+    Array.prototype.forEach.call(app.querySelectorAll('.tab-btn'), function (btn) {
+      btn.addEventListener('click', function () {
+        activeTab = btn.getAttribute('data-tab');
+        loadActivePanel(view);
+      });
+    });
+    if (activeTab === 'home') renderHomeTab(view);
+    else if (activeTab === 'savings') loadSavingsTab(view);
+    else if (activeTab === 'payment') renderPaymentTab();
+    else if (activeTab === 'profile') loadProfileTab(view);
+  }
+
+  // ---------- Home tab ----------
+
+  function renderHomeTab(view) {
+    var hasAccountNumber = !!view.virtualAccountNumber;
+    var el = document.getElementById('tab-content');
+    el.innerHTML =
+      '<div class="card">' +
+      '<span class="status-pill active">Active</span>' +
+      '<p class="balance-label" style="margin-top:16px">Landing spot</p>' +
+      '<p class="balance">' + formatNaira(view.availableBalanceKobo) + '</p>' +
+      '<p class="hint" style="margin-top:8px">Every deposit lands here first. Push it into a purpose from the Savings tab whenever you decide what it\'s for.</p>' +
+      '</div>' +
+      '<div class="card">' +
+      (hasAccountNumber
+        ? '<p class="balance-label">Your account number</p>' +
+          '<p class="acct-number">' + escapeHtml(formatAccountNumber(view.virtualAccountNumber)) + '</p>' +
+          '<p class="acct-bank">' + escapeHtml(view.bankName || '') + '</p>' +
+          '<div class="row" style="margin-top:16px">' +
+            '<span class="muted" style="font-size:14px">Account name: ' + escapeHtml(view.accountName || '') + '</span>' +
+            '<button type="button" class="copy-btn" id="copy-btn">Copy</button>' +
+          '</div>'
+        : '<p class="sub" style="margin:0">Your account is active — your account number is being issued and will appear here shortly.</p>' +
+          '<button type="button" class="btn btn-primary" id="refresh-btn">Check again</button>') +
+      '</div>';
+
+    var copyBtn = document.getElementById('copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(view.virtualAccountNumber).then(function () {
+          copyBtn.textContent = 'Copied';
+          setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
+        });
+      });
+    }
+    var refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Checking…';
+        loadAccount();
+      });
+    }
+  }
+
+  // ---------- Savings tab (purposes) ----------
+
+  function loadSavingsTab(view) {
+    var el = document.getElementById('tab-content');
+    el.innerHTML = '<div class="card skeleton"><div class="spinner"></div><span>Loading…</span></div>';
     api('/enough/purposes', { auth: true }).then(function (purposes) {
-      renderActivePanel(view, purposes);
+      renderSavingsTab(view, purposes);
     }).catch(function (err) {
-      renderActivePanel(view, [], err.message);
+      renderSavingsTab(view, [], err.message);
     });
   }
 
-  function renderActivePanel(view, purposes, purposesError) {
-    var hasAccountNumber = !!view.virtualAccountNumber;
-
+  function renderSavingsTab(view, purposes, purposesError) {
     var purposeRows = purposes.map(function (p) {
       var isAllocating = activeUi.allocatingPurposeId === p.id;
       return (
@@ -376,24 +449,11 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       );
     }).join('');
 
-    render(
+    var el = document.getElementById('tab-content');
+    el.innerHTML =
       '<div class="card">' +
-      '<span class="status-pill active">Active</span>' +
-      '<p class="balance-label" style="margin-top:16px">Landing spot</p>' +
-      '<p class="balance">' + formatNaira(view.availableBalanceKobo) + '</p>' +
-      '<p class="hint" style="margin-top:8px">Every deposit lands here first. Push it into a purpose below whenever you decide what it\'s for.</p>' +
-      '</div>' +
-      '<div class="card">' +
-      (hasAccountNumber
-        ? '<p class="balance-label">Your account number</p>' +
-          '<p class="acct-number">' + escapeHtml(formatAccountNumber(view.virtualAccountNumber)) + '</p>' +
-          '<p class="acct-bank">' + escapeHtml(view.bankName || '') + '</p>' +
-          '<div class="row" style="margin-top:16px">' +
-            '<span class="muted" style="font-size:14px">Account name: ' + escapeHtml(view.accountName || '') + '</span>' +
-            '<button type="button" class="copy-btn" id="copy-btn">Copy</button>' +
-          '</div>'
-        : '<p class="sub" style="margin:0">Your account is active — your account number is being issued and will appear here shortly.</p>' +
-          '<button type="button" class="btn btn-primary" id="refresh-btn">Check again</button>') +
+      '<p class="balance-label">Landing spot</p>' +
+      '<p class="balance" style="font-size:26px">' + formatNaira(view.availableBalanceKobo) + '</p>' +
       '</div>' +
       '<div class="card">' +
       '<p class="balance-label" style="margin-bottom:10px">Your purposes</p>' +
@@ -411,41 +471,19 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
             '</div>' +
           '</form>'
         : '<button type="button" class="push-link" id="show-create-purpose" style="margin-top:12px">+ New purpose</button>') +
-      '</div>' +
-      '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>'
-    );
-
-    document.getElementById('logout-link').addEventListener('click', logout);
-
-    var copyBtn = document.getElementById('copy-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () {
-        navigator.clipboard.writeText(view.virtualAccountNumber).then(function () {
-          copyBtn.textContent = 'Copied';
-          setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
-        });
-      });
-    }
-    var refreshBtn = document.getElementById('refresh-btn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', function () {
-        refreshBtn.disabled = true;
-        refreshBtn.textContent = 'Checking…';
-        loadAccount();
-      });
-    }
+      '</div>';
 
     Array.prototype.forEach.call(app.querySelectorAll('.push-link[data-purpose-id]'), function (btn) {
       btn.addEventListener('click', function () {
         activeUi.allocatingPurposeId = btn.getAttribute('data-purpose-id');
-        renderActivePanel(view, purposes);
+        renderSavingsTab(view, purposes);
       });
     });
     var cancelAllocate = app.querySelector('.cancel-allocate');
     if (cancelAllocate) {
       cancelAllocate.addEventListener('click', function () {
         activeUi.allocatingPurposeId = null;
-        renderActivePanel(view, purposes);
+        renderSavingsTab(view, purposes);
       });
     }
     var allocateForm = app.querySelector('.allocate-form');
@@ -465,7 +503,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
           activeUi.allocatingPurposeId = null;
           loadAccount();
         }).catch(function (err) {
-          renderActivePanel(Object.assign({}, view), purposes, err.message);
+          renderSavingsTab(view, purposes, err.message);
         });
       });
     }
@@ -474,14 +512,14 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     if (showCreateBtn) {
       showCreateBtn.addEventListener('click', function () {
         activeUi.showCreateForm = true;
-        renderActivePanel(view, purposes);
+        renderSavingsTab(view, purposes);
       });
     }
     var cancelCreateBtn = document.getElementById('cancel-create-purpose');
     if (cancelCreateBtn) {
       cancelCreateBtn.addEventListener('click', function () {
         activeUi.showCreateForm = false;
-        renderActivePanel(view, purposes);
+        renderSavingsTab(view, purposes);
       });
     }
     var createForm = document.getElementById('create-purpose-form');
@@ -495,9 +533,103 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
         submitBtn.textContent = 'Creating…';
         api('/enough/purposes', { method: 'POST', auth: true, body: { name: name } }).then(function () {
           activeUi.showCreateForm = false;
-          loadActivePanel(view);
+          loadSavingsTab(view);
         }).catch(function (err) {
-          renderActivePanel(view, purposes, err.message);
+          renderSavingsTab(view, purposes, err.message);
+        });
+      });
+    }
+  }
+
+  // ---------- Make Payment tab ----------
+
+  function renderPaymentTab() {
+    var el = document.getElementById('tab-content');
+    el.innerHTML =
+      '<div class="card">' +
+      '<p class="balance-label">Make a payment</p>' +
+      '<h1 class="title" style="margin:10px 0 12px;font-size:22px">Coming soon</h1>' +
+      '<p class="sub" style="margin:0">We\'re building the ability to send money out of your Enough account — to a bank account, or to someone else. For now, Enough only holds deposits and lets you organize them into savings purposes.</p>' +
+      '</div>';
+  }
+
+  // ---------- Profile tab ----------
+
+  function loadProfileTab(view) {
+    var el = document.getElementById('tab-content');
+    el.innerHTML = '<div class="card skeleton"><div class="spinner"></div><span>Loading…</span></div>';
+    api('/me', { auth: true }).then(function (me) {
+      renderProfileTab(view, me);
+    }).catch(function (err) {
+      el.innerHTML = '<div class="card"><div class="banner error">' + escapeHtml(err.message) + '</div></div>';
+    });
+  }
+
+  function pinFormHtml(hasExisting) {
+    return '<form id="pin-form">' +
+      (hasExisting ? '<label for="pin-current">Current PIN</label><input id="pin-current" inputmode="numeric" maxlength="4" pattern="\\d{4}" required>' : '') +
+      '<label for="pin-new">New PIN</label><input id="pin-new" inputmode="numeric" maxlength="4" pattern="\\d{4}" required>' +
+      '<label for="pin-confirm">Confirm new PIN</label><input id="pin-confirm" inputmode="numeric" maxlength="4" pattern="\\d{4}" required>' +
+      '<div class="btn-small-row">' +
+        '<button type="submit" class="btn btn-small btn-primary-small">Save PIN</button>' +
+        '<button type="button" class="btn btn-small btn-ghost-small" id="cancel-pin-btn">Cancel</button>' +
+      '</div>' +
+      '</form>';
+  }
+
+  function renderProfileTab(view, me, pinError) {
+    var el = document.getElementById('tab-content');
+    var pinMode = activeUi.pinMode;
+    el.innerHTML =
+      '<div class="card">' +
+      '<p class="balance-label">Name</p><p style="margin:2px 0 14px;font-size:16px;font-weight:700">' + escapeHtml(me.name || '') + '</p>' +
+      '<p class="balance-label">Email</p><p style="margin:2px 0 14px;font-size:16px">' + escapeHtml(me.email || '') + '</p>' +
+      '<p class="balance-label">Phone</p><p style="margin:2px 0 14px;font-size:16px">' + escapeHtml(me.phone || '') + '</p>' +
+      '<p class="balance-label">State</p><p style="margin:2px 0 0;font-size:16px">' + escapeHtml(me.state || '') + '</p>' +
+      '</div>' +
+      '<div class="card">' +
+      '<p class="balance-label" style="margin-bottom:10px">Transaction PIN</p>' +
+      (pinError ? '<div class="banner error">' + escapeHtml(pinError) + '</div>' : '') +
+      (pinMode
+        ? pinFormHtml(view.hasTransactionPin)
+        : (view.hasTransactionPin
+            ? '<div class="row"><span class="muted" style="font-size:14px">PIN is set</span><button type="button" class="push-link" id="change-pin-btn">Change PIN</button></div>'
+            : '<p class="sub" style="margin:0 0 10px">Set a 4-digit PIN to protect money leaving your account once that\'s available.</p><button type="button" class="btn btn-primary" id="set-pin-btn">Set transaction PIN</button>')) +
+      '</div>' +
+      '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>';
+
+    document.getElementById('logout-link').addEventListener('click', logout);
+
+    var setBtn = document.getElementById('set-pin-btn');
+    if (setBtn) setBtn.addEventListener('click', function () { activeUi.pinMode = 'set'; renderProfileTab(view, me); });
+    var changeBtn = document.getElementById('change-pin-btn');
+    if (changeBtn) changeBtn.addEventListener('click', function () { activeUi.pinMode = 'change'; renderProfileTab(view, me); });
+
+    var pinForm = document.getElementById('pin-form');
+    if (pinForm) {
+      document.getElementById('cancel-pin-btn').addEventListener('click', function () {
+        activeUi.pinMode = null;
+        renderProfileTab(view, me);
+      });
+      pinForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var newPin = document.getElementById('pin-new').value.trim();
+        var confirmPin = document.getElementById('pin-confirm').value.trim();
+        var currentPinInput = document.getElementById('pin-current');
+        var currentPin = currentPinInput ? currentPinInput.value.trim() : undefined;
+        if (!/^\d{4}$/.test(newPin)) { renderProfileTab(view, me, 'PIN must be exactly 4 digits.'); return; }
+        if (newPin !== confirmPin) { renderProfileTab(view, me, 'PINs do not match.'); return; }
+        if (view.hasTransactionPin && !/^\d{4}$/.test(currentPin || '')) { renderProfileTab(view, me, 'Enter your current 4-digit PIN.'); return; }
+        var submitBtn = pinForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving…';
+        var body = { pin: newPin };
+        if (currentPin) body.currentPin = currentPin;
+        api('/enough/account/pin', { method: 'PATCH', auth: true, body: body }).then(function () {
+          activeUi.pinMode = null;
+          loadAccount();
+        }).catch(function (err) {
+          renderProfileTab(view, me, err.message);
         });
       });
     }
@@ -506,6 +638,8 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
   function logout() {
     state.accessToken = null;
     localStorage.removeItem(TOKEN_KEY);
+    activeTab = 'home';
+    activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null };
     renderAuthScreen('login');
   }
 

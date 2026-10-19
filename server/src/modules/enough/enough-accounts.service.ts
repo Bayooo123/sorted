@@ -1,7 +1,12 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import { BACHS_CONNECT_ACCOUNT_PORT, BachsConnectAccountPort, EnoughAccountView, SubmitIdentityInput } from './enough.interface';
+
+// Same rounds as IdentityService's own BCRYPT_ROUNDS — not imported, same
+// reasoning as that constant being module-local rather than shared.
+const BCRYPT_ROUNDS = 12;
 
 /**
  * PLAN.md "Enough: Bachs Connect account per signup". Orchestrates Bachs
@@ -91,6 +96,7 @@ export class EnoughAccountsService {
         bankName: null,
         bankCode: null,
         availableBalanceKobo: '0',
+        hasTransactionPin: false,
       };
     }
 
@@ -113,7 +119,28 @@ export class EnoughAccountsService {
       bankName: account!.virtualAccountBankName,
       bankCode: account!.virtualAccountBankCode,
       availableBalanceKobo: account!.availableBalanceKobo.toString(),
+      hasTransactionPin: !!account!.transactionPinHash,
     };
+  }
+
+  /**
+   * First-time setup (currentPin omitted) or a change (currentPin
+   * required and checked). Gates money-movement-OUT actions once those
+   * exist — setting it up doesn't need one itself, since nothing it
+   * would protect can be done yet.
+   */
+  async setTransactionPin(userId: string, newPin: string, currentPin?: string): Promise<void> {
+    const account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
+    if (!account) throw new NotFoundException('Open your Enough account first.');
+
+    if (account.transactionPinHash) {
+      if (!currentPin) throw new BadRequestException('currentPin is required to change an existing PIN.');
+      const matches = await bcrypt.compare(currentPin, account.transactionPinHash);
+      if (!matches) throw new UnauthorizedException('Current PIN is incorrect.');
+    }
+
+    const transactionPinHash = await bcrypt.hash(newPin, BCRYPT_ROUNDS);
+    await this.prisma.enoughAccount.update({ where: { id: account.id }, data: { transactionPinHash } });
   }
 
   /** Called from the webhook handler on account.updated/capability.updated. */
