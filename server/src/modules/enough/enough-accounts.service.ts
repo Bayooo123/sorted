@@ -153,13 +153,14 @@ export class EnoughAccountsService {
    * actually lands in the account's usable balance.
    */
   async handleDeposit(eventId: string, bachsAccountId: string, chargeId: string, amountKobo: bigint): Promise<void> {
-    const account = await this.prisma.enoughAccount.findUnique({ where: { bachsAccountId } });
+    const account = await this.prisma.enoughAccount.findUnique({ where: { bachsAccountId }, include: { user: true } });
     if (!account) {
       this.logger.warn(`collection.succeeded for unknown Bachs account ${bachsAccountId} — ignoring`);
       return;
     }
+    let updated;
     try {
-      await this.prisma.$transaction([
+      [, updated] = await this.prisma.$transaction([
         this.prisma.enoughDepositEvent.create({ data: { id: eventId, enoughAccountId: account.id, chargeId, amountKobo } }),
         this.prisma.enoughAccount.update({
           where: { id: account.id },
@@ -169,9 +170,25 @@ export class EnoughAccountsService {
     } catch (err) {
       // Unique-constraint failure on eventId = a redelivered webhook —
       // exactly the idempotency this id-as-primary-key is for, not a real
-      // error. Anything else rethrows.
+      // error (and not a reason to re-send the email below). Anything else
+      // rethrows.
       if (!(err instanceof Error) || !/Unique constraint/i.test(err.message)) throw err;
       this.logger.log(`Deposit event ${eventId} already recorded — ignoring redelivery`);
+      return;
+    }
+
+    // Fire-and-log, not fire-and-fail — same discipline as the welcome
+    // email above: a Resend outage shouldn't fail a deposit that already
+    // landed.
+    if (account.user.email) {
+      this.notifications
+        .notify(
+          { userId: account.userId, email: account.user.email },
+          { kind: 'enough_deposit_received', amountKobo: Number(amountKobo), availableBalanceKobo: updated.availableBalanceKobo.toString() },
+        )
+        .catch((err) => {
+          this.logger.warn(`Enough deposit email failed for user ${account.userId}: ${err instanceof Error ? err.message : err}`);
+        });
     }
   }
 }

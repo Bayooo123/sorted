@@ -22,6 +22,13 @@ export type NotificationEvent =
    * trigger and which only talks about the gig marketplace).
    */
   | { kind: 'enough_account_opened'; name: string }
+  /**
+   * PLAN.md "Enough: Bachs Connect account per signup" — fired from
+   * EnoughAccountsService.handleDeposit right after a collection.succeeded
+   * webhook credits the account, so a deposit shows up in the user's inbox
+   * as fast as Bachs' own webhook delivery, not on their next app open.
+   */
+  | { kind: 'enough_deposit_received'; amountKobo: number; availableBalanceKobo: string }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }
