@@ -1,0 +1,27 @@
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { AuthenticatedUser, JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import { EnoughAccountsService } from './enough-accounts.service';
+import { SubmitIdentityDto } from './dto/submit-identity.dto';
+
+/**
+ * PLAN.md "Enough: Bachs Connect account per signup" — reuses Sorted's
+ * existing JwtAuthGuard/User, not a parallel auth system. See
+ * EnoughAccountsService's doc comment for the full flow.
+ */
+@Controller('enough/account')
+export class EnoughController {
+  constructor(private readonly accounts: EnoughAccountsService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  submitIdentity(@CurrentUser() user: AuthenticatedUser, @Body() dto: SubmitIdentityDto) {
+    return this.accounts.submitIdentity(user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  getAccount(@CurrentUser() user: AuthenticatedUser) {
+    return this.accounts.getAccountView(user.userId);
+  }
+}

@@ -15,6 +15,7 @@ import { WhatsappWebhookModule } from './modules/whatsapp/whatsapp-webhook.modul
 import { SiteEventsModule } from './modules/site-events/site-events.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
+import { EnoughModule } from './modules/enough/enough.module';
 
 /**
  * Composition root. The modules below correspond 1:1 to HANDOFF.md §3, plus
@@ -41,6 +42,7 @@ import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
     SiteEventsModule,
     AnalyticsModule,
     AdminAuthModule,
+    EnoughModule,
   ],
 })
 export class AppModule {}

@@ -4108,5 +4108,90 @@ both still valid documents; `classic.html`'s script re-checked clean.
 
 ---
 
+## Enough: Bachs Connect account per signup — IMPLEMENTED (held back from main)
+
+**What was asked:** "for enough i want to be able to have accounts created
+for each person that signs up" — confirmed against three real Bachs
+documentation pages pasted into chat this session (Become a platform,
+Capabilities, Virtual accounts) rather than guessed, resolving the two
+open questions from the earlier Bachs Connect research: the right
+capability is `virtual_accounts` under the **`merchant`** configuration
+(not `recipient`, which is Sorted's professional-payout persona), and the
+BVN submission IS the "representative" field on that same account — not a
+separate verification step.
+
+**What was built** — a new, self-contained `EnoughModule`
+(`server/src/modules/enough/`), same seam shape as `PostcodeModule`:
+- `EnoughAccount` + `EnoughDepositEvent` Prisma models (migration
+  `20261019150000_enough_accounts`, generated via `prisma migrate diff`
+  against the schema rather than hand-written, to avoid any drift
+  between the SQL and the model). One `EnoughAccount` per Sorted `User`
+  — Enough reuses Sorted's existing auth, not a parallel identity system.
+  Deliberately NOT a full ledger: `availableBalanceKobo` is a running
+  total of confirmed deposits only. "Purposes" (Rent, Food, etc.) stay
+  unmodeled — a separate, not-yet-designed feature, per the earlier
+  architectural conclusion that they're an internal ledger split within
+  this one account, not separate Bachs accounts.
+- `BachsConnectAccountProvider` — a NEW provider, deliberately separate
+  from `payments/providers/bachs.provider.ts`'s `BachsProvider`: same
+  vendor, completely different persona (merchant/virtual_accounts here
+  vs. recipient/transfers+payouts there), different account lifecycle,
+  different webhook registration. `createAccount` → `submitRepresentative`
+  (the BVN call) → `checkCapability` → `ensureVirtualAccount`, plus its
+  own `verifyWebhook` (same HMAC-SHA256 X-Bachs-Signature-V2 scheme as
+  the existing provider, different secret).
+- `EnoughAccountsService.submitIdentity` — the actual signup flow:
+  creates the Bachs account with `virtual_accounts` requested, submits
+  the representative (first/last name + BVN) in the next call, then
+  checks the capability once synchronously before returning — sandbox
+  activates it immediately per Bachs' own docs, so this works end to end
+  without a reachable webhook endpoint in dev. Production won't be
+  active yet at this point; `capability.updated` carries it the rest of
+  the way.
+- `EnoughController` — `POST /enough/account` (submit identity),
+  `GET /enough/account` (status + virtual account details once active) —
+  both behind the existing `JwtAuthGuard`.
+- `EnoughWebhookController` — a SEPARATE endpoint
+  (`/webhooks/bachs-connect`, own `BACHS_CONNECT_WEBHOOK_SECRET`) from
+  the existing escrow Bachs webhook, since Bachs' own docs require a
+  distinct registration with `event_source: "connect"`. Handles
+  `capability.updated` (activates the virtual account the moment Bachs
+  says it's ready) and `collection.succeeded` where `checkout_id` is
+  null (a deposit, not a checkout) — credits `availableBalanceKobo` by
+  the settlement amount (after Bachs' processing fee), idempotent on
+  Bachs' own event id exactly like `LedgerEntry.eventId` elsewhere in
+  this schema. `account.updated` is intentionally a no-op for now — no
+  "here's specifically what's missing" requirements screen yet, only
+  the generic wait state already designed.
+- `server/.env.example`: documented `BACHS_CONNECT_WEBHOOK_SECRET`
+  (reuses the existing `BACHS_SECRET_KEY`/`BACHS_API_BASE_URL` — same
+  platform account, just a second webhook registration).
+
+**What was verified:** `npx prisma generate` clean, `tsc --noEmit` clean,
+`nest build` clean, a full DI-graph boot test (`NestFactory.create`
+against the real `AppModule`) printed "BOOT OK" with `EnoughModule`
+wired in alongside everything else. (`npm run lint` is broken
+repo-wide — no `.eslintrc` exists anywhere in this project — confirmed
+pre-existing, not introduced by this change.)
+
+**Deliberately not built in this pass:**
+- Purposes/allocation (splitting one balance across Rent/Food/etc.) —
+  separate, not-yet-designed feature, as above.
+- A real requirements-rendering screen for `account.updated` — today's
+  UX is "submit once, then wait," matching the existing design screens.
+- Mobile/WhatsApp surfaces — this is server-side only; no client calls
+  these endpoints yet, same scoping discipline as every other
+  backend-first slice in this file.
+
+**Held back from `main`, same discipline as the NIPOST postcode
+migration:** `20261019150000_enough_accounts` has NOT been run against
+production and must not reach `main` until that's confirmed — this
+entire slice stays on the feature branch for now. The webhook
+registration itself (Bachs dashboard, `event_source: "connect"`) also
+hasn't been created yet — needs a real sandbox/production Bachs account
+to do, same as `BACHS_WEBHOOK_SECRET` originally did.
+
+---
+
 *Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
 Escrow funding) does not start until this plan is approved.*

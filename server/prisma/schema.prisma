@@ -137,6 +137,12 @@ model User {
 
   passwordResetTokens PasswordResetToken[]
   kycRequests         KycRequest[]
+
+  // PLAN.md "Enough: Bachs Connect account per signup" — Enough (the
+  // separate money-planning product) reuses Sorted's existing User/auth,
+  // not a parallel account system. Null until a user actually starts
+  // Enough's own registration (identity verification) step.
+  enoughAccount EnoughAccount?
 }
 
 // Manual-pilot professional verification — see PLAN.md "Profile photo + KYC
@@ -757,4 +763,76 @@ model AdminUser {
   username     String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Enough (PLAN.md "Enough: Bachs Connect account per signup") — a separate
+// product sharing Sorted's User/auth, not a new identity system. Each
+// Enough user gets their OWN Bachs connected account (merchant
+// configuration, `virtual_accounts` capability) — a completely different
+// Bachs persona from User.paystackSubaccountCode (Sorted's professional
+// payout/recipient-configuration accounts). "Purposes" (Rent, Food, etc.)
+// are deliberately NOT modeled here yet — this is just the account/
+// verification/deposit layer; splitting one balance across purposes is a
+// separate, not-yet-designed feature.
+// ---------------------------------------------------------------------------
+
+// Mirrors Bachs' own capability.status values exactly (see /connect/
+// capabilities) rather than inventing our own vocabulary — unrequested
+// before EnoughAccount even exists is represented by the row simply not
+// existing, so in practice this column only ever holds the latter four.
+enum EnoughAccountStatus {
+  unrequested
+  restricted
+  pending
+  active
+  unsupported
+}
+
+model EnoughAccount {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  // acct_... — Bachs' connected-account id. Created once, at Enough's own
+  // identity-verification step (first+last name + BVN submitted in the
+  // same call, per Bachs' "representative" requirement).
+  bachsAccountId String @unique
+  // Shown to senders as the bank-transfer recipient name — set at account
+  // creation, e.g. "Michael Adeyemi — Enough".
+  displayName String
+
+  capabilityStatus EnoughAccountStatus @default(unrequested)
+  // Human-readable reason when not active (Bachs' status_details[].message)
+  // — shown on the "Finish verifying to continue" screen, null once active.
+  capabilityStatusDetail String?
+
+  // Populated once capabilityStatus reaches active and the number has
+  // actually been created/read back — see EnoughAccountsService.
+  virtualAccountId       String?
+  virtualAccountNumber   String?
+  virtualAccountBankName String?
+  virtualAccountBankCode String?
+
+  // Running total of confirmed deposits only — NOT a full ledger (no
+  // purposes/allocation split yet, see module doc comment above).
+  // Money-integrity rule (HANDOFF.md §9): BigInt kobo, never Float.
+  availableBalanceKobo BigInt @default(0)
+
+  deposits  EnoughDepositEvent[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+}
+
+// One row per Bachs collection.succeeded deposit event — id is Bachs' own
+// event id (evt_...), not generated, so re-inserting a replayed/redelivered
+// webhook is a no-op unique-constraint failure, not a double credit. Same
+// idempotency discipline as LedgerEntry.eventId elsewhere in this schema.
+model EnoughDepositEvent {
+  id              String        @id
+  enoughAccountId String
+  enoughAccount   EnoughAccount @relation(fields: [enoughAccountId], references: [id])
+  chargeId        String
+  amountKobo      BigInt
+  receivedAt      DateTime      @default(now())
 }
