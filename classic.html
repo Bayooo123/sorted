@@ -1191,6 +1191,12 @@
 
   .field-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin: 0 0 8px; }
   .field-hint { font-size: 12px; color: var(--text-muted); margin: -8px 0 16px; }
+
+  .consent-row { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 16px; }
+  .consent-row input[type="checkbox"] { width: 18px; height: 18px; flex: none; margin-top: 1px; accent-color: var(--green-deep); cursor: pointer; }
+  .consent-row label { font-size: 13px; color: var(--text-muted); line-height: 1.5; cursor: pointer; }
+  .consent-row a { color: var(--green-deep); font-weight: 600; text-decoration: none; }
+  .consent-row a:hover { text-decoration: underline; }
   .field-hint-error { color: #b3261e; }
 
   .avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
@@ -1511,6 +1517,10 @@
         <div class="field-row-password">
           <input type="password" id="auth-signup-password" placeholder="Password (min. 8 characters)" aria-label="Password" autocomplete="new-password" />
           <button class="field-toggle" type="button" data-target="auth-signup-password" aria-label="Show password">Show</button>
+        </div>
+        <div class="consent-row">
+          <input type="checkbox" id="auth-signup-consent" />
+          <label for="auth-signup-consent">I have read and agree to Sorted's <a href="/terms" target="_blank" rel="noopener">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
         </div>
       </div>
 
@@ -2116,11 +2126,14 @@
       var stateName = stateSelect.value;
       var password = document.getElementById('auth-signup-password').value;
 
+      var consentChecked = document.getElementById('auth-signup-consent').checked;
+
       if (!name) { formError.textContent = 'Enter your full name.'; return; }
       if (!EMAIL_RE.test(email)) { formError.textContent = 'Enter a valid email address.'; return; }
       if (!phone) { formError.textContent = 'Enter your phone number.'; return; }
       if (!stateName) { formError.textContent = 'Select your state.'; return; }
       if (password.length < 8) { formError.textContent = 'Password must be at least 8 characters.'; return; }
+      if (!consentChecked) { formError.textContent = 'Please agree to the Terms of Service and Privacy Policy to continue.'; return; }
 
       formError.textContent = '';
       formSuccess.textContent = '';

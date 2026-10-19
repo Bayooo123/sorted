@@ -3971,3 +3971,45 @@ a lawyer's review before being relied on. Enough's own Terms/Privacy
 (covering BVN/KYC and money movement, materially more sensitive than the
 marketplace's) are not written yet and are called out as separate in both
 pages' opening paragraph.
+
+### Follow-up: correct entity, mandatory consent-at-signup checkbox
+
+**What was asked:** the founder supplied the actual operating entity —
+**Sorted Innovations Limited, RC 9770241** — superseding the
+`Reforma Digital Solutions Limited, RC 8801487` entity this file's
+previous section describes finding in `classic.html`'s footer, and asked
+for a required "I have read and agree" checkbox gating signup, written
+to the standard a senior corporate counsel would hold the documents to.
+
+**What changed:**
+- `terms.html` / `privacy.html`: entity swapped to Sorted Innovations
+  Limited, RC 9770241, throughout. **`classic.html`'s existing footer
+  still shows the old Reforma Digital Solutions Limited / RC 8801487—
+  deliberately left untouched pending the founder confirming that should
+  change too**, rather than silently overwriting one unverified entity
+  name with another.
+- `terms.html`: added a "General provisions" section (entire agreement,
+  severability, no waiver, assignment, notices) — standard boilerplate a
+  thorough ToS carries that this draft previously didn't, renumbering
+  Contact to section 15.
+- `privacy.html`: added a right to withdraw consent (NDPA-aligned) to
+  the "Your rights" section, and a line under "Who this policy covers"
+  describing the signup consent mechanism below.
+- `classic.html`: added a required `#auth-signup-consent` checkbox to
+  the signup form ("I have read and agree to Sorted's Terms of Service
+  and Privacy Policy," linking to both pages), and a blocking validation
+  check in `submitSignup()` — the account-creation API call is never
+  made if the box is unchecked, same pattern as the form's other
+  required-field checks (name, email, phone, state, password length).
+  This is a front-end gate only; no new server-side consent-record field
+  was added, since that wasn't asked for.
+
+**What was verified:** both legal pages checked for leftover old-entity
+text (`Reforma`, `8801487`) — none remain — and for the new entity
+appearing correctly; both still valid `<!doctype html>`...`</html>`
+documents. `classic.html`'s full inline script re-extracted and
+`node --check`ed clean after the consent-checkbox edit.
+
+**Still open:** which entity name is actually correct across the whole
+site (the footer vs. the legal pages) needs the founder's confirmation
+before `classic.html`'s footer is touched.
