@@ -41,7 +41,8 @@ export interface VirtualAccountResult {
   id: string;
   accountNumber: string;
   bankName: string;
-  bankCode: string;
+  /** Not every bank Bachs issues against returns one (confirmed live — GLOBUS BANK omits it). */
+  bankCode: string | null;
 }
 
 /**

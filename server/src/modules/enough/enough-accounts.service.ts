@@ -81,7 +81,7 @@ export class EnoughAccountsService {
   }
 
   async getAccountView(userId: string): Promise<EnoughAccountView> {
-    const account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
+    let account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
     if (!account) {
       return {
         status: 'unrequested',
@@ -93,14 +93,26 @@ export class EnoughAccountsService {
         availableBalanceKobo: '0',
       };
     }
+
+    // Self-healing: capability.updated already flipped this to active, but
+    // activateVirtualAccount's own ensureVirtualAccount call didn't land
+    // (e.g. a transient Bachs error, or the bank_code shape bug fixed
+    // alongside this) — retry on read rather than wait on a webhook
+    // redelivery that may never come, since the capability itself is
+    // already confirmed active.
+    if (account.capabilityStatus === 'active' && !account.virtualAccountNumber) {
+      await this.activateVirtualAccount(account.id, account.bachsAccountId);
+      account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
+    }
+
     return {
-      status: account.capabilityStatus,
-      statusDetail: account.capabilityStatusDetail,
-      accountName: account.displayName,
-      virtualAccountNumber: account.virtualAccountNumber,
-      bankName: account.virtualAccountBankName,
-      bankCode: account.virtualAccountBankCode,
-      availableBalanceKobo: account.availableBalanceKobo.toString(),
+      status: account!.capabilityStatus,
+      statusDetail: account!.capabilityStatusDetail,
+      accountName: account!.displayName,
+      virtualAccountNumber: account!.virtualAccountNumber,
+      bankName: account!.virtualAccountBankName,
+      bankCode: account!.virtualAccountBankCode,
+      availableBalanceKobo: account!.availableBalanceKobo.toString(),
     };
   }
 

@@ -128,12 +128,16 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
       this.logger.warn(`Bachs POST /v1/virtual-accounts for ${accountId} failed: ${status} ${JSON.stringify(data)}`);
       return null;
     }
-    const d = data as { id?: string; account_number?: string; bank_name?: string; bank_code?: string };
-    if (!d?.id || !d.account_number || !d.bank_name || !d.bank_code) {
+    const d = data as { id?: string; account_number?: string; bank_name?: string; bank_code?: string | null };
+    if (!d?.id || !d.account_number || !d.bank_name) {
       this.logger.warn(`Bachs POST /v1/virtual-accounts for ${accountId} returned an unexpected shape: ${JSON.stringify(data)}`);
       return null;
     }
-    return { id: d.id, accountNumber: d.account_number, bankName: d.bank_name, bankCode: d.bank_code };
+    // bank_code is confirmed absent/null on at least one real bank (GLOBUS
+    // BANK) in live responses — not every bank Bachs issues against has
+    // one, so it's optional here, unlike id/account_number/bank_name which
+    // are unconditionally required to actually use the account.
+    return { id: d.id, accountNumber: d.account_number, bankName: d.bank_name, bankCode: d.bank_code ?? null };
   }
 
   /**
