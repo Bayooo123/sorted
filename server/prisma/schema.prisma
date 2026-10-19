@@ -814,12 +814,18 @@ model EnoughAccount {
   virtualAccountBankName String?
   virtualAccountBankCode String?
 
-  // Running total of confirmed deposits only — NOT a full ledger (no
-  // purposes/allocation split yet, see module doc comment above).
+  // The "landing spot" — every deposit credits this balance first,
+  // regardless of what the money is for (salary, side income, anything).
+  // Not every deposit is salary to auto-split, so nothing here is
+  // allocated automatically; the user explicitly pushes money from here
+  // into named purposes below (EnoughPurposesService.allocate). This
+  // number is specifically the UNALLOCATED balance, not the account's
+  // total — see EnoughPurpose.balanceKobo for money already pushed out.
   // Money-integrity rule (HANDOFF.md §9): BigInt kobo, never Float.
   availableBalanceKobo BigInt @default(0)
 
   deposits  EnoughDepositEvent[]
+  purposes  EnoughPurpose[]
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 }
@@ -835,4 +841,20 @@ model EnoughDepositEvent {
   chargeId        String
   amountKobo      BigInt
   receivedAt      DateTime      @default(now())
+}
+
+// A named bucket a user pushes money into from the landing spot — purely
+// internal bookkeeping within the same Bachs account/balance, never a
+// separate Bachs account and never money actually moving anywhere (see
+// EnoughPurposesService.allocate). e.g. "Rent", "Food", "Savings".
+model EnoughPurpose {
+  id              String        @id @default(cuid())
+  enoughAccountId String
+  enoughAccount   EnoughAccount @relation(fields: [enoughAccountId], references: [id])
+  name            String
+  balanceKobo     BigInt        @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([enoughAccountId, name])
 }

@@ -68,6 +68,21 @@ input:focus,select:focus{border-color:var(--orange)}
 .copy-btn{background:none;border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--amber);cursor:pointer}
 footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 .skeleton{height:100px;display:flex;align-items:center;justify-content:center;color:var(--muted);gap:10px;font-size:15px}
+.purpose-list{margin-top:4px}
+.purpose-row{padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.purpose-row:last-child{border-bottom:0}
+.purpose-row-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.purpose-name{font-weight:700;font-size:15px}
+.purpose-balance{font-family:var(--display);font-weight:700;font-size:16px}
+.btn-small-row{display:flex;gap:8px;margin-top:8px}
+.btn-primary-small{background:var(--ink);color:var(--sun)}
+.btn-ghost-small{background:transparent;color:var(--amber);border:1px solid var(--line)}
+.allocate-form{display:flex;gap:8px;margin-top:10px}
+.allocate-form input{height:40px;flex:1}
+.push-link{background:none;border:0;color:var(--amber);font-weight:700;font-size:13px;cursor:pointer;padding:0;margin-top:6px}
+.new-purpose-form{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+.new-purpose-form input{margin-bottom:0}
+.empty-purposes{color:var(--muted);font-size:14px;margin:0}
 </style>
 </head>
 <body>
@@ -324,12 +339,49 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     if (view.status === 'unsupported') { renderUnsupportedScreen(view); return; }
 
     // active
+    loadActivePanel(view);
+  }
+
+  // ---------- active panel: landing spot + purposes ----------
+
+  var activeUi = { allocatingPurposeId: null, showCreateForm: false };
+
+  function loadActivePanel(view) {
+    api('/enough/purposes', { auth: true }).then(function (purposes) {
+      renderActivePanel(view, purposes);
+    }).catch(function (err) {
+      renderActivePanel(view, [], err.message);
+    });
+  }
+
+  function renderActivePanel(view, purposes, purposesError) {
     var hasAccountNumber = !!view.virtualAccountNumber;
+
+    var purposeRows = purposes.map(function (p) {
+      var isAllocating = activeUi.allocatingPurposeId === p.id;
+      return (
+        '<div class="purpose-row">' +
+          '<div class="purpose-row-main">' +
+            '<span class="purpose-name">' + escapeHtml(p.name) + '</span>' +
+            '<span class="purpose-balance">' + formatNaira(p.balanceKobo) + '</span>' +
+          '</div>' +
+          (isAllocating
+            ? '<form class="allocate-form" data-purpose-id="' + p.id + '">' +
+                '<input type="number" min="0.01" step="0.01" placeholder="Amount (₦)" required class="allocate-amount">' +
+                '<button type="submit" class="btn btn-small btn-primary-small">Push</button>' +
+                '<button type="button" class="btn btn-small btn-ghost-small cancel-allocate">Cancel</button>' +
+              '</form>'
+            : '<button type="button" class="push-link" data-purpose-id="' + p.id + '">Push money in</button>')
+        + '</div>'
+      );
+    }).join('');
+
     render(
       '<div class="card">' +
       '<span class="status-pill active">Active</span>' +
-      '<p class="balance-label" style="margin-top:16px">Available balance</p>' +
+      '<p class="balance-label" style="margin-top:16px">Landing spot</p>' +
       '<p class="balance">' + formatNaira(view.availableBalanceKobo) + '</p>' +
+      '<p class="hint" style="margin-top:8px">Every deposit lands here first. Push it into a purpose below whenever you decide what it\'s for.</p>' +
       '</div>' +
       '<div class="card">' +
       (hasAccountNumber
@@ -343,10 +395,28 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
         : '<p class="sub" style="margin:0">Your account is active — your account number is being issued and will appear here shortly.</p>' +
           '<button type="button" class="btn btn-primary" id="refresh-btn">Check again</button>') +
       '</div>' +
+      '<div class="card">' +
+      '<p class="balance-label" style="margin-bottom:10px">Your purposes</p>' +
+      (purposesError ? '<div class="banner error">' + escapeHtml(purposesError) + '</div>' : '') +
+      (purposes.length
+        ? '<div class="purpose-list">' + purposeRows + '</div>'
+        : '<p class="empty-purposes">No purposes yet — create one below, then push money into it from your landing spot.</p>') +
+      (activeUi.showCreateForm
+        ? '<form id="create-purpose-form" class="new-purpose-form">' +
+            '<label for="new-purpose-name">Purpose name</label>' +
+            '<input id="new-purpose-name" required maxlength="100" placeholder="e.g. Rent">' +
+            '<div class="btn-small-row">' +
+              '<button type="submit" class="btn btn-small btn-primary-small">Create</button>' +
+              '<button type="button" class="btn btn-small btn-ghost-small" id="cancel-create-purpose">Cancel</button>' +
+            '</div>' +
+          '</form>'
+        : '<button type="button" class="push-link" id="show-create-purpose" style="margin-top:12px">+ New purpose</button>') +
+      '</div>' +
       '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>'
     );
 
     document.getElementById('logout-link').addEventListener('click', logout);
+
     var copyBtn = document.getElementById('copy-btn');
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
@@ -362,6 +432,73 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
         refreshBtn.disabled = true;
         refreshBtn.textContent = 'Checking…';
         loadAccount();
+      });
+    }
+
+    Array.prototype.forEach.call(app.querySelectorAll('.push-link[data-purpose-id]'), function (btn) {
+      btn.addEventListener('click', function () {
+        activeUi.allocatingPurposeId = btn.getAttribute('data-purpose-id');
+        renderActivePanel(view, purposes);
+      });
+    });
+    var cancelAllocate = app.querySelector('.cancel-allocate');
+    if (cancelAllocate) {
+      cancelAllocate.addEventListener('click', function () {
+        activeUi.allocatingPurposeId = null;
+        renderActivePanel(view, purposes);
+      });
+    }
+    var allocateForm = app.querySelector('.allocate-form');
+    if (allocateForm) {
+      allocateForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var purposeId = allocateForm.getAttribute('data-purpose-id');
+        var nairaAmount = parseFloat(allocateForm.querySelector('.allocate-amount').value);
+        if (!nairaAmount || nairaAmount <= 0) return;
+        var amountKobo = Math.round(nairaAmount * 100);
+        var submitBtn = allocateForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Pushing…';
+        api('/enough/purposes/' + encodeURIComponent(purposeId) + '/allocate', {
+          method: 'POST', auth: true, body: { amountKobo: amountKobo },
+        }).then(function () {
+          activeUi.allocatingPurposeId = null;
+          loadAccount();
+        }).catch(function (err) {
+          renderActivePanel(Object.assign({}, view), purposes, err.message);
+        });
+      });
+    }
+
+    var showCreateBtn = document.getElementById('show-create-purpose');
+    if (showCreateBtn) {
+      showCreateBtn.addEventListener('click', function () {
+        activeUi.showCreateForm = true;
+        renderActivePanel(view, purposes);
+      });
+    }
+    var cancelCreateBtn = document.getElementById('cancel-create-purpose');
+    if (cancelCreateBtn) {
+      cancelCreateBtn.addEventListener('click', function () {
+        activeUi.showCreateForm = false;
+        renderActivePanel(view, purposes);
+      });
+    }
+    var createForm = document.getElementById('create-purpose-form');
+    if (createForm) {
+      createForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var name = document.getElementById('new-purpose-name').value.trim();
+        if (!name) return;
+        var submitBtn = createForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating…';
+        api('/enough/purposes', { method: 'POST', auth: true, body: { name: name } }).then(function () {
+          activeUi.showCreateForm = false;
+          loadActivePanel(view);
+        }).catch(function (err) {
+          renderActivePanel(view, purposes, err.message);
+        });
       });
     }
   }

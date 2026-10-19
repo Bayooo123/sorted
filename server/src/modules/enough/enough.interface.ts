@@ -21,6 +21,13 @@ export interface EnoughAccountView {
   availableBalanceKobo: string;
 }
 
+/** A named bucket money's been pushed into from the landing spot. See EnoughPurposesService. */
+export interface PurposeView {
+  id: string;
+  name: string;
+  balanceKobo: string;
+}
+
 export interface SubmitIdentityInput {
   firstName: string;
   lastName: string;
