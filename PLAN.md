@@ -4013,3 +4013,15 @@ documents. `classic.html`'s full inline script re-extracted and
 **Still open:** which entity name is actually correct across the whole
 site (the footer vs. the legal pages) needs the founder's confirmation
 before `classic.html`'s footer is touched.
+
+### Follow-up: footer matched, finalized as the published documents
+
+The founder confirmed Sorted Innovations Limited / RC 9770241 is
+correct everywhere. `classic.html`'s footer updated to match (was
+Reforma Digital Solutions Limited / RC 8801487). The founder also
+explicitly said to treat both pages as final, not a draft pending
+review — the "Draft, not final" notice block (and its "not legal
+advice, not yet reviewed by [a lawyer]" language) removed from both
+`terms.html` and `privacy.html`. Verified: no leftover references to the
+old entity/RC number or the draft language anywhere in either page;
+both still valid documents; `classic.html`'s script re-checked clean.
