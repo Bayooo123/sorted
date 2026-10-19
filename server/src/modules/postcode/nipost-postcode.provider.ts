@@ -5,21 +5,13 @@ import { PostcodeProviderPort, ResolvedPostcode } from './postcode.interface';
 /**
  * NIPOST adapter (PLAN.md "NIPOST digital postcode integration").
  *
- * IMPORTANT — read before relying on this in production, same caveat as
- * KwikDeliveryService's: this was written from a third-party blog post and
- * an unofficial Go client's README describing NIPOST's postcode system,
- * not NIPOST's own API reference — docs.postcode.gov.ng was unreachable
- * from this environment to confirm the real request/response shape.
- *
- * The one thing independently confirmed (government press coverage, not
- * the blog): NIPOST's National Digital Postcode launched 1 Oct 2026 and
- * postcode.gov.ng is the real, official site. The specific path below
- * (`GET /v1/lookup?code=...`) and its response fields are a best guess
- * from that third-party README's mention of a `GET /v1/lookup` endpoint —
- * confirm against NIPOST's real docs and correct via NIPOST_POSTCODE_PATH_LOOKUP
- * before trusting this for real dispatch decisions. Until then this will
- * most likely just fail closed (return null, logged), same as KWIK did
- * before its own credentials were confirmed — never silently wrong.
+ * The endpoint shape below (`GET /v1/lookup?code=...`, `{lat,lng,state}`
+ * or `{latitude,longitude,state}` response) was originally a best guess
+ * from a third-party README, not NIPOST's own docs — now confirmed
+ * working against NIPOST's real API in production (Oct 2026), with
+ * NIPOST_POSTCODE_API_BASE_URL set and no API key required. Still fails
+ * closed (returns null, logged) on any unexpected response shape or a
+ * postcode NIPOST doesn't recognize — never silently wrong.
  */
 @Injectable()
 export class NipostPostcodeProvider implements PostcodeProviderPort {

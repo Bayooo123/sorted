@@ -1723,6 +1723,18 @@
         </div>
       </div>
 
+      <div id="profile-shop-address-section" hidden>
+        <p class="field-label">Shop / pickup address</p>
+        <div class="field-row">
+          <input type="text" id="profile-shop-address" placeholder="Where couriers pick up from" />
+        </div>
+        <p class="field-label">Got a NIPOST postcode for your shop? (optional)</p>
+        <div class="field-row">
+          <input type="text" id="profile-shop-postcode" placeholder="LA-11-W06-TC-10" maxlength="20" />
+        </div>
+        <p class="field-hint" id="profile-shop-postcode-hint">Pinpoints your shop's exact location for couriers. Don't have one yet? Just skip this.</p>
+      </div>
+
       <p class="field-label">Phone</p>
       <div class="field-row">
         <input type="tel" id="profile-phone" placeholder="0803 123 4567" />
@@ -2754,6 +2766,9 @@
       var isProfessional = (user.roles || []).indexOf('professional') !== -1;
       document.getElementById('profile-displayname-section').hidden = !isProfessional;
       document.getElementById('profile-displayname').value = user.displayName || '';
+      document.getElementById('profile-shop-address-section').hidden = !isProfessional;
+      document.getElementById('profile-shop-address').value = user.professionalAddressText || '';
+      document.getElementById('profile-shop-postcode').value = user.professionalAddressPostcode || '';
       document.getElementById('profile-phone').value = user.phone || '';
       profileStateSelect.value = user.state || '';
       document.getElementById('profile-roles').textContent = (user.roles || []).join(', ') || '—';
@@ -3122,10 +3137,18 @@
       var name = document.getElementById('profile-name').value.trim();
       var isProfessional = ((shellState.user && shellState.user.roles) || []).indexOf('professional') !== -1;
       var displayName = document.getElementById('profile-displayname').value.trim();
+      var shopAddress = document.getElementById('profile-shop-address').value.trim();
+      var shopPostcode = document.getElementById('profile-shop-postcode').value.trim();
       var phone = document.getElementById('profile-phone').value.trim();
       var stateName = profileStateSelect.value;
 
       profileError.textContent = '';
+
+      if (isProfessional) {
+        var shopPostcodeError = postcodeFormatError(shopPostcode);
+        if (shopPostcodeError) { profileError.textContent = 'Shop postcode: ' + shopPostcodeError; return; }
+      }
+
       profileSave.disabled = true;
       profileSave.textContent = 'Saving…';
 
@@ -3137,6 +3160,8 @@
           displayName: isProfessional ? displayName : undefined,
           phone: phone || undefined,
           state: stateName || undefined,
+          professionalAddressText: isProfessional ? (shopAddress || undefined) : undefined,
+          professionalAddressPostcode: isProfessional ? (shopPostcode || undefined) : undefined,
         },
       })
         .then(function (updatedUser) {
@@ -3446,6 +3471,15 @@
       var err = postcodeFormatError(postPostcodeInput.value);
       postPostcodeHint.textContent = err || postPostcodeHintDefault;
       postPostcodeHint.classList.toggle('field-hint-error', !!err);
+    });
+
+    var profileShopPostcodeInput = document.getElementById('profile-shop-postcode');
+    var profileShopPostcodeHint = document.getElementById('profile-shop-postcode-hint');
+    var profileShopPostcodeHintDefault = profileShopPostcodeHint.textContent;
+    profileShopPostcodeInput.addEventListener('blur', function () {
+      var err = postcodeFormatError(profileShopPostcodeInput.value);
+      profileShopPostcodeHint.textContent = err || profileShopPostcodeHintDefault;
+      profileShopPostcodeHint.classList.toggle('field-hint-error', !!err);
     });
 
     postSubmit.addEventListener('click', function () {

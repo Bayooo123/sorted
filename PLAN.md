@@ -3916,7 +3916,87 @@ URL, but nothing links to it either.
 
 ---
 
-## Terms of Service + Privacy Policy — IMPLEMENTED (draft, needs legal review)
+## NIPOST digital postcode integration — shipped for real (full backend live)
+
+**What was asked:** a prior pass (see the "NIPOST digital postcode
+integration" section earlier in this file) built the backend deliberately
+held back from `main` pending two things only the founder could confirm:
+a real, working NIPOST API credential, and explicit sign-off to run a
+schema migration against the production database. The founder then set
+`NIPOST_POSTCODE_API_BASE_URL` in production and confirmed live lookups
+work, and asked to ship the whole thing for real, plus wire
+`prisma migrate deploy` into the build so this migration (and any future
+one) actually reaches production automatically.
+
+**What was found, concretely, before touching anything:** checking
+`sorted-api`'s actual production deployment (not assumptions) showed the
+entire `PostcodeModule`, the `Gig.postcode`/`professionalAddressPostcode`
+schema columns, and the `GigsService`/`IdentityService` wiring were absent
+from `main` — only a cosmetic web form field existed in `classic.html`,
+and since the server's global `ValidationPipe` runs with `whitelist:
+true` and `create-gig.dto.ts` on `main` had no `postcode` property, every
+postcode a real user typed into that live field was being silently
+stripped before reaching any code. Separately, there was and is no UI
+anywhere (web, mobile) for a professional to register their shop/pickup
+address at all — `professionalAddressText` didn't exist on `main`'s
+`IdentityUser` either. KWIK courier-dispatch credentials remain unset in
+production, same as always — that part is a real KWIK vendor
+relationship, not something fixable from this session.
+
+**What was merged to `main`** (scoped — pulled only these files from the
+feature branch, not the rest of its unrelated work):
+- `server/prisma/migrations/20261007120000_postcode/` + the matching
+  `schema.prisma` columns.
+- `PostcodeModule` (`postcode.interface.ts`, `postcode-format.ts`,
+  `nipost-postcode.provider.ts`, `postcode.service.ts`).
+- `GigsService`/`GigsController`/`create-gig.dto.ts` and
+  `IdentityService`/`update-profile.dto.ts` wiring (format-validate,
+  resolve, fill `locationGeoLat/Lng` / `professionalAddressLat/Lng`).
+- `NipostPostcodeProvider`'s doc comment updated from "best guess,
+  unconfirmed" to "confirmed working in production" now that it's been
+  verified against the real API.
+
+**New client-side work** (`classic.html`'s profile editor — did not
+exist before this pass): a "Shop / pickup address" text field plus a
+"Got a NIPOST postcode for your shop?" field, shown only when
+`roles` includes `professional`, reusing the exact same
+`postcodeFormatError()` offline validator already used by the gig-posting
+form (same blur-to-inline-error pattern, no network round trip to catch
+a typo), wired into `PATCH /me/profile` as `professionalAddressText` /
+`professionalAddressPostcode`. Without this, `DeliveryService` had a
+client-side pickup location but no professional-side shop location to
+pair it with — the full KWIK dispatch needs both ends.
+
+**Build step change:** `server/package.json`'s `build` script changed
+from `nest build` to `prisma migrate deploy && nest build` — explicit
+founder decision, made knowing this runs on every future deploy
+(including preview deployments, since `DATABASE_URL` is shared across
+preview and production in this project's current Vercel setup), not just
+this one migration. Chosen over a one-off manual `prisma migrate deploy`
+specifically so this stops being a manual step going forward.
+
+**Also documented:** `NIPOST_POSTCODE_API_BASE_URL` / `_API_KEY` /
+`_PATH_LOOKUP` added to `server/.env.example` (previously undocumented
+even on the feature branch — an oversight from the original pass).
+
+**What was verified before pushing to `main`** (this deploys automatically
+via Vercel's GitHub integration — nothing re-verified here means nothing
+assumed): `npx prisma generate` clean, `tsc --noEmit` clean, `nest build`
+clean, a full DI-graph boot test (`NestFactory.create` against the real
+`AppModule`, no DB connection needed to reach this far) printed "BOOT OK"
+with the merged `PostcodeModule` in place, and `node --check` on
+`classic.html`'s extracted inline script confirmed no syntax errors from
+the new profile fields.
+
+**Deliberately still not done:** KWIK credentials are still unset in
+production — courier dispatch itself still silently no-ops regardless of
+how good postcode resolution is, pending the founder's own KWIK vendor
+account. Mobile and WhatsApp surfaces still don't have either postcode
+field — web only, same scoping decision as the original pass.
+
+---
+
+## Terms of Service + Privacy Policy — IMPLEMENTED (published)
 
 **What was asked:** real Terms of Service and Privacy Policy pages for
 Sorted (the gig marketplace — not Enough, which has its own, not yet
@@ -4025,3 +4105,8 @@ advice, not yet reviewed by [a lawyer]" language) removed from both
 `terms.html` and `privacy.html`. Verified: no leftover references to the
 old entity/RC number or the draft language anywhere in either page;
 both still valid documents; `classic.html`'s script re-checked clean.
+
+---
+
+*Per HANDOFF.md §10: stop here for review. Slice 4 (Payments module +
+Escrow funding) does not start until this plan is approved.*
