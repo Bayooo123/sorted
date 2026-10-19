@@ -86,6 +86,14 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 .tabbar{display:flex;gap:4px;background:var(--sun-pale);border-radius:16px;padding:4px;margin-bottom:16px}
 .tab-btn{flex:1;border:0;background:transparent;height:44px;border-radius:12px;font-family:var(--body);font-weight:700;font-size:13px;color:var(--amber);cursor:pointer;padding:0 4px}
 .tab-btn.active{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(43,27,14,.1)}
+.history-list{margin-top:4px}
+.history-row{padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.history-row:last-child{border-bottom:0}
+.history-row-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.history-label{font-weight:700;font-size:14px}
+.history-amount-in{font-family:var(--display);font-weight:700;font-size:15px;color:var(--good)}
+.history-amount-out{font-family:var(--display);font-weight:700;font-size:15px;color:var(--ink)}
+.history-date{display:block;margin-top:4px;font-size:12.5px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -350,7 +358,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
   var activeTab = 'home';
   var activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null };
 
-  var TABS = [['home', 'Home'], ['savings', 'Savings'], ['payment', 'Make Payment'], ['profile', 'Profile']];
+  var TABS = [['home', 'Home'], ['savings', 'Savings'], ['payment', 'Pay'], ['history', 'History'], ['profile', 'Profile']];
 
   function loadActivePanel(view) {
     render(
@@ -370,6 +378,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     if (activeTab === 'home') renderHomeTab(view);
     else if (activeTab === 'savings') loadSavingsTab(view);
     else if (activeTab === 'payment') renderPaymentTab();
+    else if (activeTab === 'history') loadHistoryTab();
     else if (activeTab === 'profile') loadProfileTab(view);
   }
 
@@ -551,6 +560,45 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       '<h1 class="title" style="margin:10px 0 12px;font-size:22px">Coming soon</h1>' +
       '<p class="sub" style="margin:0">We\'re building the ability to send money out of your Enough account — to a bank account, or to someone else. For now, Enough only holds deposits and lets you organize them into savings purposes.</p>' +
       '</div>';
+  }
+
+  // ---------- History tab ----------
+
+  function formatHistoryDate(iso) {
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function loadHistoryTab() {
+    var el = document.getElementById('tab-content');
+    el.innerHTML = '<div class="card skeleton"><div class="spinner"></div><span>Loading…</span></div>';
+    api('/enough/account/history', { auth: true }).then(function (entries) {
+      renderHistoryTab(entries);
+    }).catch(function (err) {
+      el.innerHTML = '<div class="card"><div class="banner error">' + escapeHtml(err.message) + '</div></div>';
+    });
+  }
+
+  function renderHistoryTab(entries) {
+    var el = document.getElementById('tab-content');
+    if (!entries.length) {
+      el.innerHTML = '<div class="card"><p class="empty-purposes">No activity yet — once a deposit lands or you push money into a purpose, it\'ll show up here.</p></div>';
+      return;
+    }
+    var rows = entries.map(function (e) {
+      var isDeposit = e.type === 'deposit';
+      var label = isDeposit ? 'Deposit received' : 'Pushed into ' + escapeHtml(e.purposeName || '');
+      return (
+        '<div class="history-row">' +
+          '<div class="history-row-main">' +
+            '<span class="history-label">' + label + '</span>' +
+            '<span class="' + (isDeposit ? 'history-amount-in' : 'history-amount-out') + '">' + (isDeposit ? '+ ' : '− ') + formatNaira(e.amountKobo) + '</span>' +
+          '</div>' +
+          '<span class="history-date">' + formatHistoryDate(e.occurredAt) + '</span>' +
+        '</div>'
+      );
+    }).join('');
+    el.innerHTML = '<div class="card"><div class="history-list">' + rows + '</div></div>';
   }
 
   // ---------- Profile tab ----------

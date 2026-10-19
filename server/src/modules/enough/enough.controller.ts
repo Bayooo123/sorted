@@ -32,4 +32,10 @@ export class EnoughController {
     await this.accounts.setTransactionPin(user.userId, dto.pin, dto.currentPin);
     return { ok: true };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('history')
+  getHistory(@CurrentUser() user: AuthenticatedUser) {
+    return this.accounts.getHistory(user.userId);
+  }
 }

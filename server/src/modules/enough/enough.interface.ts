@@ -23,6 +23,16 @@ export interface EnoughAccountView {
   hasTransactionPin: boolean;
 }
 
+/** PLAN.md "Enough: History tab" — a single chronological feed over EnoughDepositEvent + EnoughAllocationEvent. */
+export interface HistoryEntry {
+  id: string;
+  type: 'deposit' | 'allocation';
+  amountKobo: string;
+  occurredAt: string;
+  /** Only set for type 'allocation' — which purpose the money was pushed into. */
+  purposeName?: string;
+}
+
 /** A named bucket money's been pushed into from the landing spot. See EnoughPurposesService. */
 export interface PurposeView {
   id: string;

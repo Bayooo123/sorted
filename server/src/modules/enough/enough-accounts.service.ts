@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, Logger, Not
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
-import { BACHS_CONNECT_ACCOUNT_PORT, BachsConnectAccountPort, EnoughAccountView, SubmitIdentityInput } from './enough.interface';
+import { BACHS_CONNECT_ACCOUNT_PORT, BachsConnectAccountPort, EnoughAccountView, HistoryEntry, SubmitIdentityInput } from './enough.interface';
 
 // Same rounds as IdentityService's own BCRYPT_ROUNDS — not imported, same
 // reasoning as that constant being module-local rather than shared.
@@ -141,6 +141,41 @@ export class EnoughAccountsService {
 
     const transactionPinHash = await bcrypt.hash(newPin, BCRYPT_ROUNDS);
     await this.prisma.enoughAccount.update({ where: { id: account.id }, data: { transactionPinHash } });
+  }
+
+  /**
+   * PLAN.md "Enough: History tab" — the only two ways money moves in this
+   * module so far: a deposit lands in the landing spot, or it gets pushed
+   * from there into a purpose. Merged and sorted newest-first; a third
+   * event kind (real money-movement-out) joins this feed once built.
+   */
+  async getHistory(userId: string): Promise<HistoryEntry[]> {
+    const account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
+    if (!account) return [];
+
+    const [deposits, allocations] = await Promise.all([
+      this.prisma.enoughDepositEvent.findMany({ where: { enoughAccountId: account.id } }),
+      this.prisma.enoughAllocationEvent.findMany({ where: { enoughAccountId: account.id }, include: { purpose: true } }),
+    ]);
+
+    const entries: HistoryEntry[] = [
+      ...deposits.map((d): HistoryEntry => ({
+        id: d.id,
+        type: 'deposit',
+        amountKobo: d.amountKobo.toString(),
+        occurredAt: d.receivedAt.toISOString(),
+      })),
+      ...allocations.map((a): HistoryEntry => ({
+        id: a.id,
+        type: 'allocation',
+        amountKobo: a.amountKobo.toString(),
+        occurredAt: a.createdAt.toISOString(),
+        purposeName: a.purpose.name,
+      })),
+    ];
+
+    entries.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+    return entries;
   }
 
   /** Called from the webhook handler on account.updated/capability.updated. */

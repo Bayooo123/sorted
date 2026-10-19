@@ -73,6 +73,12 @@ export class EnoughPurposesService {
       if (debited.count === 0) {
         throw new BadRequestException('Not enough in your landing spot to push that much.');
       }
+      // Recorded in the same transaction as the balance move — see
+      // EnoughAccountsService.getHistory, the History tab's only source
+      // for "where did this push go."
+      await tx.enoughAllocationEvent.create({
+        data: { enoughAccountId: account.id, purposeId, amountKobo },
+      });
       return tx.enoughPurpose.update({
         where: { id: purposeId },
         data: { balanceKobo: { increment: amountKobo } },

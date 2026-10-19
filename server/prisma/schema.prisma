@@ -831,10 +831,11 @@ model EnoughAccount {
   // Money-integrity rule (HANDOFF.md §9): BigInt kobo, never Float.
   availableBalanceKobo BigInt @default(0)
 
-  deposits  EnoughDepositEvent[]
-  purposes  EnoughPurpose[]
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
+  deposits         EnoughDepositEvent[]
+  purposes         EnoughPurpose[]
+  allocationEvents EnoughAllocationEvent[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
 }
 
 // One row per Bachs collection.succeeded deposit event — id is Bachs' own
@@ -864,4 +865,20 @@ model EnoughPurpose {
   updatedAt       DateTime      @updatedAt
 
   @@unique([enoughAccountId, name])
+  allocations EnoughAllocationEvent[]
+}
+
+// One row per push from the landing spot into a purpose — see
+// EnoughPurposesService.allocate. Alongside EnoughDepositEvent, this is
+// what the History tab reads: the only two ways money moves in this
+// module (money in, money organized), until a real money-movement-out
+// feature adds a third.
+model EnoughAllocationEvent {
+  id              String        @id @default(cuid())
+  enoughAccountId String
+  enoughAccount   EnoughAccount @relation(fields: [enoughAccountId], references: [id])
+  purposeId       String
+  purpose         EnoughPurpose @relation(fields: [purposeId], references: [id])
+  amountKobo      BigInt
+  createdAt       DateTime      @default(now())
 }
