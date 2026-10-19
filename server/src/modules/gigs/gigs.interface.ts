@@ -41,6 +41,8 @@ export interface CreateGigInput {
   clientType: string; // FK to taxonomy seed table
   locationText: string;
   locationGeo?: { lat: number; lng: number };
+  /** NIPOST National Digital Postcode, e.g. "LA-11-W06-TC-10" — see PostcodeService. Used to fill locationGeo server-side when locationGeo isn't supplied directly. */
+  postcode?: string;
   materialsMode: 'bounty_covers' | 'professional_supplies';
   bountyKobo: Kobo;
   criteria: string[];
@@ -67,6 +69,7 @@ export interface GigRecord {
   locationText: string;
   locationGeoLat: number | null;
   locationGeoLng: number | null;
+  postcode: string | null;
   materialsMode: 'bounty_covers' | 'professional_supplies';
   status: GigStatus;
   bountyKobo: Kobo;

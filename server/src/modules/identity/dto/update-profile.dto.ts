@@ -21,4 +21,15 @@ export class UpdateProfileDto {
   @IsString()
   @Length(0, 200)
   displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  professionalAddressText?: string;
+
+  /** NIPOST National Digital Postcode, e.g. "LA-11-W06-TC-10" — see PostcodeService. */
+  @IsOptional()
+  @IsString()
+  @Length(0, 20)
+  professionalAddressPostcode?: string;
 }

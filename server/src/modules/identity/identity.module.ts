@@ -4,6 +4,7 @@ import { IdentityController } from './identity.controller';
 import { ReputationNotificationsModule } from '../reputation-notifications/reputation-notifications.module';
 import { AuthModule } from '../../common/auth/auth.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { PostcodeModule } from '../postcode/postcode.module';
 
 // PaymentsModule (leaf module — only ConfigModule of its own, see
 // payments.module.ts) is safe here for the same no-cycle reasoning
@@ -11,7 +12,7 @@ import { PaymentsModule } from '../payments/payments.module';
 // PLAN.md "Account number verification" — setPayoutDestination resolves
 // a professional's bank details against PaymentsProvider before saving.
 @Module({
-  imports: [ReputationNotificationsModule, AuthModule, PaymentsModule],
+  imports: [ReputationNotificationsModule, AuthModule, PaymentsModule, PostcodeModule],
   controllers: [IdentityController],
   providers: [IdentityService],
   exports: [IdentityService],

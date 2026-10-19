@@ -54,6 +54,10 @@ export interface IdentityUser {
   serviceOfferingSubmarketIds: string[];
   /** Populated when roles includes 'client'. Submarket IDs — see CompleteRoleProfileInput. */
   seekingCategorySubmarketIds: string[];
+  /** A professional's registered shop/pickup address for KWIK dispatch — see DeliveryService. Null until they set one. */
+  professionalAddressText: string | null;
+  /** NIPOST National Digital Postcode behind professionalAddressText's coordinates, e.g. "LA-11-W06-TC-10" — see PostcodeService. */
+  professionalAddressPostcode: string | null;
 }
 
 export interface PayoutDestination {
@@ -138,6 +142,10 @@ export interface UpdateProfileInput {
   state?: string;
   /** Empty string clears it back to falling through to `name`. See IdentityUser.displayName. */
   displayName?: string;
+  /** Professional's shop/pickup address, free text — paired with professionalAddressPostcode below. See DeliveryService. */
+  professionalAddressText?: string;
+  /** NIPOST National Digital Postcode, e.g. "LA-11-W06-TC-10" — resolved server-side to fill professionalAddressLat/Lng. See PostcodeService. */
+  professionalAddressPostcode?: string;
 }
 
 /** identifier is an email or a phone number — same lookup as LoginInput. See PLAN.md "Forgot password". */
