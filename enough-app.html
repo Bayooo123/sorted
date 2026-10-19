@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enough by Sorted · Your account</title>
+<meta name="description" content="Open your Enough account: verify your BVN and get your own account number for salary deposits.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFC23C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=DM+Sans:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#2B1B0E; --ground:#FFF8EC; --card:#FFFDF7; --line:#F0E2C6; --line-soft:#F6ECD8;
+  --muted:#6B5843; --amber:#9A5B00; --sun:#FFC23C; --sun-soft:#FFE3A3; --sun-pale:#FFF1D1;
+  --orange:#F28C28; --ember:#C2502A; --deep:#8A3B1E; --good:#2E7D4F; --good-soft:#E6F3EA;
+  --display:'Bricolage Grotesque', 'Trebuchet MS', sans-serif;
+  --body:'DM Sans', 'Segoe UI', Arial, sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
+img{max-width:100%;display:block}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-0.02em;line-height:1.15}
+:focus-visible{outline:3px solid var(--orange);outline-offset:3px;border-radius:6px}
+.wrap{max-width:480px;margin:0 auto;padding:0 20px}
+header.nav{padding:20px 0}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink)}
+.brand span{font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:-.02em}
+.brand small{font-family:var(--body);font-size:13px;color:var(--muted);font-weight:500;margin-left:2px}
+main{padding:12px 0 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:28px 24px;box-shadow:0 1px 0 rgba(43,27,14,.03)}
+.card + .card{margin-top:16px}
+h1.title{font-size:26px;margin-bottom:6px}
+p.sub{color:var(--muted);margin:0 0 20px;font-size:15px}
+label{display:block;font-size:14px;font-weight:700;margin:14px 0 6px;color:var(--amber)}
+label:first-of-type{margin-top:0}
+input,select{width:100%;height:50px;padding:0 14px;border:1.5px solid var(--line);border-radius:12px;font-family:var(--body);font-size:16px;background:#fff;color:var(--ink)}
+input:focus,select:focus{border-color:var(--orange)}
+.field-row{position:relative}
+.field-toggle{position:absolute;right:10px;top:38px;background:none;border:0;color:var(--amber);font-family:var(--body);font-weight:700;font-size:13px;cursor:pointer;padding:6px}
+.hint{font-size:13px;color:var(--muted);margin-top:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;padding:0 20px;border-radius:26px;font-family:var(--body);font-weight:700;font-size:16px;text-decoration:none;border:0;cursor:pointer;margin-top:22px;transition:transform .15s ease, opacity .15s ease}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--ink);color:var(--sun)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--amber);height:40px;margin-top:10px}
+.btn-small{width:auto;height:40px;padding:0 18px;margin-top:0;font-size:14px}
+.switcher{display:flex;gap:6px;background:var(--sun-pale);border-radius:14px;padding:4px;margin-bottom:22px}
+.switcher button{flex:1;border:0;background:transparent;height:38px;border-radius:11px;font-family:var(--body);font-weight:700;font-size:14px;color:var(--amber);cursor:pointer}
+.switcher button.active{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(43,27,14,.1)}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:14px 16px;border-radius:14px;font-size:14px;margin-bottom:18px}
+.banner.error{background:#FBE6E0;color:var(--ember)}
+.banner.info{background:var(--sun-pale);color:var(--amber)}
+.banner.success{background:var(--good-soft);color:var(--good)}
+.spinner{width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(0,0,0,.15);border-top-color:currentColor;animation:spin .7s linear infinite;flex:none;margin-top:1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px}
+.status-pill.pending{background:var(--sun-pale);color:var(--amber)}
+.status-pill.active{background:var(--good-soft);color:var(--good)}
+.status-pill.unsupported{background:#FBE6E0;color:var(--ember)}
+.acct-number{font-family:var(--display);font-size:32px;font-weight:800;letter-spacing:.02em;margin:14px 0 2px}
+.acct-bank{color:var(--muted);font-size:15px}
+.balance{font-family:var(--display);font-size:40px;font-weight:800;margin:4px 0 0}
+.balance-label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.muted{color:var(--muted)}
+.copy-btn{background:none;border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--amber);cursor:pointer}
+footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
+.skeleton{height:100px;display:flex;align-items:center;justify-content:center;color:var(--muted);gap:10px;font-size:15px}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#" aria-label="Enough home">
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="#FFC23C" stroke="#2B1B0E" stroke-width="1.6"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="#2B1B0E" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>enough</span><small>by Sorted</small>
+    </a>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <div class="card skeleton" id="loading-card">
+    <div class="spinner"></div><span>Loading…</span>
+  </div>
+</main>
+
+<footer class="foot wrap">Sorted Innovations Limited · RC 9770241</footer>
+
+<script>
+(function () {
+  var API_BASE_URL = 'https://sorted-api.vercel.app';
+  var TOKEN_KEY = 'enough_access_token';
+
+  // Keep in sync with server/src/common/nigerian-states.ts.
+  var NIGERIAN_STATES = [
+    'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
+    'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT (Abuja)', 'Gombe',
+    'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos',
+    'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto',
+    'Taraba', 'Yobe', 'Zamfara',
+  ];
+
+  var app = document.getElementById('app');
+  var state = { accessToken: localStorage.getItem(TOKEN_KEY) };
+
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json' };
+    if (opts.auth) {
+      if (!state.accessToken) return Promise.reject(new Error('Not signed in'));
+      headers.Authorization = 'Bearer ' + state.accessToken;
+    }
+    return fetch(API_BASE_URL + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = text ? JSON.parse(text) : undefined;
+        if (!res.ok) {
+          var message = (data && (data.message || data.error)) || ('Request failed (' + res.status + ')');
+          var err = new Error(Array.isArray(message) ? message.join(', ') : message);
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function formatNaira(kobo) {
+    var naira = Number(kobo) / 100;
+    return '₦' + naira.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatAccountNumber(num) {
+    if (!num) return '';
+    return String(num).replace(/(\d{3})(?=\d)/g, '$1 ').trim();
+  }
+
+  // ---------- render helpers ----------
+
+  function render(html) {
+    app.innerHTML = html;
+  }
+
+  function renderAuthScreen(mode, errorMsg) {
+    mode = mode || 'login';
+    var stateOptions = NIGERIAN_STATES.map(function (s) {
+      return '<option value="' + s + '">' + s + '</option>';
+    }).join('');
+
+    render(
+      '<div class="card">' +
+      '<h1 class="title">' + (mode === 'login' ? 'Welcome back' : 'Create your account') + '</h1>' +
+      '<p class="sub">Sign in to open or check your Enough account.</p>' +
+      (errorMsg ? '<div class="banner error">' + escapeHtml(errorMsg) + '</div>' : '') +
+      '<div class="switcher">' +
+        '<button type="button" data-mode="login" class="' + (mode === 'login' ? 'active' : '') + '">Log in</button>' +
+        '<button type="button" data-mode="signup" class="' + (mode === 'signup' ? 'active' : '') + '">Sign up</button>' +
+      '</div>' +
+      '<form id="auth-form">' +
+        (mode === 'signup'
+          ? '<label for="f-name">Full name</label><input id="f-name" required maxlength="200">' +
+            '<label for="f-phone">Phone</label><input id="f-phone" required placeholder="+2348012345678">' +
+            '<label for="f-state">State</label><select id="f-state" required>' + stateOptions + '</select>' +
+            '<label for="f-email">Email</label><input id="f-email" type="email" required>' +
+            '<div class="field-row"><label for="f-password">Password</label><input id="f-password" type="password" required minlength="8">' +
+              '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>'
+          : '<label for="f-identifier">Email or phone</label><input id="f-identifier" required>' +
+            '<div class="field-row"><label for="f-password">Password</label><input id="f-password" type="password" required>' +
+              '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>') +
+        '<button type="submit" class="btn btn-primary" id="auth-submit">' + (mode === 'login' ? 'Log in' : 'Sign up') + '</button>' +
+      '</form>' +
+      '</div>'
+    );
+
+    var switcherBtns = app.querySelectorAll('.switcher button');
+    Array.prototype.forEach.call(switcherBtns, function (btn) {
+      btn.addEventListener('click', function () { renderAuthScreen(btn.getAttribute('data-mode')); });
+    });
+
+    var toggle = app.querySelector('.field-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        var input = document.getElementById(toggle.getAttribute('data-target'));
+        var showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        toggle.textContent = showing ? 'Show' : 'Hide';
+      });
+    }
+
+    document.getElementById('auth-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var submitBtn = document.getElementById('auth-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Please wait…';
+
+      var req;
+      if (mode === 'signup') {
+        req = api('/auth/signup', {
+          method: 'POST',
+          body: {
+            name: document.getElementById('f-name').value.trim(),
+            phone: document.getElementById('f-phone').value.trim(),
+            state: document.getElementById('f-state').value,
+            email: document.getElementById('f-email').value.trim(),
+            password: document.getElementById('f-password').value,
+          },
+        });
+      } else {
+        req = api('/auth/login', {
+          method: 'POST',
+          body: {
+            identifier: document.getElementById('f-identifier').value.trim(),
+            password: document.getElementById('f-password').value,
+          },
+        });
+      }
+
+      req.then(function (res) {
+        state.accessToken = res.accessToken;
+        localStorage.setItem(TOKEN_KEY, res.accessToken);
+        loadAccount();
+      }).catch(function (err) {
+        renderAuthScreen(mode, err.message);
+      });
+    });
+  }
+
+  function renderLoadingCard(label) {
+    render('<div class="card skeleton"><div class="spinner"></div><span>' + escapeHtml(label || 'Loading…') + '</span></div>');
+  }
+
+  function renderIdentityScreen(errorMsg) {
+    render(
+      '<div class="card">' +
+      '<h1 class="title">One more step</h1>' +
+      '<p class="sub">We verify your BVN to open your own account number — this is the same number people pay your salary or deposits into.</p>' +
+      (errorMsg ? '<div class="banner error">' + escapeHtml(errorMsg) + '</div>' : '') +
+      '<form id="identity-form">' +
+        '<label for="i-first">First name</label><input id="i-first" required maxlength="200">' +
+        '<label for="i-last">Last name</label><input id="i-last" required maxlength="200">' +
+        '<label for="i-bvn">BVN</label><input id="i-bvn" required inputmode="numeric" pattern="\\d{11}" maxlength="11" placeholder="11 digits">' +
+        '<p class="hint">Your BVN is sent directly to our banking partner to verify your identity — it is never stored on our side.</p>' +
+        '<button type="submit" class="btn btn-primary" id="identity-submit">Verify and continue</button>' +
+      '</form>' +
+      '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>' +
+      '</div>'
+    );
+
+    document.getElementById('logout-link').addEventListener('click', logout);
+
+    document.getElementById('identity-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bvn = document.getElementById('i-bvn').value.trim();
+      if (!/^\d{11}$/.test(bvn)) {
+        renderIdentityScreen('BVN must be exactly 11 digits.');
+        return;
+      }
+      var submitBtn = document.getElementById('identity-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying…';
+
+      api('/enough/account', {
+        method: 'POST',
+        auth: true,
+        body: {
+          firstName: document.getElementById('i-first').value.trim(),
+          lastName: document.getElementById('i-last').value.trim(),
+          bvn: bvn,
+        },
+      }).then(function (view) {
+        renderAccountView(view);
+      }).catch(function (err) {
+        renderIdentityScreen(err.message);
+      });
+    });
+  }
+
+  function renderWaitingScreen(view) {
+    render(
+      '<div class="card">' +
+      '<span class="status-pill pending">Verifying</span>' +
+      '<h1 class="title" style="margin-top:14px">Almost there</h1>' +
+      '<p class="sub">' + escapeHtml(view.statusDetail || 'Your BVN is being verified with our banking partner. This usually takes a few minutes.') + '</p>' +
+      '<button type="button" class="btn btn-primary" id="refresh-btn">Check status</button>' +
+      '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>' +
+      '</div>'
+    );
+    document.getElementById('logout-link').addEventListener('click', logout);
+    document.getElementById('refresh-btn').addEventListener('click', function () {
+      var btn = document.getElementById('refresh-btn');
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      loadAccount();
+    });
+  }
+
+  function renderUnsupportedScreen(view) {
+    render(
+      '<div class="card">' +
+      '<span class="status-pill unsupported">Not available</span>' +
+      '<h1 class="title" style="margin-top:14px">We couldn\'t verify this account</h1>' +
+      '<p class="sub">' + escapeHtml(view.statusDetail || 'Something about this identity could not be verified. Please contact support.') + '</p>' +
+      '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>' +
+      '</div>'
+    );
+    document.getElementById('logout-link').addEventListener('click', logout);
+  }
+
+  function renderAccountView(view) {
+    if (view.status === 'unrequested') { renderIdentityScreen(); return; }
+    if (view.status === 'pending' || view.status === 'restricted') { renderWaitingScreen(view); return; }
+    if (view.status === 'unsupported') { renderUnsupportedScreen(view); return; }
+
+    // active
+    var hasAccountNumber = !!view.virtualAccountNumber;
+    render(
+      '<div class="card">' +
+      '<span class="status-pill active">Active</span>' +
+      '<p class="balance-label" style="margin-top:16px">Available balance</p>' +
+      '<p class="balance">' + formatNaira(view.availableBalanceKobo) + '</p>' +
+      '</div>' +
+      '<div class="card">' +
+      (hasAccountNumber
+        ? '<p class="balance-label">Your account number</p>' +
+          '<p class="acct-number">' + escapeHtml(formatAccountNumber(view.virtualAccountNumber)) + '</p>' +
+          '<p class="acct-bank">' + escapeHtml(view.bankName || '') + '</p>' +
+          '<div class="row" style="margin-top:16px">' +
+            '<span class="muted" style="font-size:14px">Account name: ' + escapeHtml(view.accountName || '') + '</span>' +
+            '<button type="button" class="copy-btn" id="copy-btn">Copy</button>' +
+          '</div>'
+        : '<p class="sub" style="margin:0">Your account is active — your account number is being issued and will appear here shortly.</p>' +
+          '<button type="button" class="btn btn-primary" id="refresh-btn">Check again</button>') +
+      '</div>' +
+      '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>'
+    );
+
+    document.getElementById('logout-link').addEventListener('click', logout);
+    var copyBtn = document.getElementById('copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(view.virtualAccountNumber).then(function () {
+          copyBtn.textContent = 'Copied';
+          setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
+        });
+      });
+    }
+    var refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Checking…';
+        loadAccount();
+      });
+    }
+  }
+
+  function logout() {
+    state.accessToken = null;
+    localStorage.removeItem(TOKEN_KEY);
+    renderAuthScreen('login');
+  }
+
+  function loadAccount() {
+    renderLoadingCard('Checking your account…');
+    api('/enough/account', { auth: true }).then(function (view) {
+      renderAccountView(view);
+    }).catch(function (err) {
+      if (err.status === 401) {
+        logout();
+        return;
+      }
+      render(
+        '<div class="card">' +
+        '<div class="banner error">' + escapeHtml(err.message) + '</div>' +
+        '<button type="button" class="btn btn-primary" id="retry-btn">Try again</button>' +
+        '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>' +
+        '</div>'
+      );
+      document.getElementById('retry-btn').addEventListener('click', loadAccount);
+      document.getElementById('logout-link').addEventListener('click', logout);
+    });
+  }
+
+  // ---------- boot ----------
+  if (state.accessToken) {
+    loadAccount();
+  } else {
+    renderAuthScreen('login');
+  }
+})();
+</script>
+</body>
+</html>
