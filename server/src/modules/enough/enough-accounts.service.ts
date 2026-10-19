@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import { BACHS_CONNECT_ACCOUNT_PORT, BachsConnectAccountPort, EnoughAccountView, SubmitIdentityInput } from './enough.interface';
 
 /**
@@ -15,6 +16,7 @@ export class EnoughAccountsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(BACHS_CONNECT_ACCOUNT_PORT) private readonly bachs: BachsConnectAccountPort,
+    @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
 
   /**
@@ -61,6 +63,15 @@ export class EnoughAccountsService {
         capabilityStatusDetail: capability.detail,
       },
     });
+
+    // Fire-and-log, not fire-and-fail — same discipline as
+    // IdentityService.signup's own welcome email: a Resend outage shouldn't
+    // fail the BVN submission that already succeeded with Bachs.
+    this.notifications
+      .notify({ userId, email: user.email }, { kind: 'enough_account_opened', name: input.firstName })
+      .catch((err) => {
+        this.logger.warn(`Enough welcome email failed for user ${userId}: ${err instanceof Error ? err.message : err}`);
+      });
 
     if (capability.status === 'active') {
       await this.activateVirtualAccount(account.id, bachsAccountId);

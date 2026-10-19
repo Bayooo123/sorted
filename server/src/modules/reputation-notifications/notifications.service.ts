@@ -48,6 +48,10 @@ export class NotificationsService implements NotificationsPort {
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendPasswordResetEmail(target.email, event.code);
         return;
+      case 'enough_account_opened':
+        if (!target.email) return; // no email on this account — caller already checked, but stay defensive
+        await this.sendEnoughWelcomeEmail(target.email, event.name);
+        return;
       case 'professional_invited':
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendInviteEmail(target.email, event.clientName, event.gigDescription, event.submarketLabel, event.locationText, event.bountyKobo);
@@ -101,6 +105,12 @@ export class NotificationsService implements NotificationsPort {
   private async sendPasswordResetEmail(email: string, code: string): Promise<void> {
     await this.sendEmail(email, 'Your Sorted password reset code', this.passwordResetEmailHtml(code));
     this.logger.log(`Password reset email sent to ${email}`);
+  }
+
+  private async sendEnoughWelcomeEmail(email: string, name: string): Promise<void> {
+    const firstName = name.trim().split(/\s+/)[0] || name;
+    await this.sendEmail(email, 'Welcome to Enough — verifying your account', this.enoughWelcomeEmailHtml(firstName));
+    this.logger.log(`Enough welcome email sent to ${email}`);
   }
 
   private async sendFounderDigestEmail(email: string, event: Extract<NotificationEvent, { kind: 'founder_daily_digest' }>): Promise<void> {
@@ -158,6 +168,48 @@ export class NotificationsService implements NotificationsPort {
       </p>
     </div>
     <p style="font-size:12.5px;color:#7E8F8D;margin:24px 0 0;text-align:center;">Consider it sorted.</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * PLAN.md "Enough: Bachs Connect account per signup" — Enough's own
+   * brand (amber/sun palette, Bricolage Grotesque + DM Sans), matching
+   * enough.html/enough-app.html rather than Sorted's teal/green templates
+   * above: this goes to someone who just submitted their BVN through
+   * Enough, not the gig marketplace, and should look like the product
+   * they're actually using.
+   */
+  private enoughWelcomeEmailHtml(firstName: string): string {
+    return `
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:0;background:#FFF8EC;font-family:'DM Sans','Segoe UI',Arial,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#FFC23C;border:1.5px solid #2B1B0E;display:inline-block;vertical-align:middle;"></div>
+      <span style="font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:20px;color:#2B1B0E;vertical-align:middle;">enough</span>
+      <span style="font-size:13px;color:#6B5843;vertical-align:middle;">by Sorted</span>
+    </div>
+    <div style="background:#FFFDF7;border:1px solid #F0E2C6;border-radius:20px;padding:36px 32px;">
+      <p style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#2B1B0E;margin:0 0 16px;">Welcome, ${firstName}.</p>
+      <p style="font-size:15px;line-height:1.6;color:#6B5843;margin:0 0 16px;">
+        You're opening your Enough account &mdash; the one place every naira of
+        your salary gets a plan the moment it lands.
+      </p>
+      <p style="font-size:15px;line-height:1.6;color:#6B5843;margin:0 0 16px;">
+        We're verifying your details with our banking partner right now.
+        This usually takes a few minutes. Once it's done, you'll have your
+        own account number &mdash; ready to receive deposits.
+      </p>
+      <p style="font-size:15px;line-height:1.6;color:#6B5843;margin:0;">
+        Open the Enough app any time to check your status.
+      </p>
+    </div>
+    <p style="font-size:12.5px;color:#6B5843;margin:24px 0 0;text-align:center;">Make it to payday.</p>
+    <p style="font-size:11px;color:#6B5843;text-align:center;margin:12px 0 0;">Sorted Innovations Limited &middot; RC 9770241 &middot; Lagos, Nigeria</p>
   </div>
 </body>
 </html>`;

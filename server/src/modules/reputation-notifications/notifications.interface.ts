@@ -14,6 +14,14 @@
 export type NotificationEvent =
   | { kind: 'user_signed_up'; name: string }
   | { kind: 'password_reset_requested'; code: string }
+  /**
+   * PLAN.md "Enough: Bachs Connect account per signup" — fired once, right
+   * after EnoughAccountsService.submitIdentity creates the EnoughAccount
+   * row (the actual "signed up for Enough" moment — distinct from the base
+   * Sorted 'user_signed_up' email above, which both products' signup forms
+   * trigger and which only talks about the gig marketplace).
+   */
+  | { kind: 'enough_account_opened'; name: string }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }
