@@ -48,6 +48,22 @@ export interface PurposeView {
   balanceKobo: string;
   /** Suggested share of income, 1-100, from an applied plan — null for a hand-created purpose. */
   targetPercent: number | null;
+  /** Sum of this purpose's not-yet-released tranches — informational only, see EnoughPurposesService's doc comment. */
+  lockedKobo: string;
+}
+
+/** Splits an allocate() push into N tranches releasing every intervalDays — see EnoughPurposesService.allocate. */
+export interface PurposeSchedule {
+  tranches: number;
+  intervalDays: number;
+}
+
+export interface TrancheView {
+  id: string;
+  amountKobo: string;
+  releaseAt: string;
+  released: boolean;
+  releasedEarly: boolean;
 }
 
 export interface SubmitIdentityInput {

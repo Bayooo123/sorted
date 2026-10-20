@@ -877,6 +877,26 @@ model EnoughPurpose {
 
   @@unique([enoughAccountId, name])
   allocations EnoughAllocationEvent[]
+  tranches    EnoughPurposeTranche[]
+}
+
+// A time-scheduled slice of one push into a purpose — see
+// EnoughPurposesService.allocate's optional `schedule` and
+// PurposesService.computeLockedKobo. A tranche counts as locked until
+// releaseAt passes OR releasedEarlyAt is set (the PIN-gated override).
+// Each allocate call with a schedule creates its OWN independent batch —
+// pushing more money into an already-scheduled purpose never merges into
+// an existing batch, it starts a fresh one (see allocate's doc comment
+// for why). Purely informational for now: there's no spend-from-a-purpose
+// action yet for "locked" to actually block.
+model EnoughPurposeTranche {
+  id              String        @id @default(cuid())
+  purposeId       String
+  purpose         EnoughPurpose @relation(fields: [purposeId], references: [id])
+  amountKobo      BigInt
+  releaseAt       DateTime
+  releasedEarlyAt DateTime?
+  createdAt       DateTime      @default(now())
 }
 
 // One row per push from the landing spot into a purpose — see

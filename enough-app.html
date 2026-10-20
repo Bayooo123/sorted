@@ -100,6 +100,11 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 .plan-row .plan-name{flex:1}
 .plan-row .plan-percent{width:70px;flex:none;text-align:right}
 .target-pill{font-size:12px;color:var(--muted);font-weight:700;margin-left:6px}
+.tranche-list{background:var(--sun-pale);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.tranche-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tranche-row-main{display:flex;flex-direction:column;gap:2px}
+.unlock-tranche-form,.extend-schedule-form{display:flex;gap:8px;align-items:center}
+.unlock-tranche-form input,.extend-schedule-form input{height:38px;width:90px}
 </style>
 </head>
 <body>
@@ -362,7 +367,10 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
   // ---------- active panel: tabbed nav (Home / Savings / Make Payment / Profile) ----------
 
   var activeTab = 'home';
-  var activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null, planPreview: null };
+  var activeUi = {
+    allocatingPurposeId: null, showCreateForm: false, pinMode: null, planPreview: null,
+    viewingTranchesId: null, trancheData: null, unlockingTrancheId: null, editingScheduleId: null,
+  };
 
   var TABS = [['home', 'Home'], ['savings', 'Savings'], ['payment', 'Pay'], ['history', 'History'], ['profile', 'Profile']];
 
@@ -444,22 +452,72 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     });
   }
 
+  function trancheListHtml(purposeId, tranches) {
+    var rows = tranches.map(function (t) {
+      var status = t.releasedEarly ? 'Unlocked early' : (t.released ? 'Available' : 'Locked until ' + formatHistoryDate(t.releaseAt));
+      var isUnlocking = activeUi.unlockingTrancheId === t.id;
+      return '<div class="tranche-row">' +
+        '<div class="tranche-row-main">' +
+          '<span>' + formatNaira(t.amountKobo) + '</span>' +
+          '<span class="muted" style="font-size:12.5px">' + status + '</span>' +
+        '</div>' +
+        (!t.released
+          ? (isUnlocking
+              ? '<form class="unlock-tranche-form" data-tranche-id="' + t.id + '">' +
+                  '<input type="text" inputmode="numeric" maxlength="4" pattern="\\d{4}" placeholder="PIN" class="unlock-pin" required>' +
+                  '<button type="submit" class="btn btn-small btn-primary-small">Unlock</button>' +
+                  '<button type="button" class="btn btn-small btn-ghost-small cancel-unlock">Cancel</button>' +
+                '</form>'
+              : '<button type="button" class="push-link unlock-tranche-btn" data-tranche-id="' + t.id + '">Unlock now</button>')
+          : '') +
+        '</div>';
+    }).join('');
+
+    var hasPending = tranches.some(function (t) { return !t.released; });
+    return '<div class="tranche-list">' + rows + '</div>' +
+      (hasPending
+        ? (activeUi.editingScheduleId === purposeId
+            ? '<form class="extend-schedule-form" style="margin-top:10px">' +
+                '<input type="number" min="1" max="90" placeholder="New days apart" class="extend-interval" required>' +
+                '<button type="submit" class="btn btn-small btn-primary-small">Save</button>' +
+                '<button type="button" class="btn btn-small btn-ghost-small cancel-extend">Cancel</button>' +
+              '</form>'
+            : '<button type="button" class="push-link" id="adjust-schedule-btn" style="margin-top:8px">Adjust remaining schedule</button>')
+        : '');
+  }
+
   function renderSavingsTab(view, purposes, purposesError) {
     var purposeRows = purposes.map(function (p) {
       var isAllocating = activeUi.allocatingPurposeId === p.id;
+      var isViewingTranches = activeUi.viewingTranchesId === p.id;
+      var hasLocked = Number(p.lockedKobo) > 0;
       return (
         '<div class="purpose-row">' +
           '<div class="purpose-row-main">' +
             '<span class="purpose-name">' + escapeHtml(p.name) + (p.targetPercent ? '<span class="target-pill">Target ' + p.targetPercent + '%</span>' : '') + '</span>' +
             '<span class="purpose-balance">' + formatNaira(p.balanceKobo) + '</span>' +
           '</div>' +
+          (hasLocked
+            ? '<p class="hint" style="margin:4px 0 0">🔒 ' + formatNaira(p.lockedKobo) + ' locked &middot; <button type="button" class="push-link" data-view-tranches-id="' + p.id + '" style="font-size:13px">' + (isViewingTranches ? 'Hide schedule' : 'View schedule') + '</button></p>'
+            : '') +
+          (isViewingTranches && activeUi.trancheData ? '<div style="margin-top:8px">' + trancheListHtml(p.id, activeUi.trancheData) + '</div>' : '') +
           (isAllocating
             ? '<form class="allocate-form" data-purpose-id="' + p.id + '">' +
                 '<input type="number" min="0.01" step="0.01" placeholder="Amount (₦)" required class="allocate-amount">' +
-                '<button type="submit" class="btn btn-small btn-primary-small">Push</button>' +
-                '<button type="button" class="btn btn-small btn-ghost-small cancel-allocate">Cancel</button>' +
+                '<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;margin:10px 0 0;color:var(--muted)">' +
+                  '<input type="checkbox" class="allocate-schedule-toggle" style="width:auto;height:auto;flex:none">' +
+                  'Split into tranches over time' +
+                '</label>' +
+                '<div class="schedule-fields" style="display:none;gap:8px;margin-top:8px">' +
+                  '<input type="number" class="schedule-tranches" placeholder="Parts" min="1" max="90" style="width:80px">' +
+                  '<input type="number" class="schedule-interval" placeholder="Days apart" min="1" max="90" style="width:110px">' +
+                '</div>' +
+                '<div class="btn-small-row">' +
+                  '<button type="submit" class="btn btn-small btn-primary-small">Push</button>' +
+                  '<button type="button" class="btn btn-small btn-ghost-small cancel-allocate">Cancel</button>' +
+                '</div>' +
               '</form>'
-            : '<button type="button" class="push-link" data-purpose-id="' + p.id + '">Push money in</button>')
+            : '<button type="button" class="push-link" data-purpose-id="' + p.id + '" style="margin-top:8px">Push money in</button>')
         + '</div>'
       );
     }).join('');
@@ -503,20 +561,123 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     }
     var allocateForm = app.querySelector('.allocate-form');
     if (allocateForm) {
+      var scheduleToggle = allocateForm.querySelector('.allocate-schedule-toggle');
+      var scheduleFields = allocateForm.querySelector('.schedule-fields');
+      scheduleToggle.addEventListener('change', function () {
+        scheduleFields.style.display = scheduleToggle.checked ? 'flex' : 'none';
+      });
       allocateForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var purposeId = allocateForm.getAttribute('data-purpose-id');
         var nairaAmount = parseFloat(allocateForm.querySelector('.allocate-amount').value);
         if (!nairaAmount || nairaAmount <= 0) return;
         var amountKobo = Math.round(nairaAmount * 100);
+        var body = { amountKobo: amountKobo };
+        if (scheduleToggle.checked) {
+          var tranches = parseInt(allocateForm.querySelector('.schedule-tranches').value, 10);
+          var intervalDays = parseInt(allocateForm.querySelector('.schedule-interval').value, 10);
+          if (!tranches || !intervalDays) { renderSavingsTab(view, purposes, 'Enter how many parts and how many days apart.'); return; }
+          body.schedule = { tranches: tranches, intervalDays: intervalDays };
+        }
         var submitBtn = allocateForm.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Pushing…';
         api('/enough/purposes/' + encodeURIComponent(purposeId) + '/allocate', {
-          method: 'POST', auth: true, body: { amountKobo: amountKobo },
+          method: 'POST', auth: true, body: body,
         }).then(function () {
           activeUi.allocatingPurposeId = null;
           loadAccount();
+        }).catch(function (err) {
+          renderSavingsTab(view, purposes, err.message);
+        });
+      });
+    }
+
+    Array.prototype.forEach.call(app.querySelectorAll('.push-link[data-view-tranches-id]'), function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-view-tranches-id');
+        if (activeUi.viewingTranchesId === id) {
+          activeUi.viewingTranchesId = null;
+          activeUi.trancheData = null;
+          renderSavingsTab(view, purposes);
+          return;
+        }
+        activeUi.viewingTranchesId = id;
+        activeUi.unlockingTrancheId = null;
+        activeUi.editingScheduleId = null;
+        api('/enough/purposes/' + encodeURIComponent(id) + '/tranches', { auth: true }).then(function (tranches) {
+          activeUi.trancheData = tranches;
+          renderSavingsTab(view, purposes);
+        }).catch(function (err) {
+          renderSavingsTab(view, purposes, err.message);
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(app.querySelectorAll('.unlock-tranche-btn'), function (btn) {
+      btn.addEventListener('click', function () {
+        activeUi.unlockingTrancheId = btn.getAttribute('data-tranche-id');
+        renderSavingsTab(view, purposes);
+      });
+    });
+    var cancelUnlock = app.querySelector('.cancel-unlock');
+    if (cancelUnlock) {
+      cancelUnlock.addEventListener('click', function () {
+        activeUi.unlockingTrancheId = null;
+        renderSavingsTab(view, purposes);
+      });
+    }
+    var unlockForm = app.querySelector('.unlock-tranche-form');
+    if (unlockForm) {
+      unlockForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var trancheId = unlockForm.getAttribute('data-tranche-id');
+        var pin = unlockForm.querySelector('.unlock-pin').value.trim();
+        if (!/^\d{4}$/.test(pin)) { renderSavingsTab(view, purposes, 'Enter your 4-digit PIN.'); return; }
+        var submitBtn = unlockForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Unlocking…';
+        api('/enough/purposes/' + encodeURIComponent(activeUi.viewingTranchesId) + '/tranches/' + encodeURIComponent(trancheId) + '/unlock', {
+          method: 'POST', auth: true, body: { pin: pin },
+        }).then(function (tranches) {
+          activeUi.unlockingTrancheId = null;
+          activeUi.trancheData = tranches;
+          renderSavingsTab(view, purposes);
+        }).catch(function (err) {
+          renderSavingsTab(view, purposes, err.message);
+        });
+      });
+    }
+
+    var adjustScheduleBtn = document.getElementById('adjust-schedule-btn');
+    if (adjustScheduleBtn) {
+      adjustScheduleBtn.addEventListener('click', function () {
+        activeUi.editingScheduleId = activeUi.viewingTranchesId;
+        renderSavingsTab(view, purposes);
+      });
+    }
+    var cancelExtend = app.querySelector('.cancel-extend');
+    if (cancelExtend) {
+      cancelExtend.addEventListener('click', function () {
+        activeUi.editingScheduleId = null;
+        renderSavingsTab(view, purposes);
+      });
+    }
+    var extendForm = app.querySelector('.extend-schedule-form');
+    if (extendForm) {
+      extendForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var intervalDays = parseInt(extendForm.querySelector('.extend-interval').value, 10);
+        if (!intervalDays) return;
+        var submitBtn = extendForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving…';
+        api('/enough/purposes/' + encodeURIComponent(activeUi.viewingTranchesId) + '/tranches/schedule', {
+          method: 'PATCH', auth: true, body: { intervalDays: intervalDays },
+        }).then(function (tranches) {
+          activeUi.editingScheduleId = null;
+          activeUi.trancheData = tranches;
+          renderSavingsTab(view, purposes);
         }).catch(function (err) {
           renderSavingsTab(view, purposes, err.message);
         });
@@ -773,7 +934,10 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     state.accessToken = null;
     localStorage.removeItem(TOKEN_KEY);
     activeTab = 'home';
-    activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null, planPreview: null };
+    activeUi = {
+      allocatingPurposeId: null, showCreateForm: false, pinMode: null, planPreview: null,
+      viewingTranchesId: null, trancheData: null, unlockingTrancheId: null, editingScheduleId: null,
+    };
     renderAuthScreen('login');
   }
 
