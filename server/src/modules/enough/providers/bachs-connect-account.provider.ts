@@ -173,6 +173,18 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
     if (!ok) {
       throw new Error(`Bachs POST /v1/accounts/${accountId} (request transfers capability) failed: ${status} ${JSON.stringify(data)}`);
     }
+
+    // Diagnostic only, not load-bearing: the request above is accepted
+    // but pullToPlatform keeps failing 403 on the NEXT attempt anyway
+    // (confirmed live, 2026-10-20) — unlike virtual_accounts, which
+    // activates instantly in sandbox, transfers may need extra
+    // currently_due requirements (BachsProvider.createSubaccount's doc
+    // comment flags this same gap for recipient accounts generally:
+    // persons.*.id_document etc., or a default_payout_destination).
+    // Logging the capability's own status_details here is the fastest
+    // way to see exactly what's still missing without guessing again.
+    const check = await this.request('GET', `/v1/accounts/${accountId}/capabilities`);
+    this.logger.warn(`Bachs capabilities for ${accountId} after requesting transfers: ${JSON.stringify(check.data)}`);
   }
 
   /**
