@@ -104,7 +104,7 @@ export interface VirtualAccountResult {
  * entirely, even though it's the same vendor.
  */
 export interface BachsConnectAccountPort {
-  /** Creates the connected account with virtual_accounts requested. Returns Bachs' acct_... id. */
+  /** Creates the connected account with virtual_accounts AND transfers requested. Returns Bachs' acct_... id. */
   createAccount(input: { contactEmail: string; displayName: string }): Promise<string>;
   /** Submits the BVN representative — the actual identity-verification step. */
   submitRepresentative(accountId: string, input: SubmitIdentityInput): Promise<void>;
@@ -112,6 +112,13 @@ export interface BachsConnectAccountPort {
   checkCapability(accountId: string): Promise<CapabilityCheckResult>;
   /** Idempotent — safe to call repeatedly. Null if the capability isn't active yet (403). */
   ensureVirtualAccount(accountId: string): Promise<VirtualAccountResult | null>;
+  /**
+   * Backfill for accounts created before transfers was requested at
+   * signup (see createAccount) — EnoughPaymentsService calls this when
+   * BachsPayoutPort.pullToPlatform reports the capability as unrequested,
+   * the same self-heal-on-use pattern as ensureVirtualAccount.
+   */
+  requestTransfersCapability(accountId: string): Promise<void>;
   verifyWebhook(rawBody: Buffer, headers: Record<string, string>): { valid: boolean; payload: unknown };
 }
 
@@ -137,6 +144,15 @@ export interface ResolvedAccount {
   accountName: string;
   accountNumber: string;
 }
+
+/**
+ * Thrown by BachsPayoutPort.pullToPlatform when Bachs reports the
+ * connected account's transfers capability as not enabled (403) — a
+ * distinct case from a generic failure, since EnoughPaymentsService can
+ * self-heal it via BachsConnectAccountPort.requestTransfersCapability
+ * rather than just failing the payment outright.
+ */
+export class TransfersNotEnabledError extends Error {}
 
 export interface BachsPayoutPort {
   listBanks(): Promise<BankOption[]>;

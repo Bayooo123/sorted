@@ -9,6 +9,8 @@ import {
   VirtualAccountResult,
 } from '../enough.interface';
 
+
+
 const BACHS_SANDBOX_BASE_URL = 'https://sandbox-api.bachs.io';
 
 /**
@@ -63,12 +65,17 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
   }
 
   async createAccount(input: { contactEmail: string; displayName: string }): Promise<string> {
+    // transfers requested alongside virtual_accounts (confirmed live,
+    // 2026-10-20) — Make Payment's self-transfer step needs it, and
+    // "unrequested" never becomes active on its own, unlike "restricted"
+    // pending review. Accounts created before this needed the backfill
+    // in requestTransfersCapability below instead.
     const { ok, status, data } = await this.request('POST', '/v1/accounts', {
       contact_email: input.contactEmail,
       display_name: input.displayName,
       country: 'NG',
       configuration: {
-        merchant: { capabilities: { virtual_accounts: { requested: true } } },
+        merchant: { capabilities: { virtual_accounts: { requested: true }, transfers: { requested: true } } },
       },
     });
     if (!ok) {
@@ -138,6 +145,23 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
     // one, so it's optional here, unlike id/account_number/bank_name which
     // are unconditionally required to actually use the account.
     return { id: d.id, accountNumber: d.account_number, bankName: d.bank_name, bankCode: d.bank_code ?? null };
+  }
+
+  /**
+   * Same update endpoint submitRepresentative already uses for this
+   * account — the account-configuration body shape mirrors createAccount's
+   * own, just for an existing acct_... id. Not idempotent-checked against
+   * capability status first: Bachs itself treats a repeat "requested: true"
+   * as a no-op (confirmed by submitRepresentative's own working pattern of
+   * POSTing the same endpoint repeatedly without issue).
+   */
+  async requestTransfersCapability(accountId: string): Promise<void> {
+    const { ok, status, data } = await this.request('POST', `/v1/accounts/${accountId}`, {
+      configuration: { merchant: { capabilities: { transfers: { requested: true } } } },
+    });
+    if (!ok) {
+      throw new Error(`Bachs POST /v1/accounts/${accountId} (request transfers capability) failed: ${status} ${JSON.stringify(data)}`);
+    }
   }
 
   /**

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { BachsPayoutPort, BankOption, ResolvedAccount } from '../enough.interface';
+import { BachsPayoutPort, BankOption, ResolvedAccount, TransfersNotEnabledError } from '../enough.interface';
 
 const BACHS_SANDBOX_BASE_URL = 'https://sandbox-api.bachs.io';
 
@@ -120,9 +120,18 @@ export class BachsPayoutProvider implements BachsPayoutPort {
       // different organizations").
       { 'X-Account-Id': connectedAccountId },
     );
-    const body = data as { id?: string };
+    const body = data as { id?: string; detail?: string; error_code?: string };
     if (!ok || !body?.id) {
       this.logger.warn(`Bachs self-transfer unexpected shape for ${connectedAccountId} (status ${status}): ${JSON.stringify(data)}`);
+      // Confirmed live (2026-10-20): the connected account's transfers
+      // capability was never requested at signup — createAccount now
+      // requests it for new accounts, but existing ones need the
+      // requestTransfersCapability backfill. Distinct from a generic
+      // failure so EnoughPaymentsService can self-heal instead of just
+      // failing the payment.
+      if (status === 403 && body?.error_code === 'FORBIDDEN' && /transfers enabled/i.test(body?.detail ?? '')) {
+        throw new TransfersNotEnabledError(body.detail ?? 'Transfers capability not enabled for this account.');
+      }
       throw new BadRequestException(`Bachs self-transfer failed for ${connectedAccountId}: ${status} ${JSON.stringify(data)}`);
     }
     return body.id;

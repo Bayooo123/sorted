@@ -3,12 +3,15 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import {
+  BACHS_CONNECT_ACCOUNT_PORT,
   BACHS_PAYOUT_PORT,
+  BachsConnectAccountPort,
   BachsPayoutPort,
   BankOption,
   PaymentEventView,
   PaymentSource,
   ResolvedAccount,
+  TransfersNotEnabledError,
 } from './enough.interface';
 
 /**
@@ -28,6 +31,7 @@ export class EnoughPaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(BACHS_PAYOUT_PORT) private readonly bachs: BachsPayoutPort,
+    @Inject(BACHS_CONNECT_ACCOUNT_PORT) private readonly bachsConnect: BachsConnectAccountPort,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
 
@@ -166,6 +170,18 @@ export class EnoughPaymentsService {
       // Synchronous failure — credit the source back and mark failed
       // immediately, rather than leaving money debited with nowhere to go.
       await this.creditBackAndMarkFailed(paymentEvent.id, account.id, purposeId, amountKobo, err instanceof Error ? err.message : 'Payment failed.');
+
+      if (err instanceof TransfersNotEnabledError) {
+        // Self-heal, same pattern as EnoughAccountsService's
+        // activateVirtualAccount-on-read: request the capability now so
+        // the NEXT attempt (not this one — Bachs needs a moment) succeeds,
+        // rather than leaving the user stuck on a capability gap forever.
+        this.bachsConnect.requestTransfersCapability(account.bachsAccountId).catch((reqErr) => {
+          this.logger.warn(`Failed to request transfers capability for ${account.bachsAccountId}: ${reqErr instanceof Error ? reqErr.message : reqErr}`);
+        });
+        throw new BadRequestException('Bank transfers were not yet turned on for your account — we just requested it. Please try again in a few seconds.');
+      }
+
       throw new BadRequestException('Could not send that payment right now — your money has not left your account.');
     }
   }
