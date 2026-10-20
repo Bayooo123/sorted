@@ -70,12 +70,23 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
     // "unrequested" never becomes active on its own, unlike "restricted"
     // pending review. Accounts created before this needed the backfill
     // in requestTransfersCapability below instead.
+    //
+    // transfers goes under `recipient`, NOT `merchant` — confirmed live
+    // via a 400 "Named under the wrong persona: transfers (belongs to
+    // recipient, not merchant)" (error_code capability_configuration_
+    // mismatch), and matches BachsProvider.createSubaccount's own
+    // doc-confirmed recipient-persona shape in payments/providers/
+    // bachs.provider.ts. A single connected account can carry both
+    // personas — merchant for virtual_accounts (accepting deposits),
+    // recipient for transfers (this account receiving its own self-
+    // transfer payout).
     const { ok, status, data } = await this.request('POST', '/v1/accounts', {
       contact_email: input.contactEmail,
       display_name: input.displayName,
       country: 'NG',
       configuration: {
-        merchant: { capabilities: { virtual_accounts: { requested: true }, transfers: { requested: true } } },
+        merchant: { capabilities: { virtual_accounts: { requested: true } } },
+        recipient: { capabilities: { transfers: { requested: true } } },
       },
     });
     if (!ok) {
@@ -157,7 +168,7 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
    */
   async requestTransfersCapability(accountId: string): Promise<void> {
     const { ok, status, data } = await this.request('POST', `/v1/accounts/${accountId}`, {
-      configuration: { merchant: { capabilities: { transfers: { requested: true } } } },
+      configuration: { recipient: { capabilities: { transfers: { requested: true } } } },
     });
     if (!ok) {
       throw new Error(`Bachs POST /v1/accounts/${accountId} (request transfers capability) failed: ${status} ${JSON.stringify(data)}`);
