@@ -840,6 +840,7 @@ model EnoughAccount {
   deposits         EnoughDepositEvent[]
   purposes         EnoughPurpose[]
   allocationEvents EnoughAllocationEvent[]
+  payments         EnoughPaymentEvent[]
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 }
@@ -887,8 +888,9 @@ model EnoughPurpose {
 // Each allocate call with a schedule creates its OWN independent batch —
 // pushing more money into an already-scheduled purpose never merges into
 // an existing batch, it starts a fresh one (see allocate's doc comment
-// for why). Purely informational for now: there's no spend-from-a-purpose
-// action yet for "locked" to actually block.
+// for why). Now load-bearing: EnoughPaymentsService.initiatePayment checks
+// a purpose's balanceKobo minus its locked tranches before letting a
+// payment draw from it.
 model EnoughPurposeTranche {
   id              String        @id @default(cuid())
   purposeId       String
@@ -902,8 +904,8 @@ model EnoughPurposeTranche {
 // One row per push from the landing spot into a purpose — see
 // EnoughPurposesService.allocate. Alongside EnoughDepositEvent, this is
 // what the History tab reads: the only two ways money moves in this
-// module (money in, money organized), until a real money-movement-out
-// feature adds a third.
+// module (money in, money organized) — EnoughPaymentEvent below is the
+// third, money actually leaving.
 model EnoughAllocationEvent {
   id              String        @id @default(cuid())
   enoughAccountId String
@@ -912,4 +914,43 @@ model EnoughAllocationEvent {
   purpose         EnoughPurpose @relation(fields: [purposeId], references: [id])
   amountKobo      BigInt
   createdAt       DateTime      @default(now())
+}
+
+// PLAN.md "Enough: Make Payment" — real money leaving the account, via
+// Bachs' payouts API: EnoughPaymentsService.initiatePayment debits the
+// source (landing spot or a purpose's UNLOCKED balance) in the same
+// transaction as creating this row with status 'processing', then calls
+// Bachs (self-transfer to pull the connected account's balance up to the
+// platform, then a platform-level withdrawal to the recipient). A
+// synchronous failure in either Bachs call credits the source back and
+// marks this 'failed' immediately; a synchronous success leaves it
+// 'processing' until the payout webhook (payout.paid/payout.failed)
+// confirms — same event-driven discipline as deposits, just reversed.
+// A webhook-reported failure also credits the source back, since the
+// money demonstrably never left.
+model EnoughPaymentEvent {
+  id              String        @id @default(cuid())
+  enoughAccountId String
+  enoughAccount   EnoughAccount  @relation(fields: [enoughAccountId], references: [id])
+
+  // Where the money was debited from — null purposeId means the landing spot.
+  sourcePurposeId String?
+
+  amountKobo            BigInt
+  recipientBankCode     String
+  recipientBankName     String?
+  recipientAccountNumber String
+  // Resolved server-side via Bachs' account-resolve call, never trusted
+  // from the client — shown back to the user for confirmation before send.
+  recipientAccountName String
+
+  status        String  @default("processing") // 'processing' | 'completed' | 'failed'
+  failureReason String?
+
+  // Bachs' own ids, for webhook correlation and support lookups.
+  bachsTransferId   String?
+  bachsWithdrawalId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

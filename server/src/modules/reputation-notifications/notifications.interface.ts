@@ -29,6 +29,14 @@ export type NotificationEvent =
    * as fast as Bachs' own webhook delivery, not on their next app open.
    */
   | { kind: 'enough_deposit_received'; amountKobo: number; availableBalanceKobo: string }
+  /**
+   * PLAN.md "Enough: Make Payment" — fired from
+   * EnoughPaymentsService.handlePayoutWebhook once Bachs' payout webhook
+   * resolves a payment one way or the other; a synchronous failure in
+   * initiatePayment itself is surfaced directly in the API response, not
+   * an email.
+   */
+  | { kind: 'enough_payment_status_changed'; completed: boolean; amountKobo: number; recipientAccountName: string; failureReason: string | null }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }

@@ -162,9 +162,10 @@ export class EnoughAccountsService {
     const account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
     if (!account) return [];
 
-    const [deposits, allocations] = await Promise.all([
+    const [deposits, allocations, payments] = await Promise.all([
       this.prisma.enoughDepositEvent.findMany({ where: { enoughAccountId: account.id } }),
       this.prisma.enoughAllocationEvent.findMany({ where: { enoughAccountId: account.id }, include: { purpose: true } }),
+      this.prisma.enoughPaymentEvent.findMany({ where: { enoughAccountId: account.id } }),
     ]);
 
     const entries: HistoryEntry[] = [
@@ -180,6 +181,14 @@ export class EnoughAccountsService {
         amountKobo: a.amountKobo.toString(),
         occurredAt: a.createdAt.toISOString(),
         purposeName: a.purpose.name,
+      })),
+      ...payments.map((p): HistoryEntry => ({
+        id: p.id,
+        type: 'payment',
+        amountKobo: p.amountKobo.toString(),
+        occurredAt: p.createdAt.toISOString(),
+        paymentStatus: p.status as 'processing' | 'completed' | 'failed',
+        recipientAccountName: p.recipientAccountName,
       })),
     ];
 

@@ -34,11 +34,14 @@ export interface PlanPurpose {
 /** PLAN.md "Enough: History tab" — a single chronological feed over EnoughDepositEvent + EnoughAllocationEvent. */
 export interface HistoryEntry {
   id: string;
-  type: 'deposit' | 'allocation';
+  type: 'deposit' | 'allocation' | 'payment';
   amountKobo: string;
   occurredAt: string;
   /** Only set for type 'allocation' — which purpose the money was pushed into. */
   purposeName?: string;
+  /** Only set for type 'payment'. */
+  paymentStatus?: 'processing' | 'completed' | 'failed';
+  recipientAccountName?: string;
 }
 
 /** A named bucket money's been pushed into from the landing spot. See EnoughPurposesService. */
@@ -113,3 +116,59 @@ export interface BachsConnectAccountPort {
 }
 
 export const BACHS_CONNECT_ACCOUNT_PORT = 'BACHS_CONNECT_ACCOUNT_PORT';
+
+/**
+ * PLAN.md "Enough: Make Payment" — real money leaving the account via
+ * Bachs' payouts API. Built from a third-party SDK generated from Bachs'
+ * OpenAPI spec (github.com/Daviduche03/bachs-io-sdk-python-4), NOT from
+ * Bachs' own published docs — docs.bachs.io/api.bachs.io don't resolve
+ * from this environment, unlike every other Bachs integration in this
+ * codebase, which was confirmed against real pasted docs first. CONFIRM
+ * WITH BACHS BEFORE RELYING ON THIS WITH REAL MONEY, especially the
+ * two-step flow and the X-Connected-Account-ID header name — see
+ * BachsPayoutProvider's doc comment for the full mechanism.
+ */
+export interface BankOption {
+  code: string;
+  name: string;
+}
+
+export interface ResolvedAccount {
+  accountName: string;
+  accountNumber: string;
+}
+
+export interface BachsPayoutPort {
+  listBanks(): Promise<BankOption[]>;
+  /** Resolved server-side, never trusted from the client — shown back for confirmation before send. */
+  resolveAccount(bankCode: string, accountNumber: string): Promise<ResolvedAccount>;
+  /** Step 1: pulls amountKobo from a connected account's own balance up to the platform's balance. Returns Bachs' transfer id. */
+  pullToPlatform(connectedAccountId: string, amountKobo: bigint): Promise<string>;
+  /** Step 2: pays out from the platform's own balance to the recipient's real bank account. */
+  createWithdrawal(input: {
+    bankCode: string;
+    accountNumber: string;
+    accountName: string;
+    amountKobo: bigint;
+    reference: string;
+    email: string;
+  }): Promise<{ withdrawalId: string; status: string }>;
+  verifyWebhook(rawBody: Buffer, headers: Record<string, string>): { valid: boolean; payload: unknown };
+}
+
+export const BACHS_PAYOUT_PORT = 'BACHS_PAYOUT_PORT';
+
+/** Where a payment draws from — the landing spot, or a specific purpose's unlocked balance. */
+export type PaymentSource = { type: 'landing_spot' } | { type: 'purpose'; purposeId: string };
+
+export interface PaymentEventView {
+  id: string;
+  amountKobo: string;
+  status: 'processing' | 'completed' | 'failed';
+  failureReason: string | null;
+  recipientBankName: string | null;
+  recipientBankCode: string;
+  recipientAccountNumber: string;
+  recipientAccountName: string;
+  createdAt: string;
+}

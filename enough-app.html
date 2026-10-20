@@ -391,7 +391,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     });
     if (activeTab === 'home') renderHomeTab(view);
     else if (activeTab === 'savings') loadSavingsTab(view);
-    else if (activeTab === 'payment') renderPaymentTab();
+    else if (activeTab === 'payment') loadPaymentTab(view);
     else if (activeTab === 'history') loadHistoryTab();
     else if (activeTab === 'profile') loadProfileTab(view);
   }
@@ -719,14 +719,134 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 
   // ---------- Make Payment tab ----------
 
-  function renderPaymentTab() {
+  function loadPaymentTab(view) {
     var el = document.getElementById('tab-content');
+    el.innerHTML = '<div class="card skeleton"><div class="spinner"></div><span>Loading…</span></div>';
+    Promise.all([
+      api('/enough/purposes', { auth: true }),
+      api('/enough/payments/banks', { auth: true }),
+      api('/enough/payments', { auth: true }),
+    ]).then(function (results) {
+      renderPaymentTab(view, results[0], results[1], results[2]);
+    }).catch(function (err) {
+      el.innerHTML = '<div class="card"><div class="banner error">' + escapeHtml(err.message) + '</div></div>';
+    });
+  }
+
+  function paymentStatusLabel(status) {
+    if (status === 'completed') return 'Completed';
+    if (status === 'failed') return 'Failed — refunded';
+    return 'Processing';
+  }
+
+  function renderPaymentTab(view, purposes, banks, payments, formError) {
+    var el = document.getElementById('tab-content');
+
+    var sourceOptions = '<option value="landing_spot">Landing spot — ' + formatNaira(view.availableBalanceKobo) + '</option>' +
+      purposes.map(function (p) {
+        var availableKobo = Number(p.balanceKobo) - Number(p.lockedKobo);
+        return '<option value="purpose:' + p.id + '">' + escapeHtml(p.name) + ' — ' + formatNaira(String(availableKobo)) + ' available</option>';
+      }).join('');
+
+    var bankOptions = banks.map(function (b) {
+      return '<option value="' + escapeHtml(b.code) + '">' + escapeHtml(b.name) + '</option>';
+    }).join('');
+
+    var paymentRows = payments.map(function (p) {
+      return '<div class="history-row">' +
+        '<div class="history-row-main">' +
+          '<span class="history-label">To ' + escapeHtml(p.recipientAccountName) + '</span>' +
+          '<span class="history-amount-out">&minus; ' + formatNaira(p.amountKobo) + '</span>' +
+        '</div>' +
+        '<span class="history-date">' + paymentStatusLabel(p.status) + (p.failureReason ? ' — ' + escapeHtml(p.failureReason) : '') + '</span>' +
+        '</div>';
+    }).join('');
+
     el.innerHTML =
       '<div class="card">' +
-      '<p class="balance-label">Make a payment</p>' +
-      '<h1 class="title" style="margin:10px 0 12px;font-size:22px">Coming soon</h1>' +
-      '<p class="sub" style="margin:0">We\'re building the ability to send money out of your Enough account — to a bank account, or to someone else. For now, Enough only holds deposits and lets you organize them into savings purposes.</p>' +
+      '<p class="balance-label" style="margin-bottom:10px">Make a payment</p>' +
+      (formError ? '<div class="banner error">' + escapeHtml(formError) + '</div>' : '') +
+      (banks.length === 0
+        ? '<p class="sub" style="margin:0">Payments aren\'t available right now — try again shortly.</p>'
+        : '<form id="payment-form">' +
+            '<label for="payment-source">Pay from</label>' +
+            '<select id="payment-source">' + sourceOptions + '</select>' +
+            '<label for="payment-bank">Bank</label>' +
+            '<select id="payment-bank">' + bankOptions + '</select>' +
+            '<label for="payment-account-number">Account number</label>' +
+            '<input id="payment-account-number" inputmode="numeric" maxlength="20" required>' +
+            '<div class="btn-small-row">' +
+              '<button type="button" class="btn btn-small btn-ghost-small" id="resolve-account-btn">Resolve account</button>' +
+            '</div>' +
+            '<p class="hint" id="resolved-name-display" style="display:none;margin-top:8px"></p>' +
+            '<label for="payment-amount" style="margin-top:14px">Amount (₦)</label>' +
+            '<input id="payment-amount" type="number" min="0.01" step="0.01" required>' +
+            '<label for="payment-pin">Transaction PIN</label>' +
+            '<input id="payment-pin" inputmode="numeric" maxlength="4" pattern="\\d{4}" required>' +
+            '<button type="submit" class="btn btn-primary" id="send-payment-btn" disabled>Resolve the account first</button>' +
+          '</form>') +
+      '</div>' +
+      '<div class="card">' +
+      '<p class="balance-label" style="margin-bottom:10px">Recent payments</p>' +
+      (payments.length ? '<div class="history-list">' + paymentRows + '</div>' : '<p class="empty-purposes">No payments yet.</p>') +
       '</div>';
+
+    var resolveBtn = document.getElementById('resolve-account-btn');
+    var sendBtn = document.getElementById('send-payment-btn');
+    var resolvedNameDisplay = document.getElementById('resolved-name-display');
+    var resolvedName = null;
+
+    if (resolveBtn) {
+      resolveBtn.addEventListener('click', function () {
+        var bankCode = document.getElementById('payment-bank').value;
+        var accountNumber = document.getElementById('payment-account-number').value.trim();
+        if (!accountNumber) return;
+        resolveBtn.disabled = true;
+        resolveBtn.textContent = 'Resolving…';
+        resolvedNameDisplay.style.display = 'none';
+        api('/enough/payments/resolve', { method: 'POST', auth: true, body: { bankCode: bankCode, accountNumber: accountNumber } }).then(function (resolved) {
+          resolvedName = resolved.accountName;
+          resolvedNameDisplay.textContent = 'Resolved: ' + resolved.accountName;
+          resolvedNameDisplay.style.display = 'block';
+          resolveBtn.disabled = false;
+          resolveBtn.textContent = 'Resolve account';
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send payment';
+        }).catch(function (err) {
+          resolveBtn.disabled = false;
+          resolveBtn.textContent = 'Resolve account';
+          renderPaymentTab(view, purposes, banks, payments, err.message);
+        });
+      });
+    }
+
+    var paymentForm = document.getElementById('payment-form');
+    if (paymentForm) {
+      paymentForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!resolvedName) return;
+        var sourceValue = document.getElementById('payment-source').value;
+        var source = sourceValue === 'landing_spot'
+          ? { type: 'landing_spot' }
+          : { type: 'purpose', purposeId: sourceValue.slice('purpose:'.length) };
+        var bankCode = document.getElementById('payment-bank').value;
+        var accountNumber = document.getElementById('payment-account-number').value.trim();
+        var nairaAmount = parseFloat(document.getElementById('payment-amount').value);
+        var pin = document.getElementById('payment-pin').value.trim();
+        if (!nairaAmount || nairaAmount <= 0) return;
+        if (!/^\d{4}$/.test(pin)) { renderPaymentTab(view, purposes, banks, payments, 'Enter your 4-digit PIN.'); return; }
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending…';
+        api('/enough/payments', {
+          method: 'POST', auth: true,
+          body: { source: source, amountKobo: Math.round(nairaAmount * 100), bankCode: bankCode, accountNumber: accountNumber, pin: pin },
+        }).then(function () {
+          loadAccount();
+        }).catch(function (err) {
+          renderPaymentTab(view, purposes, banks, payments, err.message);
+        });
+      });
+    }
   }
 
   // ---------- History tab ----------
