@@ -93,18 +93,17 @@ export class BachsPayoutProvider implements BachsPayoutPort {
       bank_code: bankCode,
       account_number: accountNumber,
     });
-    const body = data as { status?: boolean; data?: { account_name?: string }; error?: string };
-    if (!ok || !body?.status || !body.data?.account_name) {
-      // Same SDK-vs-reality gap as listBanks had — log the raw shape so
-      // the real field names can be confirmed instead of guessed again.
+    // Confirmed live (2026-10-20): the real response is a FLAT object —
+    // {account_name, account_number, bank_name, bank_code} — not the
+    // {status, data: {account_name}, error} wrapper the SDK this was
+    // built from assumed. Same gap as listBanks' key, different shape
+    // of wrongness.
+    const body = data as { account_name?: string; error?: string; message?: string };
+    if (!ok || !body?.account_name) {
       this.logger.warn(`Bachs POST /v1/payouts/resolve-account unexpected shape (status ${status}): ${JSON.stringify(data)}`);
-      // BadRequestException (not a plain Error) so this reaches the
-      // caller as a real 400 with this message, instead of Nest's
-      // generic "Internal server error" hiding the actual reason —
-      // same gap resolveAccount's own failure just surfaced.
-      throw new BadRequestException(body?.error ?? `Could not resolve that account (status ${status}).`);
+      throw new BadRequestException(body?.error ?? body?.message ?? `Could not resolve that account (status ${status}).`);
     }
-    return { accountName: body.data.account_name, accountNumber };
+    return { accountName: body.account_name, accountNumber };
   }
 
   async pullToPlatform(connectedAccountId: string, amountKobo: bigint): Promise<string> {
@@ -116,7 +115,8 @@ export class BachsPayoutProvider implements BachsPayoutPort {
     );
     const body = data as { id?: string };
     if (!ok || !body?.id) {
-      throw new Error(`Bachs self-transfer failed for ${connectedAccountId}: ${status} ${JSON.stringify(data)}`);
+      this.logger.warn(`Bachs self-transfer unexpected shape for ${connectedAccountId} (status ${status}): ${JSON.stringify(data)}`);
+      throw new BadRequestException(`Bachs self-transfer failed for ${connectedAccountId}: ${status} ${JSON.stringify(data)}`);
     }
     return body.id;
   }
@@ -142,7 +142,8 @@ export class BachsPayoutProvider implements BachsPayoutPort {
     });
     const body = data as { withdrawal_id?: string; status?: string };
     if (!ok || !body?.withdrawal_id) {
-      throw new Error(`Bachs withdrawal failed: ${status} ${JSON.stringify(data)}`);
+      this.logger.warn(`Bachs withdrawal unexpected shape (status ${status}): ${JSON.stringify(data)}`);
+      throw new BadRequestException(`Bachs withdrawal failed: ${status} ${JSON.stringify(data)}`);
     }
     return { withdrawalId: body.withdrawal_id, status: body.status ?? 'processing' };
   }
