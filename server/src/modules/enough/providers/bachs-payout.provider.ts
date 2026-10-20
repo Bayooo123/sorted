@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { BachsPayoutPort, BankOption, ResolvedAccount } from '../enough.interface';
@@ -95,7 +95,14 @@ export class BachsPayoutProvider implements BachsPayoutPort {
     });
     const body = data as { status?: boolean; data?: { account_name?: string }; error?: string };
     if (!ok || !body?.status || !body.data?.account_name) {
-      throw new Error(body?.error ?? `Could not resolve that account (status ${status}).`);
+      // Same SDK-vs-reality gap as listBanks had — log the raw shape so
+      // the real field names can be confirmed instead of guessed again.
+      this.logger.warn(`Bachs POST /v1/payouts/resolve-account unexpected shape (status ${status}): ${JSON.stringify(data)}`);
+      // BadRequestException (not a plain Error) so this reaches the
+      // caller as a real 400 with this message, instead of Nest's
+      // generic "Internal server error" hiding the actual reason —
+      // same gap resolveAccount's own failure just surfaced.
+      throw new BadRequestException(body?.error ?? `Could not resolve that account (status ${status}).`);
     }
     return { accountName: body.data.account_name, accountNumber };
   }
