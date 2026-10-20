@@ -16,12 +16,13 @@ const BACHS_SANDBOX_BASE_URL = 'https://sandbox-api.bachs.io';
  * Two-step mechanism, per that SDK: a connected account's balance can't
  * be paid out directly to an external bank account.
  *   Step 1 (pullToPlatform): POST /v1/transfers with
- *     destination: "self", acting AS the connected account via an
- *     X-Connected-Account-ID header — pulls that balance UP to the
- *     platform's own balance. (Header name taken from the SDK's own
- *     doc text; BachsConnectAccountProvider's working endpoints use
- *     X-Account-Id instead — these may or may not be the same header
- *     under two names, unconfirmed.)
+ *     destination: "self", acting AS the connected account via the
+ *     X-Account-Id header (same header BachsConnectAccountProvider's
+ *     working calls use — the SDK doc text's X-Connected-Account-ID
+ *     name was wrong, confirmed live 2026-10-20 via a 400 "source and
+ *     destination must be different organizations": the header wasn't
+ *     recognized, so both sides resolved to the platform) — pulls that
+ *     balance UP to the platform's own balance.
  *   Step 2 (createWithdrawal): the platform-level /v1/payouts/*
  *     endpoints (NOT connected-account scoped) pay OUT from the
  *     platform's own balance to the recipient's real bank account.
@@ -111,7 +112,13 @@ export class BachsPayoutProvider implements BachsPayoutPort {
       'POST',
       '/v1/transfers',
       { destination: 'self', amount: this.koboToNaira(amountKobo), currency: 'NGN' },
-      { 'X-Connected-Account-ID': connectedAccountId },
+      // Confirmed live (2026-10-20): the header BachsConnectAccountProvider's
+      // own working calls (e.g. ensureVirtualAccount) use is X-Account-Id —
+      // X-Connected-Account-ID (the SDK doc text's header name) is NOT
+      // recognized, so the request was authenticated as the platform on
+      // both sides and Bachs rejected it ("source and destination must be
+      // different organizations").
+      { 'X-Account-Id': connectedAccountId },
     );
     const body = data as { id?: string };
     if (!ok || !body?.id) {
