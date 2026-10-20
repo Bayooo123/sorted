@@ -73,15 +73,15 @@ export class BachsPayoutProvider implements BachsPayoutPort {
   async listBanks(): Promise<BankOption[]> {
     const { ok, status, data } = await this.request('GET', '/v1/payouts/banks');
     if (!ok) throw new Error(`Bachs GET /v1/payouts/banks failed: ${status} ${JSON.stringify(data)}`);
-    const rows = ((data as { data?: Record<string, unknown>[] })?.data ?? []) as Record<string, unknown>[];
+    // Confirmed live (2026-10-20): the real key is "banks", not "data" as
+    // the SDK this was built from assumed — each row's own field names
+    // (name/code) were already right. nibss_bank_code also exists per
+    // row but code is the one that matched a real resolve-account/
+    // withdrawal call elsewhere in this file, so that's what's used.
+    const rows = ((data as { banks?: Record<string, unknown>[] })?.banks ?? []) as Record<string, unknown>[];
     const banks = rows
       .map((r) => ({ code: String(r.code ?? r.bank_code ?? ''), name: String(r.name ?? r.bank_name ?? '') }))
       .filter((b) => b.code && b.name);
-    // The SDK this was built from didn't specify the bank-record field
-    // names, so this is a best guess (code/name, falling back to
-    // bank_code/bank_name) — log the raw shape whenever it comes back
-    // empty so a real response can correct the mapping instead of
-    // guessing again.
     if (banks.length === 0) {
       this.logger.warn(`Bachs GET /v1/payouts/banks returned no usable rows — raw response: ${JSON.stringify(data)}`);
     }
