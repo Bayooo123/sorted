@@ -821,6 +821,12 @@ model EnoughAccount {
   // actually needing it.
   transactionPinHash String?
 
+  // Free-text "describe yourself and your income" — the input to
+  // EnoughPlanService.generatePlan (an AI-suggested purpose split). Not
+  // required for anything else Enough does; purposes can always be
+  // created by hand without this ever being set.
+  description String?
+
   // The "landing spot" — every deposit credits this balance first,
   // regardless of what the money is for (salary, side income, anything).
   // Not every deposit is salary to auto-split, so nothing here is
@@ -861,6 +867,11 @@ model EnoughPurpose {
   enoughAccount   EnoughAccount @relation(fields: [enoughAccountId], references: [id])
   name            String
   balanceKobo     BigInt        @default(0)
+  // Suggested share of income, 1-100 — set when this purpose comes from
+  // an applied AI plan (EnoughPlanService.applyPlan); null for a purpose
+  // created by hand. A target, never enforced automatically — pushing
+  // money in from the landing spot stays a deliberate, manual action.
+  targetPercent   Int?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

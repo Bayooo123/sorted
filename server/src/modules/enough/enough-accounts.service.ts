@@ -97,6 +97,7 @@ export class EnoughAccountsService {
         bankCode: null,
         availableBalanceKobo: '0',
         hasTransactionPin: false,
+        description: null,
       };
     }
 
@@ -120,7 +121,15 @@ export class EnoughAccountsService {
       bankCode: account!.virtualAccountBankCode,
       availableBalanceKobo: account!.availableBalanceKobo.toString(),
       hasTransactionPin: !!account!.transactionPinHash,
+      description: account!.description,
     };
+  }
+
+  /** Saves the free-text "describe yourself" input to EnoughPlanService.generatePlan. */
+  async updateDescription(userId: string, description: string): Promise<void> {
+    const account = await this.prisma.enoughAccount.findUnique({ where: { userId } });
+    if (!account) throw new NotFoundException('Open your Enough account first.');
+    await this.prisma.enoughAccount.update({ where: { id: account.id }, data: { description } });
   }
 
   /**

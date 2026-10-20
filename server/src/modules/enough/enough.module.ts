@@ -3,8 +3,10 @@ import { AuthModule } from '../../common/auth/auth.module';
 import { ReputationNotificationsModule } from '../reputation-notifications/reputation-notifications.module';
 import { EnoughAccountsService } from './enough-accounts.service';
 import { EnoughPurposesService } from './enough-purposes.service';
+import { EnoughPlanService } from './enough-plan.service';
 import { EnoughController } from './enough.controller';
 import { EnoughPurposesController } from './enough-purposes.controller';
+import { EnoughPlanController } from './enough-plan.controller';
 import { EnoughWebhookController } from './enough-webhook.controller';
 import { BachsConnectAccountProvider } from './providers/bachs-connect-account.provider';
 import { BACHS_CONNECT_ACCOUNT_PORT } from './enough.interface';
@@ -18,7 +20,12 @@ import { BACHS_CONNECT_ACCOUNT_PORT } from './enough.interface';
  */
 @Module({
   imports: [AuthModule, ReputationNotificationsModule],
-  controllers: [EnoughController, EnoughPurposesController, EnoughWebhookController],
-  providers: [EnoughAccountsService, EnoughPurposesService, { provide: BACHS_CONNECT_ACCOUNT_PORT, useClass: BachsConnectAccountProvider }],
+  controllers: [EnoughController, EnoughPurposesController, EnoughPlanController, EnoughWebhookController],
+  providers: [
+    EnoughAccountsService,
+    EnoughPurposesService,
+    EnoughPlanService,
+    { provide: BACHS_CONNECT_ACCOUNT_PORT, useClass: BachsConnectAccountProvider },
+  ],
 })
 export class EnoughModule {}

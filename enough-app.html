@@ -36,7 +36,8 @@ p.sub{color:var(--muted);margin:0 0 20px;font-size:15px}
 label{display:block;font-size:14px;font-weight:700;margin:14px 0 6px;color:var(--amber)}
 label:first-of-type{margin-top:0}
 input,select{width:100%;height:50px;padding:0 14px;border:1.5px solid var(--line);border-radius:12px;font-family:var(--body);font-size:16px;background:#fff;color:var(--ink)}
-input:focus,select:focus{border-color:var(--orange)}
+textarea{width:100%;min-height:90px;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:var(--body);font-size:15px;background:#fff;color:var(--ink);resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--orange);outline:none}
 .field-row{position:relative}
 .field-toggle{position:absolute;right:10px;top:38px;background:none;border:0;color:var(--amber);font-family:var(--body);font-weight:700;font-size:13px;cursor:pointer;padding:6px}
 .hint{font-size:13px;color:var(--muted);margin-top:6px}
@@ -94,6 +95,11 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 .history-amount-in{font-family:var(--display);font-weight:700;font-size:15px;color:var(--good)}
 .history-amount-out{font-family:var(--display);font-weight:700;font-size:15px;color:var(--ink)}
 .history-date{display:block;margin-top:4px;font-size:12.5px;color:var(--muted)}
+.plan-review{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+.plan-row{display:flex;align-items:center;gap:8px}
+.plan-row .plan-name{flex:1}
+.plan-row .plan-percent{width:70px;flex:none;text-align:right}
+.target-pill{font-size:12px;color:var(--muted);font-weight:700;margin-left:6px}
 </style>
 </head>
 <body>
@@ -356,7 +362,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
   // ---------- active panel: tabbed nav (Home / Savings / Make Payment / Profile) ----------
 
   var activeTab = 'home';
-  var activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null };
+  var activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null, planPreview: null };
 
   var TABS = [['home', 'Home'], ['savings', 'Savings'], ['payment', 'Pay'], ['history', 'History'], ['profile', 'Profile']];
 
@@ -444,7 +450,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       return (
         '<div class="purpose-row">' +
           '<div class="purpose-row-main">' +
-            '<span class="purpose-name">' + escapeHtml(p.name) + '</span>' +
+            '<span class="purpose-name">' + escapeHtml(p.name) + (p.targetPercent ? '<span class="target-pill">Target ' + p.targetPercent + '%</span>' : '') + '</span>' +
             '<span class="purpose-balance">' + formatNaira(p.balanceKobo) + '</span>' +
           '</div>' +
           (isAllocating
@@ -625,7 +631,22 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       '</form>';
   }
 
-  function renderProfileTab(view, me, pinError) {
+  function planReviewHtml(purposes) {
+    var rows = purposes.map(function (p, i) {
+      return '<div class="plan-row" data-index="' + i + '">' +
+        '<input type="text" class="plan-name" value="' + escapeHtml(p.name) + '" maxlength="100">' +
+        '<input type="number" class="plan-percent" value="' + p.targetPercent + '" min="1" max="100">' +
+        '<span class="muted" style="font-size:13px">%</span>' +
+        '</div>';
+    }).join('');
+    return '<div class="plan-review">' + rows + '</div>' +
+      '<div class="btn-small-row">' +
+        '<button type="button" class="btn btn-small btn-primary-small" id="apply-plan-btn">Apply plan</button>' +
+        '<button type="button" class="btn btn-small btn-ghost-small" id="discard-plan-btn">Discard</button>' +
+      '</div>';
+  }
+
+  function renderProfileTab(view, me, bannerError) {
     var el = document.getElementById('tab-content');
     var pinMode = activeUi.pinMode;
     el.innerHTML =
@@ -636,8 +657,18 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       '<p class="balance-label">State</p><p style="margin:2px 0 0;font-size:16px">' + escapeHtml(me.state || '') + '</p>' +
       '</div>' +
       '<div class="card">' +
+      '<p class="balance-label" style="margin-bottom:10px">Describe yourself</p>' +
+      (bannerError ? '<div class="banner error">' + escapeHtml(bannerError) + '</div>' : '') +
+      '<p class="hint" style="margin:0 0 10px">Tell us about your life and income in your own words — what you earn, what you pay for, who depends on you. We use this to suggest how to split your money into purposes.</p>' +
+      '<textarea id="description-input" rows="4" placeholder="e.g. I\'m a nurse in Lagos paid on the 28th. I pay rent yearly, send money to my mum, and want to save for school fees.">' + escapeHtml(view.description || '') + '</textarea>' +
+      '<div class="btn-small-row">' +
+        '<button type="button" class="btn btn-small btn-primary-small" id="save-description-btn">Save description</button>' +
+        '<button type="button" class="btn btn-small btn-ghost-small" id="generate-plan-btn">Generate my plan</button>' +
+      '</div>' +
+      (activeUi.planPreview ? '<div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)"><p class="balance-label" style="margin-bottom:10px">Suggested plan — review and adjust</p>' + planReviewHtml(activeUi.planPreview) + '</div>' : '') +
+      '</div>' +
+      '<div class="card">' +
       '<p class="balance-label" style="margin-bottom:10px">Transaction PIN</p>' +
-      (pinError ? '<div class="banner error">' + escapeHtml(pinError) + '</div>' : '') +
       (pinMode
         ? pinFormHtml(view.hasTransactionPin)
         : (view.hasTransactionPin
@@ -647,6 +678,61 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       '<button type="button" class="btn btn-ghost" id="logout-link">Log out</button>';
 
     document.getElementById('logout-link').addEventListener('click', logout);
+
+    document.getElementById('save-description-btn').addEventListener('click', function () {
+      var description = document.getElementById('description-input').value.trim();
+      if (!description) { renderProfileTab(view, me, 'Write a description first.'); return; }
+      var btn = document.getElementById('save-description-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      api('/enough/account/description', { method: 'PATCH', auth: true, body: { description: description } }).then(function () {
+        loadAccount();
+      }).catch(function (err) {
+        renderProfileTab(view, me, err.message);
+      });
+    });
+
+    document.getElementById('generate-plan-btn').addEventListener('click', function () {
+      var btn = document.getElementById('generate-plan-btn');
+      btn.disabled = true;
+      btn.textContent = 'Thinking…';
+      api('/enough/plan/generate', { method: 'POST', auth: true }).then(function (purposes) {
+        activeUi.planPreview = purposes;
+        renderProfileTab(view, me);
+      }).catch(function (err) {
+        renderProfileTab(view, me, err.message);
+      });
+    });
+
+    var applyBtn = document.getElementById('apply-plan-btn');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', function () {
+        var rows = app.querySelectorAll('.plan-row');
+        var purposes = Array.prototype.map.call(rows, function (row) {
+          return {
+            name: row.querySelector('.plan-name').value.trim(),
+            targetPercent: parseInt(row.querySelector('.plan-percent').value, 10),
+          };
+        }).filter(function (p) { return p.name && p.targetPercent >= 1; });
+        if (!purposes.length) { renderProfileTab(view, me, 'Add at least one purpose.'); return; }
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Applying…';
+        api('/enough/plan/apply', { method: 'POST', auth: true, body: { purposes: purposes } }).then(function () {
+          activeUi.planPreview = null;
+          activeTab = 'savings';
+          loadAccount();
+        }).catch(function (err) {
+          renderProfileTab(view, me, err.message);
+        });
+      });
+    }
+    var discardBtn = document.getElementById('discard-plan-btn');
+    if (discardBtn) {
+      discardBtn.addEventListener('click', function () {
+        activeUi.planPreview = null;
+        renderProfileTab(view, me);
+      });
+    }
 
     var setBtn = document.getElementById('set-pin-btn');
     if (setBtn) setBtn.addEventListener('click', function () { activeUi.pinMode = 'set'; renderProfileTab(view, me); });
@@ -687,7 +773,7 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
     state.accessToken = null;
     localStorage.removeItem(TOKEN_KEY);
     activeTab = 'home';
-    activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null };
+    activeUi = { allocatingPurposeId: null, showCreateForm: false, pinMode: null, planPreview: null };
     renderAuthScreen('login');
   }
 

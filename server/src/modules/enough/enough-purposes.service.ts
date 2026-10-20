@@ -16,8 +16,8 @@ import { PurposeView } from './enough.interface';
 export class EnoughPurposesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private toView(purpose: { id: string; name: string; balanceKobo: bigint }): PurposeView {
-    return { id: purpose.id, name: purpose.name, balanceKobo: purpose.balanceKobo.toString() };
+  private toView(purpose: { id: string; name: string; balanceKobo: bigint; targetPercent: number | null }): PurposeView {
+    return { id: purpose.id, name: purpose.name, balanceKobo: purpose.balanceKobo.toString(), targetPercent: purpose.targetPercent };
   }
 
   private async requireAccount(userId: string) {
@@ -87,5 +87,22 @@ export class EnoughPurposesService {
 
     const refreshedAccount = await this.prisma.enoughAccount.findUniqueOrThrow({ where: { id: account.id } });
     return { purpose: this.toView(updatedPurpose), availableBalanceKobo: refreshedAccount.availableBalanceKobo.toString() };
+  }
+
+  /**
+   * Called from EnoughPlanService.applyPlan — creates a purpose with this
+   * target if none exists under this name yet, otherwise just updates the
+   * target on the existing one (balance untouched either way; applying a
+   * plan never moves money, same as creating a purpose by hand never does).
+   */
+  async upsertWithTarget(userId: string, name: string, targetPercent: number): Promise<PurposeView> {
+    const account = await this.requireAccount(userId);
+    const trimmed = name.trim();
+    const purpose = await this.prisma.enoughPurpose.upsert({
+      where: { enoughAccountId_name: { enoughAccountId: account.id, name: trimmed } },
+      create: { enoughAccountId: account.id, name: trimmed, targetPercent },
+      update: { targetPercent },
+    });
+    return this.toView(purpose);
   }
 }

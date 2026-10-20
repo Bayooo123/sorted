@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { EnoughAccountsService } from './enough-accounts.service';
 import { SubmitIdentityDto } from './dto/submit-identity.dto';
 import { SetTransactionPinDto } from './dto/set-transaction-pin.dto';
+import { UpdateDescriptionDto } from './dto/update-description.dto';
 
 /**
  * PLAN.md "Enough: Bachs Connect account per signup" — reuses Sorted's
@@ -37,5 +38,12 @@ export class EnoughController {
   @Get('history')
   getHistory(@CurrentUser() user: AuthenticatedUser) {
     return this.accounts.getHistory(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('description')
+  async updateDescription(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateDescriptionDto) {
+    await this.accounts.updateDescription(user.userId, dto.description);
+    return { ok: true };
   }
 }

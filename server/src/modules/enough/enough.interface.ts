@@ -21,6 +21,14 @@ export interface EnoughAccountView {
   availableBalanceKobo: string;
   /** Whether a transaction PIN has been set — never the PIN or its hash. */
   hasTransactionPin: boolean;
+  /** Free-text "describe yourself" — input to EnoughPlanService.generatePlan. Null until saved. */
+  description: string | null;
+}
+
+/** One suggested (or applied) purpose + its share of income — see EnoughPlanService. */
+export interface PlanPurpose {
+  name: string;
+  targetPercent: number;
 }
 
 /** PLAN.md "Enough: History tab" — a single chronological feed over EnoughDepositEvent + EnoughAllocationEvent. */
@@ -38,6 +46,8 @@ export interface PurposeView {
   id: string;
   name: string;
   balanceKobo: string;
+  /** Suggested share of income, 1-100, from an applied plan — null for a hand-created purpose. */
+  targetPercent: number | null;
 }
 
 export interface SubmitIdentityInput {
