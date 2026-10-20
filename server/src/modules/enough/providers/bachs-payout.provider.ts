@@ -74,9 +74,18 @@ export class BachsPayoutProvider implements BachsPayoutPort {
     const { ok, status, data } = await this.request('GET', '/v1/payouts/banks');
     if (!ok) throw new Error(`Bachs GET /v1/payouts/banks failed: ${status} ${JSON.stringify(data)}`);
     const rows = ((data as { data?: Record<string, unknown>[] })?.data ?? []) as Record<string, unknown>[];
-    return rows
+    const banks = rows
       .map((r) => ({ code: String(r.code ?? r.bank_code ?? ''), name: String(r.name ?? r.bank_name ?? '') }))
       .filter((b) => b.code && b.name);
+    // The SDK this was built from didn't specify the bank-record field
+    // names, so this is a best guess (code/name, falling back to
+    // bank_code/bank_name) — log the raw shape whenever it comes back
+    // empty so a real response can correct the mapping instead of
+    // guessing again.
+    if (banks.length === 0) {
+      this.logger.warn(`Bachs GET /v1/payouts/banks returned no usable rows — raw response: ${JSON.stringify(data)}`);
+    }
+    return banks;
   }
 
   async resolveAccount(bankCode: string, accountNumber: string): Promise<ResolvedAccount> {
