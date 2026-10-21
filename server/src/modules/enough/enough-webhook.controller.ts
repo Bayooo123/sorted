@@ -50,6 +50,16 @@ export class EnoughWebhookController {
         if (accountId && status) {
           await this.accounts.handleCapabilityUpdated(accountId, status, null);
         }
+      } else if (event.type === 'capability.updated' && event.data?.capability === 'transfers') {
+        // Make Payment's self-transfer step (recipient persona) — confirmed
+        // with Bachs support that this webhook, not an empty requirements
+        // list, is the only reliable signal this capability has actually
+        // activated. See EnoughAccountsService.handleTransfersCapabilityUpdated.
+        const accountId = event.account ?? event.organization_id;
+        const status = event.data.status as string | undefined;
+        if (accountId && status) {
+          await this.accounts.handleTransfersCapabilityUpdated(accountId, status);
+        }
       } else if (event.type === 'collection.succeeded' && event.data && event.data.checkout_id == null) {
         const accountId = event.organization_id;
         const eventId = event.id;

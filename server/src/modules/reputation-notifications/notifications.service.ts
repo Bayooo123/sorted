@@ -60,6 +60,10 @@ export class NotificationsService implements NotificationsPort {
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendEnoughPaymentStatusEmail(target.email, event.completed, event.amountKobo, event.recipientAccountName, event.failureReason);
         return;
+      case 'enough_transfers_enabled':
+        if (!target.email) return; // no email on this account — caller already checked, but stay defensive
+        await this.sendEnoughTransfersEnabledEmail(target.email);
+        return;
       case 'professional_invited':
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendInviteEmail(target.email, event.clientName, event.gigDescription, event.submarketLabel, event.locationText, event.bountyKobo);
@@ -143,6 +147,11 @@ export class NotificationsService implements NotificationsPort {
       : `Your payment of ${nairaText(amountKobo)} to ${recipientAccountName} didn't go through`;
     await this.sendEmail(email, subject, this.enoughPaymentStatusEmailHtml(completed, nairaHtml(amountKobo), recipientAccountName, failureReason));
     this.logger.log(`Enough payment status email (${completed ? 'completed' : 'failed'}) sent to ${email}`);
+  }
+
+  private async sendEnoughTransfersEnabledEmail(email: string): Promise<void> {
+    await this.sendEmail(email, 'Make a payment is ready on Enough', this.enoughTransfersEnabledEmailHtml());
+    this.logger.log(`Enough transfers-enabled email sent to ${email}`);
   }
 
   private async sendFounderDigestEmail(email: string, event: Extract<NotificationEvent, { kind: 'founder_daily_digest' }>): Promise<void> {
@@ -296,6 +305,32 @@ export class NotificationsService implements NotificationsPort {
         ${completed
           ? `Your payment to <strong>${escapedName}</strong> went through.`
           : `Your payment to <strong>${escapedName}</strong> didn't go through${failureReason ? ': ' + this.escapeHtml(failureReason) : '.'} The money has been credited back to your account.`}
+      </p>
+    </div>
+    <p style="font-size:12.5px;color:#6B5843;margin:24px 0 0;text-align:center;">Make it to payday.</p>
+    <p style="font-size:11px;color:#6B5843;text-align:center;margin:12px 0 0;">Sorted Innovations Limited &middot; RC 9770241 &middot; Lagos, Nigeria</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  private enoughTransfersEnabledEmailHtml(): string {
+    return `
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:0;background:#FFF8EC;font-family:'DM Sans','Segoe UI',Arial,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#FFC23C;border:1.5px solid #2B1B0E;display:inline-block;vertical-align:middle;"></div>
+      <span style="font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:20px;color:#2B1B0E;vertical-align:middle;">enough</span>
+      <span style="font-size:13px;color:#6B5843;vertical-align:middle;">by Sorted</span>
+    </div>
+    <div style="background:#FFFDF7;border:1px solid #F0E2C6;border-radius:20px;padding:36px 32px;">
+      <p style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#2E7D4F;margin:0 0 8px;">Ready</p>
+      <p style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#2B1B0E;margin:0 0 12px;">Make a payment is ready</p>
+      <p style="font-size:15px;line-height:1.6;color:#6B5843;margin:0;">
+        Bank transfers are now turned on for your Enough account. You can send a payment from your landing spot or any purpose, any time.
       </p>
     </div>
     <p style="font-size:12.5px;color:#6B5843;margin:24px 0 0;text-align:center;">Make it to payday.</p>

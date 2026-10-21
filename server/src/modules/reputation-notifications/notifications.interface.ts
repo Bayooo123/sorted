@@ -37,6 +37,18 @@ export type NotificationEvent =
    * an email.
    */
   | { kind: 'enough_payment_status_changed'; completed: boolean; amountKobo: number; recipientAccountName: string; failureReason: string | null }
+  /**
+   * PLAN.md "Enough: Make Payment" — fired from
+   * EnoughAccountsService.handleTransfersCapabilityUpdated the first time
+   * Bachs' capability.updated webhook reports the transfers capability
+   * (recipient persona) as active, i.e. the moment Make Payment actually
+   * becomes usable for this account. Confirmed with Bachs support: an
+   * empty requirements list does NOT mean this moment has arrived — only
+   * this webhook (or a live call) does, so a user who hit the "not yet
+   * turned on, try again" message has no other way to know when it's
+   * actually safe to retry without this email.
+   */
+  | { kind: 'enough_transfers_enabled' }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }

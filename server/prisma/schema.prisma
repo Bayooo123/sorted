@@ -814,6 +814,15 @@ model EnoughAccount {
   virtualAccountBankName String?
   virtualAccountBankCode String?
 
+  // The connected account's "transfers" capability (recipient persona) —
+  // separate from capabilityStatus above, which only ever tracked
+  // virtual_accounts (merchant persona). Confirmed with Bachs support:
+  // an empty requirements list does NOT mean this is active — activation
+  // happens after a manual review pass on their side, signaled only by a
+  // capability.updated webhook (EnoughWebhookController) or by actually
+  // calling Bachs live. Null until the capability is first requested.
+  transfersCapabilityStatus EnoughAccountStatus?
+
   // 4-digit transaction PIN, bcrypt-hashed, never the plaintext digits —
   // same hashing discipline as User.passwordHash. Gates money-movement-OUT
   // actions once those exist; setting/changing it is its own slice (see

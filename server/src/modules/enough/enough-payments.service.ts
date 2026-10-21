@@ -172,10 +172,15 @@ export class EnoughPaymentsService {
       await this.creditBackAndMarkFailed(paymentEvent.id, account.id, purposeId, amountKobo, err instanceof Error ? err.message : 'Payment failed.');
 
       if (err instanceof TransfersNotEnabledError) {
-        // Self-heal, same pattern as EnoughAccountsService's
-        // activateVirtualAccount-on-read: request the capability now so
-        // the NEXT attempt (not this one — Bachs needs a moment) succeeds,
-        // rather than leaving the user stuck on a capability gap forever.
+        // Self-heal the REQUEST so a never-requested account doesn't stay
+        // stuck forever — but confirmed with Bachs support (2026-10-21):
+        // activating the capability itself needs a manual review pass on
+        // their side, not just satisfying requirements, and the only
+        // reliable signal that review has finished is a capability.updated
+        // webhook (EnoughAccountsService.handleTransfersCapabilityUpdated),
+        // not a quick retry. Repeating the request here is harmless —
+        // Bachs treats a repeat "requested: true" as a no-op — but "try
+        // again in a few seconds" was actively misleading and is gone.
         //
         // AWAITED, not fire-and-forget — confirmed live, 2026-10-20/21:
         // a dangling un-awaited promise here raced against this serverless
@@ -189,7 +194,9 @@ export class EnoughPaymentsService {
         } catch (reqErr) {
           this.logger.warn(`Failed to request transfers capability for ${account.bachsAccountId}: ${reqErr instanceof Error ? reqErr.message : reqErr}`);
         }
-        throw new BadRequestException('Bank transfers were not yet turned on for your account — we just requested it. Please try again in a few seconds.');
+        throw new BadRequestException(
+          "Bank transfers aren't turned on for your account yet — this needs a one-time review on our payments partner's side, which can take a while. We'll email you the moment it's ready.",
+        );
       }
 
       throw new BadRequestException('Could not send that payment right now — your money has not left your account.');

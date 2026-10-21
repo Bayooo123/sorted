@@ -212,6 +212,45 @@ export class EnoughAccountsService {
     }
   }
 
+  /**
+   * Called from the webhook handler on capability.updated for "transfers"
+   * (recipient persona — see BachsPayoutProvider/BachsConnectAccountProvider's
+   * own doc comments on the Make Payment self-transfer step). Confirmed with
+   * Bachs support: an empty requirements list never means this capability
+   * is active — only this webhook (or a live call) does, after their own
+   * manual review finishes. Stores the status so it's visible without
+   * guessing from payment failures, and emails the user the FIRST time it
+   * flips to active (idempotent against a redelivered webhook, same
+   * updateMany-on-the-old-value pattern EscrowService/ConflictException
+   * uses elsewhere for a concurrent-write race, not just a redelivery one).
+   */
+  async handleTransfersCapabilityUpdated(bachsAccountId: string, status: string): Promise<void> {
+    const account = await this.prisma.enoughAccount.findUnique({ where: { bachsAccountId }, include: { user: true } });
+    if (!account) {
+      this.logger.warn(`capability.updated (transfers) for unknown Bachs account ${bachsAccountId} — ignoring`);
+      return;
+    }
+
+    const becameActive = status === 'active' && account.transfersCapabilityStatus !== 'active';
+    const updated = await this.prisma.enoughAccount.updateMany({
+      where: { id: account.id, transfersCapabilityStatus: account.transfersCapabilityStatus },
+      data: { transfersCapabilityStatus: status as EnoughAccountView['status'] },
+    });
+    if (updated.count === 0) return; // Lost a race with another delivery of the same event — the other one already recorded this.
+
+    if (becameActive && account.user.email) {
+      // Awaited, not fire-and-forget — a dangling promise here can lose
+      // the race against this serverless function's response being sent
+      // and the execution context freezing, the same real bug confirmed
+      // earlier today in EnoughPaymentsService's own capability self-heal.
+      try {
+        await this.notifications.notify({ userId: account.userId, email: account.user.email }, { kind: 'enough_transfers_enabled' });
+      } catch (err) {
+        this.logger.warn(`Enough transfers-enabled email failed for user ${account.userId}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+  }
+
   private async activateVirtualAccount(enoughAccountId: string, bachsAccountId: string): Promise<void> {
     const virtualAccount = await this.bachs.ensureVirtualAccount(bachsAccountId);
     if (!virtualAccount) return; // Logged by the provider already — not active yet, webhook will retry this path later.
