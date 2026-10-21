@@ -94,9 +94,10 @@ export class GigsController {
     return this.gigs.listClaimedGigs(user.userId);
   }
 
+  /** Public, unauthenticated — see GigsService.getPublicGig's doc comment for why this isn't the raw getGig. */
   @Get(':id')
   get(@Param('id') id: string) {
-    return this.gigs.getGig(id);
+    return this.gigs.getPublicGig(id);
   }
 
   /**

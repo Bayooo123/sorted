@@ -348,6 +348,25 @@ export class GigsService implements GigsPort {
   }
 
   /**
+   * GigsController's `GET /gigs/:id` is unauthenticated, same as `GET
+   * /gigs` — but unlike listGigs, getGig itself has no caller identity to
+   * filter on and is also used by every trusted internal call site
+   * (publish, escrow, disputes, whatsapp, ratings) that legitimately needs
+   * a draft or restricted gig's full record. This wrapper applies
+   * listGigs' own documented rule (a draft's content, or a gig restricted
+   * to one professional, isn't meant to be visible to a random anonymous
+   * caller) to the single-gig read path specifically, instead of leaving
+   * getGig itself — and every trusted caller of it — unprotected.
+   */
+  async getPublicGig(gigId: string): Promise<GigRecord> {
+    const gig = await this.getGig(gigId);
+    if (gig.status === 'draft' || gig.restrictedToProfessionalId) {
+      throw new NotFoundException('Gig not found');
+    }
+    return gig;
+  }
+
+  /**
    * WhatsApp "invite someone I already know" reassignment (PLAN.md Phase
    * 3.1) — swap or clear who a gig is restricted to, independent of
    * status (a claimable 'open' gig stays 'open' either way; this is not a
