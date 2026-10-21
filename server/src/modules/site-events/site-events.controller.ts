@@ -56,4 +56,23 @@ export class SiteEventsController {
     const url = `https://wa.me/${number}` + (cleanText ? `?text=${encodeURIComponent(cleanText)}` : '');
     res.redirect(302, url);
   }
+
+  /**
+   * Logs a WhatsApp CTA click WITHOUT redirecting — the link itself now
+   * points straight at wa.me (see index.html/classic.html), so this just
+   * records the click in parallel via navigator.sendBeacon, off the
+   * critical path to actually reaching WhatsApp. redirectToWhatsapp above
+   * made every click wait on this same database write (plus a cold
+   * start) BEFORE the browser could even start navigating to wa.me — that
+   * synchronous round-trip was the "takes too long to load" complaint,
+   * not a wrong URL. Kept GET /go/whatsapp itself for any already-shared
+   * link (e.g. a printed QR code) that points at it directly.
+   */
+  @Post('go/whatsapp/click')
+  @HttpCode(204)
+  async recordWhatsappClick(@Body('cta') cta: string | undefined): Promise<void> {
+    await this.prisma.siteEvent.create({
+      data: { type: 'whatsapp_click', ctaId: sanitize(cta, 100) },
+    });
+  }
 }

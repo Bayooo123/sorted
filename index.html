@@ -399,15 +399,32 @@
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 
-  // Same analytics as the classic site: WhatsApp clicks go through the API's
-  // /go/whatsapp redirect so they're counted, and each page view is recorded.
+  // WhatsApp links go straight to wa.me — NOT through the API first. They
+  // used to route through /go/whatsapp so a click was logged before the
+  // browser navigated away, but that put a cold-started serverless
+  // function + a database write on the critical path to opening
+  // WhatsApp, which is what made the button feel slow. The click is still
+  // logged (trackWhatsappClick below), just off that path, via sendBeacon
+  // fired alongside the navigation instead of before it.
   var SITE_API_BASE_URL = 'https://sorted-api.vercel.app';
-  function waLink(text, ctaId) {
-    return SITE_API_BASE_URL + '/go/whatsapp?cta=' + encodeURIComponent(ctaId) + '&text=' + encodeURIComponent(text);
+  function waLink(text) {
+    return 'https://wa.me/2349031812675?text=' + encodeURIComponent(text);
   }
-  document.getElementById('wa-hero').href = waLink("Hi Sorted, I'd like to book a dry cleaning pickup in Yaba.", 'landing_hero');
-  document.getElementById('wa-pros').href = waLink("Hi Sorted, I run a dry cleaning business and I'd like to join.", 'landing_dry_cleaners');
-  document.getElementById('wa-riders').href = waLink("Hi Sorted, I'm a dispatch rider and I'd like to ride with Sorted.", 'landing_riders');
+  function trackWhatsappClick(ctaId) {
+    try {
+      navigator.sendBeacon(SITE_API_BASE_URL + '/go/whatsapp/click', new Blob([JSON.stringify({ cta: ctaId })], { type: 'application/json' }));
+    } catch (e) {}
+  }
+  [
+    ['wa-hero', "Hi Sorted, I'd like to book a dry cleaning pickup in Yaba.", 'landing_hero'],
+    ['wa-pros', "Hi Sorted, I run a dry cleaning business and I'd like to join.", 'landing_dry_cleaners'],
+    ['wa-riders', "Hi Sorted, I'm a dispatch rider and I'd like to ride with Sorted.", 'landing_riders'],
+  ].forEach(function (row) {
+    var el = document.getElementById(row[0]);
+    if (!el) return;
+    el.href = waLink(row[1]);
+    el.addEventListener('click', function () { trackWhatsappClick(row[2]); });
+  });
 
   try {
     fetch(SITE_API_BASE_URL + '/site-events', {
