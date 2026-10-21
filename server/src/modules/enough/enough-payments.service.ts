@@ -176,9 +176,19 @@ export class EnoughPaymentsService {
         // activateVirtualAccount-on-read: request the capability now so
         // the NEXT attempt (not this one — Bachs needs a moment) succeeds,
         // rather than leaving the user stuck on a capability gap forever.
-        this.bachsConnect.requestTransfersCapability(account.bachsAccountId).catch((reqErr) => {
+        //
+        // AWAITED, not fire-and-forget — confirmed live, 2026-10-20/21:
+        // a dangling un-awaited promise here raced against this serverless
+        // function's response being sent and Vercel freezing/killing the
+        // execution context, so the request sometimes never completed at
+        // all (no log, capability never actually requested). Awaiting adds
+        // a little latency to this error response but guarantees the
+        // request — and its diagnostic log — actually happens every time.
+        try {
+          await this.bachsConnect.requestTransfersCapability(account.bachsAccountId);
+        } catch (reqErr) {
           this.logger.warn(`Failed to request transfers capability for ${account.bachsAccountId}: ${reqErr instanceof Error ? reqErr.message : reqErr}`);
-        });
+        }
         throw new BadRequestException('Bank transfers were not yet turned on for your account — we just requested it. Please try again in a few seconds.');
       }
 
