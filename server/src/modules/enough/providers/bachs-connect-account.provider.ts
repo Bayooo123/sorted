@@ -185,6 +185,16 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
     // way to see exactly what's still missing without guessing again.
     const check = await this.request('GET', `/v1/accounts/${accountId}/capabilities`);
     this.logger.warn(`Bachs capabilities for ${accountId} after requesting transfers: ${JSON.stringify(check.data)}`);
+
+    // Confirmed live (2026-10-21): transfers came back "restricted" with
+    // status_details {"code":"requirements_outstanding","message":
+    // "Outstanding requirements. See the account's requirements."} — the
+    // capability itself doesn't say WHICH fields; that lives on the
+    // account object's own requirements.currently_due, per the same gap
+    // BachsProvider.createSubaccount already flagged for recipient
+    // accounts generally. Fetching it here rather than guessing again.
+    const account = await this.request('GET', `/v1/accounts/${accountId}`);
+    this.logger.warn(`Bachs account ${accountId} requirements: ${JSON.stringify((account.data as { requirements?: unknown })?.requirements ?? account.data)}`);
   }
 
   /**
