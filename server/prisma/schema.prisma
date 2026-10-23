@@ -143,6 +143,16 @@ model User {
   // not a parallel account system. Null until a user actually starts
   // Enough's own registration (identity verification) step.
   enoughAccount EnoughAccount?
+
+  // PLAN.md "Sorted-owned rider fleet" — a "rider" roleFlag (added the same
+  // additive way as "client"/"professional", see roleFlags above) gets a
+  // RiderProfile the first time they register via RiderService.becomeRider.
+  // riderDeliveryTasks is every DeliveryTask ever assigned to this user as
+  // the courier — named/relationed separately from Gig's own User relations
+  // since a rider is a third, independent party to the gig, not the client
+  // or the professional.
+  riderProfile       RiderProfile?
+  riderDeliveryTasks DeliveryTask[] @relation("RiderDeliveryTasks")
 }
 
 // Manual-pilot professional verification — see PLAN.md "Profile photo + KYC
@@ -419,6 +429,14 @@ enum DeliveryTaskStatus {
   upcoming
   started
   arrived
+  // PLAN.md "Sorted-owned rider fleet" — two extra, finer-grained stages a
+  // Sorted-fleet rider job passes through that KWIK's own job_status never
+  // produces (KWIK goes straight from arrived to ended): picked_up (code
+  // verified / count taken at the origin) and in_transit (moving to the
+  // destination). Added here rather than splitting DeliveryTask into two
+  // rows per leg — see RiderService for the transitions that set these.
+  picked_up
+  in_transit
   ended
   failed
   unassigned
@@ -433,15 +451,50 @@ model DeliveryTask {
   gigId         String
   gig           Gig                @relation(fields: [gigId], references: [id])
   leg           DeliveryLeg
-  provider      String             @default("kwik") // SEAM: only KWIK in v1, but kept a plain string in case a second courier is added later
-  providerJobId String? // KWIK's job_id — null if dispatch failed/was skipped (see DeliveryService: best-effort, never blocks the gig)
+  provider      String             @default("kwik") // SEAM: "kwik" or "sorted_fleet" — see DeliveryProviderPort.providerKey
+  providerJobId String? // KWIK's job_id, or a synthetic id for sorted_fleet — null if dispatch failed/was skipped (see DeliveryService: best-effort, never blocks the gig)
   status        DeliveryTaskStatus @default(upcoming)
   trackingLink  String?
-  failureReason String? // set when dispatch was skipped or KWIK returned an error — never silently dropped
+  failureReason String? // set when dispatch was skipped or the provider returned an error — never silently dropped
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
+  // PLAN.md "Sorted-owned rider fleet" — only set when provider is
+  // "sorted_fleet". riderId is the assigned rider's User.id (null while a
+  // task sits "unassigned", waiting for a rider to come online — see
+  // RiderService.setOnline's claim-pending-work step).
+  riderId String?
+  rider   User?   @relation("RiderDeliveryTasks", fields: [riderId], references: [id])
+
+  // PLAN.md "Sorted-owned rider fleet" — the client-held pickup-verification
+  // code for a pickup_to_professional leg only (never set for return legs).
+  // Same shape as PasswordResetToken: never store the raw code, bcrypt hash
+  // + expiry + attempt cap, checked in RiderService.confirmPickup.
+  pickupCodeHash      String?
+  pickupCodeExpiresAt DateTime?
+  pickupCodeAttempts  Int        @default(0)
+  // Piece count taken at the origin (client for a pickup leg, professional's
+  // shop for a return leg) — RiderService.confirmPickup sets this.
+  pieceCount Int?
+
   @@index([gigId])
+  @@index([riderId])
+}
+
+// PLAN.md "Sorted-owned rider fleet" — one row per User with the "rider"
+// roleFlag. Deliberately minimal for v1: just an online/offline toggle
+// (SortedFleetDeliveryService only assigns new jobs to online riders) and a
+// free-text vehicle type for display in the job offer. No location/GPS
+// tracking yet — see RiderService's own doc comment on what "available" and
+// "nearest" mean (or don't yet) in v1.
+model RiderProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  online      Boolean  @default(false)
+  vehicleType String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Criterion {
