@@ -284,6 +284,16 @@ model ProfessionalServiceOffering {
   submarket   Submarket @relation(fields: [submarketId], references: [id])
   createdAt   DateTime  @default(now())
 
+  // PLAN.md "Directory order-eligibility gate" — a professional can be
+  // listed in the directory for a submarket without being claimable yet
+  // (e.g. a dummy/display-only listing, or a real one still being
+  // onboarded). Defaults true so every *existing* offering keeps working
+  // exactly as before this column existed; EscrowService.holdStake is the
+  // one enforcement point (see IdentityService.assertAcceptingOrders) —
+  // every claim path (direct, WhatsApp conversation/broadcast/invite)
+  // already funnels through it.
+  acceptingOrders Boolean @default(true)
+
   @@unique([userId, submarketId])
 }
 

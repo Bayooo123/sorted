@@ -19,6 +19,7 @@ import { PAYMENTS_PROVIDER, PaymentsProvider } from '../payments/payments.interf
 import { PostcodeService } from '../postcode/postcode.service';
 import {
   AccountType,
+  AdminCreateProfessionalInput,
   ApplyForKycInput,
   AuthResult,
   BusinessProfileInput,
@@ -390,9 +391,20 @@ export class IdentityService implements IdentityPort {
   }
 
   /** Admin-only — dashboard.html "All users". Newest first, matching every other admin listing in this codebase. */
-  async listAllUsers(): Promise<UserAdminView[]> {
-    const users = await this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
-    return users.map((u) => ({
+  private toUserAdminView(u: {
+    id: string;
+    name: string | null;
+    displayName: string | null;
+    email: string | null;
+    phone: string | null;
+    state: string | null;
+    roleFlags: string[];
+    accountType: string;
+    kycStatus: string;
+    createdAt: Date;
+    lastLoginAt: Date | null;
+  }): UserAdminView {
+    return {
       id: u.id,
       name: u.name,
       displayName: u.displayName,
@@ -401,10 +413,15 @@ export class IdentityService implements IdentityPort {
       state: u.state,
       roles: u.roleFlags as Role[],
       accountType: u.accountType as AccountType,
-      kycStatus: u.kycStatus,
+      kycStatus: u.kycStatus as KycStatus,
       createdAt: u.createdAt,
       lastLoginAt: u.lastLoginAt,
-    }));
+    };
+  }
+
+  async listAllUsers(): Promise<UserAdminView[]> {
+    const users = await this.prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+    return users.map((u) => this.toUserAdminView(u));
   }
 
   /** Admin-only listing — see IdentityController's AdminGuard-gated route. */
@@ -511,6 +528,7 @@ export class IdentityService implements IdentityPort {
         roleFlags: { has: 'professional' },
         serviceOfferings: { some: { submarketId: submarket.id } },
       },
+      include: { serviceOfferings: { where: { submarketId: submarket.id } } },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -520,7 +538,81 @@ export class IdentityService implements IdentityPort {
       avatarBase64: u.avatarBase64,
       kycStatus: u.kycStatus as KycStatus,
       accountType: u.accountType as AccountType,
+      // The @@unique([userId, submarketId]) constraint guarantees at most one match.
+      acceptingOrders: u.serviceOfferings[0]?.acceptingOrders ?? true,
     }));
+  }
+
+  /**
+   * PLAN.md "Directory order-eligibility gate" — the one enforcement point
+   * for every claim path (EscrowService.holdStake is the only caller, and
+   * every claim — direct, WhatsApp conversation/broadcast/invite — already
+   * funnels through it). A missing offering (professional listed under a
+   * different submarket, or not listed at all) is treated the same as
+   * acceptingOrders: false — fail closed, not open.
+   */
+  async assertAcceptingOrders(userId: string, submarketKey: string): Promise<void> {
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: submarketKey } });
+    if (!submarket) throw new BadRequestException(`Unknown submarket "${submarketKey}"`);
+    const offering = await this.prisma.professionalServiceOffering.findUnique({
+      where: { userId_submarketId: { userId, submarketId: submarket.id } },
+    });
+    if (!offering?.acceptingOrders) {
+      throw new ForbiddenException('This professional is not accepting orders in this category yet.');
+    }
+  }
+
+  /**
+   * PLAN.md "Directory order-eligibility gate" — a directory-only listing:
+   * no phone/email/password, so it can never log in, be claimed by a client
+   * off-platform, or receive a notification — purely a display row. Starts
+   * closed (acceptingOrders defaults false here, the opposite of the
+   * column's own schema default) unless the caller explicitly opts it in,
+   * since every call site today is "add a dummy for look-and-feel."
+   */
+  async adminCreateDummyProfessional(input: AdminCreateProfessionalInput): Promise<UserAdminView> {
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: input.submarketKey } });
+    if (!submarket) throw new BadRequestException(`Unknown submarket "${input.submarketKey}"`);
+
+    const user = await this.prisma.user.create({
+      data: {
+        displayName: input.displayName,
+        roleFlags: ['professional'],
+        serviceOfferings: { create: { submarketId: submarket.id, acceptingOrders: input.acceptingOrders ?? false } },
+      },
+    });
+    return this.toUserAdminView(user);
+  }
+
+  async adminRenameUser(userId: string, displayName: string): Promise<UserAdminView> {
+    const user = await this.prisma.user.update({ where: { id: userId }, data: { displayName } });
+    return this.toUserAdminView(user);
+  }
+
+  /**
+   * "Delete from the list of X" — removes only the ONE submarket listing
+   * (ProfessionalServiceOffering), not the account. Everything else about
+   * the user (login, other roles, order history) stays intact; they just
+   * stop appearing in this submarket's directory. Note completeRoleProfile
+   * fully resyncs a user's offerings from scratch on every call, so if this
+   * professional re-submits their role profile with this category still
+   * checked, it comes back — that's existing, unrelated behavior, not a bug
+   * introduced here.
+   */
+  async adminRemoveServiceOffering(userId: string, submarketKey: string): Promise<void> {
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: submarketKey } });
+    if (!submarket) throw new BadRequestException(`Unknown submarket "${submarketKey}"`);
+    await this.prisma.professionalServiceOffering.deleteMany({ where: { userId, submarketId: submarket.id } });
+  }
+
+  async adminSetAcceptingOrders(userId: string, submarketKey: string, acceptingOrders: boolean): Promise<void> {
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: submarketKey } });
+    if (!submarket) throw new BadRequestException(`Unknown submarket "${submarketKey}"`);
+    const updated = await this.prisma.professionalServiceOffering.updateMany({
+      where: { userId, submarketId: submarket.id },
+      data: { acceptingOrders },
+    });
+    if (updated.count === 0) throw new NotFoundException('That professional has no listing in that submarket.');
   }
 
   async getPayoutDestination(userId: string): Promise<PayoutDestination | null> {
