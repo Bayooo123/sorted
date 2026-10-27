@@ -227,6 +227,7 @@ export class GigsService implements GigsPort {
           { userId: professional.id, email: professional.email },
           {
             kind: 'professional_invited',
+            gigId,
             clientName: client.name || client.displayName || 'A client',
             gigDescription: gig.description,
             submarketLabel: submarket?.label ?? gig.submarket,

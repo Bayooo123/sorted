@@ -64,6 +64,8 @@ export type NotificationEvent =
    */
   | {
       kind: 'professional_invited';
+      /** Real bug, fixed — the email's CTA had no gig reference at all and pointed at the bare homepage. See notifications.service.ts's inviteEmailHtml. */
+      gigId: string;
       clientName: string;
       gigDescription: string;
       submarketLabel: string;
