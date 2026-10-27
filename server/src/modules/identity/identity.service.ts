@@ -599,6 +599,31 @@ export class IdentityService implements IdentityPort {
    * checked, it comes back — that's existing, unrelated behavior, not a bug
    * introduced here.
    */
+  /**
+   * PLAN.md "Hybrid-account category persistence" — the admin-side fix-it
+   * counterpart to adminRemoveServiceOffering, for a professional whose
+   * listing got wiped by the completeRoleProfile bug this same change
+   * fixes going forward. Idempotent (upsert, not create) so re-running it
+   * is harmless. Also makes sure 'professional' is actually on roleFlags —
+   * a listing with no role flag is invisible to listProfessionalsBySubmarket
+   * regardless of having an offering row.
+   */
+  async adminAddServiceOffering(userId: string, submarketKey: string, acceptingOrders?: boolean): Promise<void> {
+    const submarket = await this.prisma.submarket.findUnique({ where: { key: submarketKey } });
+    if (!submarket) throw new BadRequestException(`Unknown submarket "${submarketKey}"`);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!user.roleFlags.includes('professional')) {
+      await this.prisma.user.update({ where: { id: userId }, data: { roleFlags: { push: 'professional' } } });
+    }
+    await this.prisma.professionalServiceOffering.upsert({
+      where: { userId_submarketId: { userId, submarketId: submarket.id } },
+      create: { userId, submarketId: submarket.id, ...(acceptingOrders !== undefined ? { acceptingOrders } : {}) },
+      update: acceptingOrders !== undefined ? { acceptingOrders } : {},
+    });
+  }
+
   async adminRemoveServiceOffering(userId: string, submarketKey: string): Promise<void> {
     const submarket = await this.prisma.submarket.findUnique({ where: { key: submarketKey } });
     if (!submarket) throw new BadRequestException(`Unknown submarket "${submarketKey}"`);
@@ -700,17 +725,41 @@ export class IdentityService implements IdentityPort {
 
     const wantsProfessional = roles.includes('professional');
     const wantsClient = roles.includes('client');
+
+    // PLAN.md "Hybrid-account category persistence" — omitting one of
+    // these arrays now means "leave that role's categories exactly as
+    // they are," not "clear them." The old code always wiped and rebuilt
+    // BOTH lists from whatever this one call happened to include, even for
+    // a call that never meant to touch the other role's categories — e.g.
+    // a screen that only edits client seeking-categories, submitting
+    // roles without serviceOfferingSubmarketIds, would silently delete
+    // every professional service offering. Real bug, confirmed against a
+    // live account whose dry-cleaning listing vanished this exact way.
+    const touchesServiceOfferings = input.serviceOfferingSubmarketIds !== undefined;
+    const touchesSeekingCategories = input.seekingCategorySubmarketIds !== undefined;
     const serviceOfferingIds = input.serviceOfferingSubmarketIds ?? [];
     const seekingCategoryIds = input.seekingCategorySubmarketIds ?? [];
 
-    if (wantsProfessional && serviceOfferingIds.length === 0) {
-      throw new BadRequestException('serviceOfferingSubmarketIds must have at least one entry for the "professional" role');
+    if (wantsProfessional) {
+      const willHaveOfferings = touchesServiceOfferings
+        ? serviceOfferingIds.length > 0
+        : (await this.prisma.professionalServiceOffering.count({ where: { userId } })) > 0;
+      if (!willHaveOfferings) {
+        throw new BadRequestException('serviceOfferingSubmarketIds must have at least one entry for the "professional" role');
+      }
     }
-    if (wantsClient && seekingCategoryIds.length === 0) {
-      throw new BadRequestException('seekingCategorySubmarketIds must have at least one entry for the "client" role');
+    if (wantsClient) {
+      const willHaveSeekingCategories = touchesSeekingCategories
+        ? seekingCategoryIds.length > 0
+        : (await this.prisma.clientSeekingCategory.count({ where: { userId } })) > 0;
+      if (!willHaveSeekingCategories) {
+        throw new BadRequestException('seekingCategorySubmarketIds must have at least one entry for the "client" role');
+      }
     }
 
-    const allSubmarketIds = [...new Set([...serviceOfferingIds, ...seekingCategoryIds])];
+    const allSubmarketIds = [
+      ...new Set([...(touchesServiceOfferings ? serviceOfferingIds : []), ...(touchesSeekingCategories ? seekingCategoryIds : [])]),
+    ];
     if (allSubmarketIds.length > 0) {
       const found = await this.prisma.submarket.findMany({
         where: { id: { in: allSubmarketIds } },
@@ -758,21 +807,27 @@ export class IdentityService implements IdentityPort {
         });
       }
 
-      // Replace-in-full rather than diff — simpler, and this call is rare
-      // (registration, or a deliberate profile edit) so the extra writes
-      // don't matter.
-      await tx.professionalServiceOffering.deleteMany({ where: { userId } });
-      if (wantsProfessional && serviceOfferingIds.length > 0) {
-        await tx.professionalServiceOffering.createMany({
-          data: serviceOfferingIds.map((submarketId) => ({ userId, submarketId })),
-        });
+      // Replace-in-full, but ONLY for a list the caller actually sent —
+      // see touchesServiceOfferings/touchesSeekingCategories above. A call
+      // that never mentions a given array leaves those existing rows
+      // completely untouched, which is what makes "set up as a dry
+      // cleaner once, it persists" actually true for a hybrid account.
+      if (touchesServiceOfferings) {
+        await tx.professionalServiceOffering.deleteMany({ where: { userId } });
+        if (serviceOfferingIds.length > 0) {
+          await tx.professionalServiceOffering.createMany({
+            data: serviceOfferingIds.map((submarketId) => ({ userId, submarketId })),
+          });
+        }
       }
 
-      await tx.clientSeekingCategory.deleteMany({ where: { userId } });
-      if (wantsClient && seekingCategoryIds.length > 0) {
-        await tx.clientSeekingCategory.createMany({
-          data: seekingCategoryIds.map((submarketId) => ({ userId, submarketId })),
-        });
+      if (touchesSeekingCategories) {
+        await tx.clientSeekingCategory.deleteMany({ where: { userId } });
+        if (seekingCategoryIds.length > 0) {
+          await tx.clientSeekingCategory.createMany({
+            data: seekingCategoryIds.map((submarketId) => ({ userId, submarketId })),
+          });
+        }
       }
     });
 

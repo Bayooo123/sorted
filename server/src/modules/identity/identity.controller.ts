@@ -17,6 +17,7 @@ import { ListProfessionalsDto } from './dto/list-professionals.dto';
 import { AdminCreateProfessionalDto } from './dto/admin-create-professional.dto';
 import { AdminRenameUserDto } from './dto/admin-rename-user.dto';
 import { AdminSetAcceptingOrdersDto } from './dto/admin-set-accepting-orders.dto';
+import { AdminAddServiceOfferingDto } from './dto/admin-add-service-offering.dto';
 
 /**
  * The only thing in the Identity module that touches HTTP/Express — every
@@ -137,6 +138,18 @@ export class IdentityController {
   @Patch('admin/users/:id/display-name')
   adminRenameUser(@Param('id') id: string, @Body() dto: AdminRenameUserDto) {
     return this.identity.adminRenameUser(id, dto.displayName);
+  }
+
+  /** Idempotent — adds (or re-enables) one submarket listing for an existing user, without touching their other categories. */
+  @UseGuards(AdminGuard)
+  @Patch('admin/professionals/:userId/submarkets/:submarketKey/add')
+  async adminAddServiceOffering(
+    @Param('userId') userId: string,
+    @Param('submarketKey') submarketKey: string,
+    @Body() dto: AdminAddServiceOfferingDto,
+  ) {
+    await this.identity.adminAddServiceOffering(userId, submarketKey, dto.acceptingOrders);
+    return { ok: true };
   }
 
   /** Removes only this one submarket listing — the account itself is untouched. */
