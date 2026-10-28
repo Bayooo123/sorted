@@ -13,11 +13,19 @@ import { EnoughPaymentsController } from './enough-payments.controller';
 import { EnoughWebhookController } from './enough-webhook.controller';
 import { EnoughPayoutWebhookController } from './enough-payout-webhook.controller';
 import { NombaWebhookController } from './nomba-webhook.controller';
+import { SettlementSweepService } from './settlement-sweep.service';
+import { SettlementCronController } from './settlement-cron.controller';
 import { BachsConnectAccountProvider } from './providers/bachs-connect-account.provider';
 import { BachsPayoutProvider } from './providers/bachs-payout.provider';
 import { NombaConnectAccountProvider } from './providers/nomba-connect-account.provider';
 import { NombaPayoutProvider } from './providers/nomba-payout.provider';
-import { BachsConnectAccountPort, BachsPayoutPort, BACHS_CONNECT_ACCOUNT_PORT, BACHS_PAYOUT_PORT } from './enough.interface';
+import {
+  BachsConnectAccountPort,
+  BachsPayoutPort,
+  BACHS_CONNECT_ACCOUNT_PORT,
+  BACHS_PAYOUT_PORT,
+  SETTLEMENT_PAYOUT_PORT,
+} from './enough.interface';
 
 /**
  * PLAN.md "Enough: Bachs Connect account per signup" — AuthModule imported
@@ -36,12 +44,14 @@ import { BachsConnectAccountPort, BachsPayoutPort, BACHS_CONNECT_ACCOUNT_PORT, B
     EnoughWebhookController,
     EnoughPayoutWebhookController,
     NombaWebhookController,
+    SettlementCronController,
   ],
   providers: [
     EnoughAccountsService,
     EnoughPurposesService,
     EnoughPlanService,
     EnoughPaymentsService,
+    SettlementSweepService,
     BachsConnectAccountProvider,
     BachsPayoutProvider,
     NombaConnectAccountProvider,
@@ -58,6 +68,9 @@ import { BachsConnectAccountPort, BachsPayoutPort, BACHS_CONNECT_ACCOUNT_PORT, B
         config.get<string>('ENOUGH_PROVIDER_KEY') === 'nomba' ? nomba : bachs,
       inject: [ConfigService, BachsPayoutProvider, NombaPayoutProvider],
     },
+    // PLAN.md "Settlement sweep" — fixed to Nomba, never switched by
+    // ENOUGH_PROVIDER_KEY. See SETTLEMENT_PAYOUT_PORT's doc comment.
+    { provide: SETTLEMENT_PAYOUT_PORT, useExisting: NombaPayoutProvider },
   ],
 })
 export class EnoughModule {}

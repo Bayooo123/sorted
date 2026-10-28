@@ -174,6 +174,20 @@ export interface BachsPayoutPort {
 
 export const BACHS_PAYOUT_PORT = 'BACHS_PAYOUT_PORT';
 
+/**
+ * PLAN.md "Settlement sweep" — the ONE rail every actual user payout
+ * executes through, always, regardless of ENOUGH_PROVIDER_KEY (which only
+ * controls which provider NEW accounts/deposits are created under). Fixed
+ * to Nomba in enough.module.ts, not switchable — see SettlementSweepService's
+ * doc comment for why: deposits collected on a different provider (e.g.
+ * Bachs) are physically swept into Nomba's one settlement account by that
+ * background job, so Nomba is the only rail that can ever be guaranteed
+ * to actually hold the funds a payout needs. BACHS_PAYOUT_PORT stays
+ * switchable and is still used — but only by SettlementSweepService, to
+ * pull+sweep money OUT of Bachs, never for a user-facing withdrawal.
+ */
+export const SETTLEMENT_PAYOUT_PORT = 'SETTLEMENT_PAYOUT_PORT';
+
 /** Where a payment draws from — the landing spot, or a specific purpose's unlocked balance. */
 export type PaymentSource = { type: 'landing_spot' } | { type: 'purpose'; purposeId: string };
 

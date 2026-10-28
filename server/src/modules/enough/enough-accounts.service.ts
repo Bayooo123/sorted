@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
@@ -20,6 +21,7 @@ export class EnoughAccountsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     @Inject(BACHS_CONNECT_ACCOUNT_PORT) private readonly bachs: BachsConnectAccountPort,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
@@ -59,10 +61,17 @@ export class EnoughAccountsService {
     // works end to end.
     const capability = await this.bachs.checkCapability(bachsAccountId);
 
+    // PLAN.md "Settlement sweep" — stamps which rail this account's
+    // deposits actually land on, read once here (not re-derived later —
+    // switching ENOUGH_PROVIDER_KEY afterward must never silently change
+    // which provider an EXISTING account's money is tracked against).
+    const provider = this.config.get<string>('ENOUGH_PROVIDER_KEY') === 'nomba' ? 'nomba' : 'bachs';
+
     const account = await this.prisma.enoughAccount.create({
       data: {
         userId,
         bachsAccountId,
+        provider,
         displayName,
         capabilityStatus: capability.status,
         capabilityStatusDetail: capability.detail,

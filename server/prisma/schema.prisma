@@ -857,10 +857,24 @@ model EnoughAccount {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id])
 
-  // acct_... — Bachs' connected-account id. Created once, at Enough's own
-  // identity-verification step (first+last name + BVN submitted in the
-  // same call, per Bachs' "representative" requirement).
+  // acct_... — Bachs' connected-account id (or Nomba's accountRef, see
+  // enough.interface.ts's BachsConnectAccountPort doc comment on why this
+  // column is reused as a generic provider reference). Created once, at
+  // Enough's own identity-verification step (first+last name + BVN
+  // submitted in the same call, per Bachs' "representative" requirement —
+  // Nomba does the equivalent in one call too, see
+  // NombaConnectAccountProvider.submitRepresentative).
   bachsAccountId String @unique
+
+  // PLAN.md "Settlement sweep" — which provider this account's deposits
+  // actually land on, set once at submitIdentity and never changed after
+  // (switching ENOUGH_PROVIDER_KEY only affects NEW signups). Needed
+  // because payouts always execute through the one designated settlement
+  // provider (SETTLEMENT_PAYOUT_PORT, currently always Nomba) regardless
+  // of which provider a given account was created under — a "bachs"
+  // account's money has to be physically swept to Nomba first (see
+  // SettlementSweepService) before a payout for it can actually succeed.
+  provider String @default("bachs")
   // Shown to senders as the bank-transfer recipient name — set at account
   // creation, e.g. "Michael Adeyemi — Enough".
   displayName String
@@ -1025,4 +1039,27 @@ model EnoughPaymentEvent {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// PLAN.md "Settlement sweep" — audit trail for SettlementSweepService's
+// background job, which physically moves money collected on a secondary
+// provider (e.g. Bachs) over to the one designated settlement provider
+// (currently always Nomba) that every actual user payout executes
+// through. Deliberately does NOT touch any EnoughAccount.availableBalanceKobo
+// — a sweep only changes WHERE the cash physically sits, never who is
+// entitled to it; that ledger is already correct regardless of custody.
+enum SettlementSweepStatus {
+  completed
+  failed
+}
+
+model SettlementSweep {
+  id            String                @id @default(cuid())
+  fromProvider  String
+  toProvider    String
+  amountKobo    BigInt
+  accountsSwept Int
+  status        SettlementSweepStatus
+  failureReason String?
+  createdAt     DateTime              @default(now())
 }
