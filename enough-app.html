@@ -46,6 +46,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);outline:none}
 .btn-primary{background:var(--ink);color:var(--sun)}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed}
 .btn-ghost{background:transparent;color:var(--amber);height:40px;margin-top:10px}
+.btn-link{background:none;border:0;padding:0;margin-top:10px;color:var(--amber);font-family:var(--body);font-weight:700;font-size:13px;text-decoration:underline;cursor:pointer;text-align:left}
 .btn-small{width:auto;height:40px;padding:0 18px;margin-top:0;font-size:14px}
 .switcher{display:flex;gap:6px;background:var(--sun-pale);border-radius:14px;padding:4px;margin-bottom:22px}
 .switcher button{flex:1;border:0;background:transparent;height:38px;border-radius:11px;font-family:var(--body);font-weight:700;font-size:14px;color:var(--amber);cursor:pointer}
@@ -215,7 +216,8 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
               '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>'
           : '<label for="f-identifier">Email or phone</label><input id="f-identifier" required>' +
             '<div class="field-row"><label for="f-password">Password</label><input id="f-password" type="password" required>' +
-              '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>') +
+              '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>' +
+            '<button type="button" class="btn-link" id="forgot-password-link">Forgot password?</button>') +
         '<button type="submit" class="btn btn-primary" id="auth-submit">' + (mode === 'login' ? 'Log in' : 'Sign up') + '</button>' +
       '</form>' +
       '</div>'
@@ -233,6 +235,13 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
         var showing = input.type === 'text';
         input.type = showing ? 'password' : 'text';
         toggle.textContent = showing ? 'Show' : 'Hide';
+      });
+    }
+
+    var forgotLink = document.getElementById('forgot-password-link');
+    if (forgotLink) {
+      forgotLink.addEventListener('click', function () {
+        renderForgotPasswordScreen('request');
       });
     }
 
@@ -271,6 +280,102 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
       }).catch(function (err) {
         renderAuthScreen(mode, err.message);
       });
+    });
+  }
+
+  // Two stages: 'request' (enter email/phone, get a code emailed) and
+  // 'reset' (enter that code + a new password). reset-password itself
+  // only changes the password (returns {message}, no session) — matching
+  // the live mobile app's own forgot-password flow (sorted-app/src/app/
+  // password.tsx), a normal /auth/login call with the new password is
+  // what actually signs the user in afterward.
+  function renderForgotPasswordScreen(stage, opts) {
+    opts = opts || {};
+    var identifier = opts.identifier || '';
+
+    if (stage === 'request') {
+      render(
+        '<div class="card">' +
+        '<h1 class="title">Reset your password</h1>' +
+        '<p class="sub">Enter the email or phone on your account and we\'ll send a reset code.</p>' +
+        (opts.errorMsg ? '<div class="banner error">' + escapeHtml(opts.errorMsg) + '</div>' : '') +
+        '<form id="forgot-form">' +
+          '<label for="fp-identifier">Email or phone</label><input id="fp-identifier" required value="' + escapeHtml(identifier) + '">' +
+          '<button type="submit" class="btn btn-primary" id="forgot-submit">Send reset code</button>' +
+        '</form>' +
+        '<button type="button" class="btn btn-ghost" id="back-to-login">Back to log in</button>' +
+        '</div>'
+      );
+
+      document.getElementById('back-to-login').addEventListener('click', function () { renderAuthScreen('login'); });
+      document.getElementById('forgot-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var submitBtn = document.getElementById('forgot-submit');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Please wait…';
+        var enteredIdentifier = document.getElementById('fp-identifier').value.trim();
+
+        api('/auth/forgot-password', { method: 'POST', body: { identifier: enteredIdentifier } })
+          .then(function () {
+            renderForgotPasswordScreen('reset', { identifier: enteredIdentifier });
+          })
+          .catch(function (err) {
+            renderForgotPasswordScreen('request', { identifier: enteredIdentifier, errorMsg: err.message });
+          });
+      });
+      return;
+    }
+
+    // stage === 'reset'
+    render(
+      '<div class="card">' +
+      '<h1 class="title">Check your email</h1>' +
+      '<p class="sub">If an account exists for that email or phone, a reset code has been sent. Enter it below with your new password.</p>' +
+      (opts.errorMsg ? '<div class="banner error">' + escapeHtml(opts.errorMsg) + '</div>' : '') +
+      '<form id="reset-form">' +
+        '<label for="rp-code">Code from your email</label><input id="rp-code" required inputmode="numeric" pattern="\\d{6}" maxlength="6" placeholder="6 digits">' +
+        '<div class="field-row"><label for="rp-password">New password</label><input id="rp-password" type="password" required minlength="8">' +
+          '<button type="button" class="field-toggle" data-target="rp-password">Show</button></div>' +
+        '<button type="submit" class="btn btn-primary" id="reset-submit">Save password and log in</button>' +
+      '</form>' +
+      '<button type="button" class="btn-link" id="resend-code">Send a new code</button>' +
+      '<button type="button" class="btn btn-ghost" id="back-to-login">Back to log in</button>' +
+      '</div>'
+    );
+
+    var resetToggle = app.querySelector('.field-toggle');
+    if (resetToggle) {
+      resetToggle.addEventListener('click', function () {
+        var input = document.getElementById(resetToggle.getAttribute('data-target'));
+        var showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        resetToggle.textContent = showing ? 'Show' : 'Hide';
+      });
+    }
+
+    document.getElementById('back-to-login').addEventListener('click', function () { renderAuthScreen('login'); });
+    document.getElementById('resend-code').addEventListener('click', function () { renderForgotPasswordScreen('request', { identifier: identifier }); });
+
+    document.getElementById('reset-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var submitBtn = document.getElementById('reset-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Please wait…';
+      var code = document.getElementById('rp-code').value.trim();
+      var newPassword = document.getElementById('rp-password').value;
+
+      api('/auth/reset-password', { method: 'POST', body: { identifier: identifier, code: code, newPassword: newPassword } })
+        .then(function () {
+          return api('/auth/login', { method: 'POST', body: { identifier: identifier, password: newPassword } });
+        })
+        .then(function (res) {
+          state.accessToken = res.accessToken;
+          localStorage.setItem(TOKEN_KEY, res.accessToken);
+          loadAccount();
+        })
+        .catch(function (err) {
+          renderForgotPasswordScreen('reset', { identifier: identifier, errorMsg: err.message });
+        });
     });
   }
 
