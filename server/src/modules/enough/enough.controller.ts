@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthenticatedUser, JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
+import { AdminGuard } from '../../common/auth/admin.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { EnoughAccountsService } from './enough-accounts.service';
 import { SubmitIdentityDto } from './dto/submit-identity.dto';
@@ -45,5 +46,18 @@ export class EnoughController {
   async updateDescription(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateDescriptionDto) {
     await this.accounts.updateDescription(user.userId, dto.description);
     return { ok: true };
+  }
+
+  /**
+   * Admin-only (x-admin-key) — see AdminGuard's doc comment. A real
+   * user's deposit account number changes as a result (their old Bachs/
+   * Nomba virtual account stops being monitored), so this is deliberately
+   * a manual, one-at-a-time admin action rather than anything automatic.
+   * See EnoughAccountsService.migrateToPaga's doc comment.
+   */
+  @UseGuards(AdminGuard)
+  @Post('admin/:userId/migrate-to-paga')
+  migrateToPaga(@Param('userId') userId: string) {
+    return this.accounts.migrateToPaga(userId);
   }
 }
