@@ -49,6 +49,15 @@ export type NotificationEvent =
    * actually safe to retry without this email.
    */
   | { kind: 'enough_transfers_enabled' }
+  /**
+   * PLAN.md "Paga integration" — fired from
+   * EnoughAccountsService.migrateToPaga, an admin-triggered one-off for
+   * an existing account whose deposit account number is changing (e.g.
+   * Bachs/Globus -> Paga). oldAccountNumber/oldBankName are null if the
+   * account never had a virtual account activated yet (nothing to warn
+   * them off sending to).
+   */
+  | { kind: 'enough_deposit_account_changed'; oldAccountNumber: string | null; oldBankName: string | null; newAccountNumber: string; newBankName: string }
   | { kind: 'gig_funded'; gigId: string }
   | { kind: 'gig_claimed'; gigId: string }
   | { kind: 'escrow_released'; gigId: string }
@@ -64,6 +73,8 @@ export type NotificationEvent =
    */
   | {
       kind: 'professional_invited';
+      /** Real bug, fixed — the email's CTA had no gig reference at all and pointed at the bare homepage. See notifications.service.ts's inviteEmailHtml. */
+      gigId: string;
       clientName: string;
       gigDescription: string;
       submarketLabel: string;

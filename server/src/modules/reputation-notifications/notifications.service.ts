@@ -64,9 +64,13 @@ export class NotificationsService implements NotificationsPort {
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
         await this.sendEnoughTransfersEnabledEmail(target.email);
         return;
+      case 'enough_deposit_account_changed':
+        if (!target.email) return; // no email on this account — caller already checked, but stay defensive
+        await this.sendEnoughDepositAccountChangedEmail(target.email, event.oldAccountNumber, event.oldBankName, event.newAccountNumber, event.newBankName);
+        return;
       case 'professional_invited':
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
-        await this.sendInviteEmail(target.email, event.clientName, event.gigDescription, event.submarketLabel, event.locationText, event.bountyKobo);
+        await this.sendInviteEmail(target.email, event.gigId, event.clientName, event.gigDescription, event.submarketLabel, event.locationText, event.bountyKobo);
         return;
       case 'founder_daily_digest':
         if (!target.email) return; // no email on this account — caller already checked, but stay defensive
@@ -154,6 +158,21 @@ export class NotificationsService implements NotificationsPort {
     this.logger.log(`Enough transfers-enabled email sent to ${email}`);
   }
 
+  private async sendEnoughDepositAccountChangedEmail(
+    email: string,
+    oldAccountNumber: string | null,
+    oldBankName: string | null,
+    newAccountNumber: string,
+    newBankName: string,
+  ): Promise<void> {
+    await this.sendEmail(
+      email,
+      'Your Enough deposit account number has changed',
+      this.enoughDepositAccountChangedEmailHtml(oldAccountNumber, oldBankName, newAccountNumber, newBankName),
+    );
+    this.logger.log(`Enough deposit-account-changed email sent to ${email}`);
+  }
+
   private async sendFounderDigestEmail(email: string, event: Extract<NotificationEvent, { kind: 'founder_daily_digest' }>): Promise<void> {
     await this.sendEmail(email, `Sorted daily briefing — ${event.periodLabel}`, this.founderDigestEmailHtml(event));
     this.logger.log(`Founder daily digest sent to ${email} for ${event.periodLabel}`);
@@ -161,6 +180,7 @@ export class NotificationsService implements NotificationsPort {
 
   private async sendInviteEmail(
     email: string,
+    gigId: string,
     clientName: string,
     gigDescription: string,
     submarketLabel: string,
@@ -168,7 +188,7 @@ export class NotificationsService implements NotificationsPort {
     bountyKobo: number,
   ): Promise<void> {
     const subject = `${clientName.trim().split(/\s+/)[0] || clientName} picked you for a job on Sorted`;
-    await this.sendEmail(email, subject, this.inviteEmailHtml(clientName, gigDescription, submarketLabel, locationText, bountyKobo));
+    await this.sendEmail(email, subject, this.inviteEmailHtml(gigId, clientName, gigDescription, submarketLabel, locationText, bountyKobo));
     this.logger.log(`Direct-invite email sent to ${email}`);
   }
 
@@ -340,6 +360,41 @@ export class NotificationsService implements NotificationsPort {
 </html>`;
   }
 
+  private enoughDepositAccountChangedEmailHtml(
+    oldAccountNumber: string | null,
+    oldBankName: string | null,
+    newAccountNumber: string,
+    newBankName: string,
+  ): string {
+    const oldLine = oldAccountNumber
+      ? `<p style="font-size:14px;line-height:1.6;color:#6B5843;margin:0 0 20px;">Your old deposit account (${this.escapeHtml(oldBankName ?? '')} ${this.escapeHtml(oldAccountNumber)}) is no longer monitored for new deposits. <strong>Don't send or forward money to it anymore.</strong></p>`
+      : '';
+    return `
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:0;background:#FFF8EC;font-family:'DM Sans','Segoe UI',Arial,sans-serif;">
+  <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">
+      <div style="width:22px;height:22px;border-radius:50%;background:#FFC23C;border:1.5px solid #2B1B0E;display:inline-block;vertical-align:middle;"></div>
+      <span style="font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:20px;color:#2B1B0E;vertical-align:middle;">enough</span>
+      <span style="font-size:13px;color:#6B5843;vertical-align:middle;">by Sorted</span>
+    </div>
+    <div style="background:#FFFDF7;border:1px solid #F0E2C6;border-radius:20px;padding:36px 32px;">
+      <p style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#B5542B;margin:0 0 8px;">Action needed</p>
+      <p style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#2B1B0E;margin:0 0 12px;">Your deposit account number changed</p>
+      ${oldLine}
+      <p style="font-size:14px;color:#6B5843;margin:0 0 6px;">Send money to this account from now on:</p>
+      <p style="font-size:20px;font-weight:700;color:#2B1B0E;margin:0 0 2px;">${this.escapeHtml(newAccountNumber)}</p>
+      <p style="font-size:14px;color:#6B5843;margin:0;">${this.escapeHtml(newBankName)}</p>
+    </div>
+    <p style="font-size:12.5px;color:#6B5843;margin:24px 0 0;text-align:center;">Make it to payday.</p>
+    <p style="font-size:11px;color:#6B5843;text-align:center;margin:12px 0 0;">Sorted Innovations Limited &middot; RC 9770241 &middot; Lagos, Nigeria</p>
+  </div>
+</body>
+</html>`;
+  }
+
   /**
    * PLAN.md "Direct-invite email redesign" — visual design supplied by the
    * founder (built elsewhere, handed over as a screenshot), reproduced here
@@ -363,7 +418,7 @@ export class NotificationsService implements NotificationsPort {
    * right) that doesn't exist yet — both the primary and secondary CTA
    * point at the site for now; see PLAN.md for the follow-up.
    */
-  private inviteEmailHtml(clientName: string, gigDescription: string, submarketLabel: string, locationText: string, bountyKobo: number): string {
+  private inviteEmailHtml(gigId: string, clientName: string, gigDescription: string, submarketLabel: string, locationText: string, bountyKobo: number): string {
     // &#8358; (₦), not the literal glyph — every other template here uses
     // HTML entities for non-ASCII (&mdash;, &ldquo;, ...) rather than
     // relying on a charset declaration email clients may strip; found via
@@ -373,6 +428,17 @@ export class NotificationsService implements NotificationsPort {
     const description = this.escapeHtml(gigDescription);
     const category = this.escapeHtml(submarketLabel);
     const location = this.escapeHtml(locationText);
+    // Real bug, fixed — this used to be a bare "https://sorted.com.ng" with
+    // no gig reference at all, so there was no way to actually respond from
+    // the email. /app/cleaner/request/[id] is the real accept/decline
+    // screen (confirmed against the AFRICA repo's Expo Router + its
+    // vercel.json rewrite, which is what makes this exact path work on the
+    // sorted.com.ng/app deployment) — it reads a gig by id and renders
+    // Accept/Decline for any gig still in 'open' status, which an
+    // unanswered invite always is. Only works for an already-logged-in
+    // professional — there's no logged-out deep-link redirect in the app
+    // yet (separate, unfixed gap, not this template's job).
+    const respondUrl = `https://sorted.com.ng/app/cleaner/request/${encodeURIComponent(gigId)}`;
 
     return `
 <!doctype html>
@@ -416,8 +482,8 @@ export class NotificationsService implements NotificationsPort {
       </div>
 
       <div style="padding:0 28px 24px;">
-        <a href="https://sorted.com.ng" style="display:block;text-align:center;background:#027A61;color:#FFFFFF;font-size:15px;font-weight:700;padding:15px 0;border-radius:12px;text-decoration:none;">Open Sorted to respond &rarr;</a>
-        <p style="text-align:center;font-size:12px;color:#7E8F8D;margin:14px 0 0;">Can't take this job? <a href="https://sorted.com.ng" style="color:#027A61;font-weight:700;text-decoration:underline;">Open Sorted</a> to let us know, so we can offer it to someone else.</p>
+        <a href="${respondUrl}" style="display:block;text-align:center;background:#027A61;color:#FFFFFF;font-size:15px;font-weight:700;padding:15px 0;border-radius:12px;text-decoration:none;">Open Sorted to respond &rarr;</a>
+        <p style="text-align:center;font-size:12px;color:#7E8F8D;margin:14px 0 0;">Can't take this job? <a href="${respondUrl}" style="color:#027A61;font-weight:700;text-decoration:underline;">Open Sorted</a> to let us know, so we can offer it to someone else.</p>
       </div>
 
       <div style="margin:0 28px 28px;padding:16px 18px;border:1px dashed #E0E6E4;border-radius:12px;">

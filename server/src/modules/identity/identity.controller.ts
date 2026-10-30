@@ -14,6 +14,10 @@ import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { ApplyKycDto } from './dto/apply-kyc.dto';
 import { ReviewKycDto } from './dto/review-kyc.dto';
 import { ListProfessionalsDto } from './dto/list-professionals.dto';
+import { AdminCreateProfessionalDto } from './dto/admin-create-professional.dto';
+import { AdminRenameUserDto } from './dto/admin-rename-user.dto';
+import { AdminSetAcceptingOrdersDto } from './dto/admin-set-accepting-orders.dto';
+import { AdminAddServiceOfferingDto } from './dto/admin-add-service-offering.dto';
 
 /**
  * The only thing in the Identity module that touches HTTP/Express — every
@@ -121,5 +125,49 @@ export class IdentityController {
   @Post('admin/kyc/:id/review')
   reviewKyc(@Param('id') id: string, @Body() dto: ReviewKycDto) {
     return this.identity.reviewKyc(id, dto);
+  }
+
+  /** PLAN.md "Directory order-eligibility gate" — a directory-only dummy listing, no login. */
+  @UseGuards(AdminGuard)
+  @Post('admin/professionals')
+  adminCreateProfessional(@Body() dto: AdminCreateProfessionalDto) {
+    return this.identity.adminCreateDummyProfessional(dto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Patch('admin/users/:id/display-name')
+  adminRenameUser(@Param('id') id: string, @Body() dto: AdminRenameUserDto) {
+    return this.identity.adminRenameUser(id, dto.displayName);
+  }
+
+  /** Idempotent — adds (or re-enables) one submarket listing for an existing user, without touching their other categories. */
+  @UseGuards(AdminGuard)
+  @Patch('admin/professionals/:userId/submarkets/:submarketKey/add')
+  async adminAddServiceOffering(
+    @Param('userId') userId: string,
+    @Param('submarketKey') submarketKey: string,
+    @Body() dto: AdminAddServiceOfferingDto,
+  ) {
+    await this.identity.adminAddServiceOffering(userId, submarketKey, dto.acceptingOrders);
+    return { ok: true };
+  }
+
+  /** Removes only this one submarket listing — the account itself is untouched. */
+  @UseGuards(AdminGuard)
+  @Patch('admin/professionals/:userId/submarkets/:submarketKey/remove')
+  async adminRemoveServiceOffering(@Param('userId') userId: string, @Param('submarketKey') submarketKey: string) {
+    await this.identity.adminRemoveServiceOffering(userId, submarketKey);
+    return { ok: true };
+  }
+
+  @UseGuards(AdminGuard)
+  @Patch('admin/professionals/:userId/submarkets/:submarketKey/accepting-orders')
+  async adminSetAcceptingOrders(
+    @Param('userId') userId: string,
+    @Param('submarketKey') submarketKey: string,
+    @Body() dto: AdminSetAcceptingOrdersDto,
+  ) {
+    await this.identity.adminSetAcceptingOrders(userId, submarketKey, dto.acceptingOrders);
+    return { ok: true };
   }
 }

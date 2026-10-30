@@ -104,8 +104,21 @@ export interface VirtualAccountResult {
  * entirely, even though it's the same vendor.
  */
 export interface BachsConnectAccountPort {
-  /** Creates the connected account with virtual_accounts AND transfers requested. Returns Bachs' acct_... id. */
-  createAccount(input: { contactEmail: string; displayName: string }): Promise<string>;
+  /**
+   * Creates the connected account with virtual_accounts AND transfers
+   * requested. Returns Bachs' acct_... id. firstName/lastName/bvn are
+   * part of this call's input (not just submitRepresentative's) because
+   * PagaConnectAccountProvider needs them here: Paga's
+   * registerPersistentPaymentAccount is ONE call that both creates the
+   * account AND returns its real, final bank account number — unlike
+   * Bachs/Nomba, there's no separate "create, then verify identity"
+   * step, so Paga does its real work in createAccount and leaves
+   * submitRepresentative a no-op (the mirror image of
+   * NombaConnectAccountProvider, which does its real work in
+   * submitRepresentative and leaves createAccount a no-op). Bachs and
+   * Nomba both ignore these three extra fields.
+   */
+  createAccount(input: { contactEmail: string; displayName: string; firstName: string; lastName: string; bvn: string }): Promise<string>;
   /** Submits the BVN representative — the actual identity-verification step. */
   submitRepresentative(accountId: string, input: SubmitIdentityInput): Promise<void>;
   /** Reads the virtual_accounts capability's current status straight from Bachs — never cached. */
@@ -173,6 +186,24 @@ export interface BachsPayoutPort {
 }
 
 export const BACHS_PAYOUT_PORT = 'BACHS_PAYOUT_PORT';
+
+/**
+ * PLAN.md "Settlement sweep" — the ONE rail every actual user payout
+ * executes through, always, regardless of ENOUGH_PROVIDER_KEY (which only
+ * controls which provider NEW accounts/deposits are created under). Fixed
+ * to Paga in enough.module.ts, not switchable — chosen as the central
+ * settlement balance over Bachs (no working transfers-out yet) and Nomba
+ * (works, but Paga's the one both collecting and paying out already, so
+ * consolidating onto it means fewer moving parts, not more). See
+ * SettlementSweepService's doc comment for why: deposits collected on a
+ * different provider (Bachs, or Nomba) are physically swept into Paga's
+ * one business-account balance by that background job, so Paga is the
+ * only rail that can ever be guaranteed to actually hold the funds a
+ * payout needs. BACHS_PAYOUT_PORT stays switchable and is still used —
+ * but only by SettlementSweepService, to pull+sweep money OUT of Bachs
+ * or Nomba, never for a user-facing withdrawal.
+ */
+export const SETTLEMENT_PAYOUT_PORT = 'SETTLEMENT_PAYOUT_PORT';
 
 /** Where a payment draws from — the landing spot, or a specific purpose's unlocked balance. */
 export type PaymentSource = { type: 'landing_spot' } | { type: 'purpose'; purposeId: string };

@@ -64,7 +64,7 @@ export class BachsConnectAccountProvider implements BachsConnectAccountPort {
     return { ok: response.ok, status: response.status, data };
   }
 
-  async createAccount(input: { contactEmail: string; displayName: string }): Promise<string> {
+  async createAccount(input: { contactEmail: string; displayName: string; firstName: string; lastName: string; bvn: string }): Promise<string> {
     // transfers requested alongside virtual_accounts (confirmed live,
     // 2026-10-20) — Make Payment's self-transfer step needs it, and
     // "unrequested" never becomes active on its own, unlike "restricted"

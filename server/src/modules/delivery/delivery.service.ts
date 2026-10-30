@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DELIVERY_PROVIDER_PORT, DeliveryLeg, DeliveryLocation, DeliveryProviderPort } from './delivery.interface';
+import { WHATSAPP_PORT, WhatsAppPort } from '../whatsapp/whatsapp.interface';
+import { DELIVERY_PROVIDER_PORT, DeliveryLeg, DeliveryLocation, DeliveryProviderPort, DeliveryTaskResult } from './delivery.interface';
+import { hashPickupCode, PICKUP_CODE_TTL_MS } from './pickup-code.util';
 
 /**
  * PLAN.md "KWIK delivery integration" — the only submarket that needs a
@@ -34,6 +36,7 @@ export class DeliveryService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(DELIVERY_PROVIDER_PORT) private readonly provider: DeliveryProviderPort,
+    @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
   ) {}
 
   static isDeliveryEligible(submarketKey: string): boolean {
@@ -85,8 +88,8 @@ export class DeliveryService {
       const reason = !clientLocation
         ? 'client location has no geocoded coordinates or phone — WhatsApp-originated gigs commonly lack this, see PLAN.md'
         : "professional has no registered shop address/coordinates — they haven't set professionalAddressText/Lat/Lng yet";
-      this.logger.warn(`Skipping KWIK dispatch for gig ${gigId} (${leg}): ${reason}`);
-      await this.recordTask(gigId, leg, null, reason);
+      this.logger.warn(`Skipping ${this.provider.providerKey} dispatch for gig ${gigId} (${leg}): ${reason}`);
+      await this.recordTask(gigId, leg, { providerJobId: null, failureReason: reason });
       return;
     }
 
@@ -94,29 +97,87 @@ export class DeliveryService {
 
     const result = await this.provider.createTask({ leg, pickup, dropoff, itemDescription: gig.description });
     if (!result) {
-      await this.recordTask(gigId, leg, null, 'KWIK dispatch failed or provider not configured — see server logs');
+      await this.recordTask(gigId, leg, {
+        providerJobId: null,
+        failureReason: `${this.provider.providerKey} dispatch failed or provider not configured — see server logs`,
+      });
       return;
     }
 
-    await this.recordTask(gigId, leg, result.providerJobId, null, result.trackingLink);
+    await this.recordTask(gigId, leg, {
+      providerJobId: result.providerJobId,
+      trackingLink: result.trackingLink,
+      riderId: result.riderId,
+      pickupCode: result.pickupCode,
+      statusOverride: result.status,
+    });
+
+    await this.sendDispatchNotifications(leg, client, professional, result).catch((err) => {
+      this.logger.warn(`Dispatch notifications failed for gig ${gigId} (${leg}): ${err instanceof Error ? err.message : err}`);
+    });
   }
 
   private async recordTask(
     gigId: string,
     leg: DeliveryLeg,
-    providerJobId: string | null,
-    failureReason: string | null,
-    trackingLink?: string,
+    opts: {
+      providerJobId: string | null;
+      failureReason?: string | null;
+      trackingLink?: string;
+      riderId?: string;
+      pickupCode?: string;
+      statusOverride?: DeliveryTaskResult['status'];
+    },
   ): Promise<void> {
+    const pickupCodeHash = opts.pickupCode ? await hashPickupCode(opts.pickupCode) : undefined;
     await this.prisma.deliveryTask.create({
       data: {
         gigId,
         leg,
-        providerJobId,
-        failureReason,
-        trackingLink,
-        status: providerJobId ? 'upcoming' : 'failed',
+        provider: this.provider.providerKey,
+        providerJobId: opts.providerJobId,
+        failureReason: opts.failureReason ?? null,
+        trackingLink: opts.trackingLink,
+        riderId: opts.riderId,
+        pickupCodeHash,
+        pickupCodeExpiresAt: pickupCodeHash ? new Date(Date.now() + PICKUP_CODE_TTL_MS) : undefined,
+        status: opts.statusOverride ?? (opts.providerJobId ? 'upcoming' : 'failed'),
       },
     });
+  }
+
+  /**
+   * PLAN.md "Autonomous notification/order-status architecture" — the
+   * "company gets WhatsApp too" (professional, pickup leg only) and
+   * "clothes are done, tell the rider and the client at once" (return leg)
+   * pieces of that vision. Best-effort, same discipline as the rest of this
+   * file: a failed send here must never undo the dispatch it's attached to
+   * — see this.dispatch's .catch() around this call.
+   */
+  private async sendDispatchNotifications(
+    leg: DeliveryLeg,
+    client: { name: string | null; phone: string | null },
+    professional: { name: string | null; phone: string | null },
+    result: DeliveryTaskResult,
+  ): Promise<void> {
+    if (leg === 'pickup_to_professional') {
+      if (professional.phone) {
+        await this.whatsapp.sendMessage(
+          professional.phone,
+          `📦 New order incoming on Sorted! A client has booked you — we'll let you know once it's on its way.`,
+        );
+      }
+      if (client.phone && result.pickupCode) {
+        await this.whatsapp.sendMessage(
+          client.phone,
+          `Your Sorted pickup code is *${result.pickupCode}*. Give this to the rider when they arrive to collect your items.`,
+        );
+      }
+    } else if (client.phone && result.riderId) {
+      await this.whatsapp.sendMessage(
+        client.phone,
+        `🎉 Your clothes are clean and ready! A rider has been arranged to bring them back to you shortly.`,
+      );
+    }
   }
 }

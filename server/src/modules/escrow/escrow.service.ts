@@ -60,6 +60,11 @@ export class EscrowService implements EscrowPort {
       throw new BadRequestException(`Gig must be open to claim, was "${gig.status}"`);
     }
     await this.identity.assertRole(professionalId, 'professional');
+    // PLAN.md "Directory order-eligibility gate" — the one enforcement point
+    // for every claim path (WhatsApp conversation/broadcast/invite all call
+    // holdStake too). A directory-only/dummy listing throws here, before
+    // anything else below is touched.
+    await this.identity.assertAcceptingOrders(professionalId, gig.submarket);
 
     // v1: trivial accept, no shortlist/bidding — see FixedPriceAcceptStrategy's
     // own doc comment. Called before the transaction below so a future

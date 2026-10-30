@@ -32,6 +32,7 @@ import {
 @Injectable()
 export class KwikDeliveryService implements DeliveryProviderPort {
   private readonly logger = new Logger(KwikDeliveryService.name);
+  readonly providerKey = 'kwik';
 
   // Nigeria (WAT, UTC+1) as a fixed offset — KWIK's own examples encode
   // "ahead of UTC" zones as negative minutes (e.g. IST +5:30 -> -330), so

@@ -239,6 +239,21 @@ export interface ProfessionalDirectoryEntry {
   avatarBase64: string | null;
   kycStatus: KycStatus;
   accountType: AccountType;
+  /** PLAN.md "Directory order-eligibility gate" — false means listed but not claimable; see EscrowService.holdStake. */
+  acceptingOrders: boolean;
+}
+
+/**
+ * PLAN.md "Directory order-eligibility gate" — admin-only creation of a
+ * directory-only listing (no login, no phone/email — see
+ * IdentityService.adminCreateDummyProfessional's doc comment). Defaults to
+ * NOT accepting orders: a dummy listing created for display has to be
+ * explicitly flipped on, never the other way around.
+ */
+export interface AdminCreateProfessionalInput {
+  displayName: string;
+  submarketKey: string;
+  acceptingOrders?: boolean;
 }
 
 /** The only surface other modules may call into Identity through. */

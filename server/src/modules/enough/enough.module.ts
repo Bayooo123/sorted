@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthModule } from '../../common/auth/auth.module';
 import { ReputationNotificationsModule } from '../reputation-notifications/reputation-notifications.module';
 import { EnoughAccountsService } from './enough-accounts.service';
@@ -11,9 +12,23 @@ import { EnoughPlanController } from './enough-plan.controller';
 import { EnoughPaymentsController } from './enough-payments.controller';
 import { EnoughWebhookController } from './enough-webhook.controller';
 import { EnoughPayoutWebhookController } from './enough-payout-webhook.controller';
+import { NombaWebhookController } from './nomba-webhook.controller';
+import { PagaWebhookController } from './paga-webhook.controller';
+import { SettlementSweepService } from './settlement-sweep.service';
+import { SettlementCronController } from './settlement-cron.controller';
 import { BachsConnectAccountProvider } from './providers/bachs-connect-account.provider';
 import { BachsPayoutProvider } from './providers/bachs-payout.provider';
-import { BACHS_CONNECT_ACCOUNT_PORT, BACHS_PAYOUT_PORT } from './enough.interface';
+import { NombaConnectAccountProvider } from './providers/nomba-connect-account.provider';
+import { NombaPayoutProvider } from './providers/nomba-payout.provider';
+import { PagaConnectAccountProvider } from './providers/paga-connect-account.provider';
+import { PagaPayoutProvider } from './providers/paga-payout.provider';
+import {
+  BachsConnectAccountPort,
+  BachsPayoutPort,
+  BACHS_CONNECT_ACCOUNT_PORT,
+  BACHS_PAYOUT_PORT,
+  SETTLEMENT_PAYOUT_PORT,
+} from './enough.interface';
 
 /**
  * PLAN.md "Enough: Bachs Connect account per signup" — AuthModule imported
@@ -31,14 +46,51 @@ import { BACHS_CONNECT_ACCOUNT_PORT, BACHS_PAYOUT_PORT } from './enough.interfac
     EnoughPaymentsController,
     EnoughWebhookController,
     EnoughPayoutWebhookController,
+    NombaWebhookController,
+    PagaWebhookController,
+    SettlementCronController,
   ],
   providers: [
     EnoughAccountsService,
     EnoughPurposesService,
     EnoughPlanService,
     EnoughPaymentsService,
-    { provide: BACHS_CONNECT_ACCOUNT_PORT, useClass: BachsConnectAccountProvider },
-    { provide: BACHS_PAYOUT_PORT, useClass: BachsPayoutProvider },
+    SettlementSweepService,
+    BachsConnectAccountProvider,
+    BachsPayoutProvider,
+    NombaConnectAccountProvider,
+    NombaPayoutProvider,
+    PagaConnectAccountProvider,
+    PagaPayoutProvider,
+    {
+      provide: BACHS_CONNECT_ACCOUNT_PORT,
+      // Paga is the default (unset, or any value other than 'bachs'/
+      // 'nomba') — Bachs doesn't support real transfers out yet and
+      // Paga is the one rail confirmed to both collect AND pay out, so
+      // it's the safer default for new signups. 'bachs'/'nomba' stay
+      // explicitly selectable.
+      useFactory: (
+        config: ConfigService,
+        bachs: BachsConnectAccountProvider,
+        nomba: NombaConnectAccountProvider,
+        paga: PagaConnectAccountProvider,
+      ): BachsConnectAccountPort => {
+        const key = config.get<string>('ENOUGH_PROVIDER_KEY');
+        return key === 'bachs' ? bachs : key === 'nomba' ? nomba : paga;
+      },
+      inject: [ConfigService, BachsConnectAccountProvider, NombaConnectAccountProvider, PagaConnectAccountProvider],
+    },
+    {
+      provide: BACHS_PAYOUT_PORT,
+      useFactory: (config: ConfigService, bachs: BachsPayoutProvider, nomba: NombaPayoutProvider, paga: PagaPayoutProvider): BachsPayoutPort => {
+        const key = config.get<string>('ENOUGH_PROVIDER_KEY');
+        return key === 'bachs' ? bachs : key === 'nomba' ? nomba : paga;
+      },
+      inject: [ConfigService, BachsPayoutProvider, NombaPayoutProvider, PagaPayoutProvider],
+    },
+    // PLAN.md "Settlement sweep" — fixed to Paga, never switched by
+    // ENOUGH_PROVIDER_KEY. See SETTLEMENT_PAYOUT_PORT's doc comment.
+    { provide: SETTLEMENT_PAYOUT_PORT, useExisting: PagaPayoutProvider },
   ],
 })
 export class EnoughModule {}

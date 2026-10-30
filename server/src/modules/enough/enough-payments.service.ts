@@ -2,27 +2,25 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Una
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
-import {
-  BACHS_CONNECT_ACCOUNT_PORT,
-  BACHS_PAYOUT_PORT,
-  BachsConnectAccountPort,
-  BachsPayoutPort,
-  BankOption,
-  PaymentEventView,
-  PaymentSource,
-  ResolvedAccount,
-  TransfersNotEnabledError,
-} from './enough.interface';
+import { BankOption, PaymentEventView, PaymentSource, ResolvedAccount, SETTLEMENT_PAYOUT_PORT, BachsPayoutPort } from './enough.interface';
 
 /**
- * PLAN.md "Enough: Make Payment" — see BachsPayoutPort's doc comment for
- * the unverified-against-real-docs caveat. Debits the source (landing
- * spot, or a purpose's balance minus its locked tranches) atomically
- * alongside creating the EnoughPaymentEvent row, THEN calls Bachs — a
- * synchronous failure there credits the source back immediately; a
- * synchronous success leaves the row 'processing' for the payout webhook
- * to resolve. A webhook-reported failure also credits back, since the
- * money demonstrably never left.
+ * PLAN.md "Enough: Make Payment" / "Settlement sweep" — debits the source
+ * (landing spot, or a purpose's balance minus its locked tranches)
+ * atomically alongside creating the EnoughPaymentEvent row, THEN calls
+ * out to the settlement provider — a synchronous failure there credits
+ * the source back immediately; a synchronous success leaves the row
+ * 'processing' for the payout webhook to resolve. A webhook-reported
+ * failure also credits back, since the money demonstrably never left.
+ *
+ * Always uses SETTLEMENT_PAYOUT_PORT (fixed to Paga, never switched by
+ * ENOUGH_PROVIDER_KEY) — NOT whichever provider this account's own
+ * deposits happen to be tagged with (EnoughAccount.provider). A Bachs-
+ * or Nomba-tagged account's money has to be physically swept into
+ * Paga's settlement balance first (see SettlementSweepService) before a
+ * payout for it can succeed; calling Bachs/Nomba directly here would
+ * only ever see that one account's own un-swept balance, not the
+ * platform's actual settled liquidity.
  */
 @Injectable()
 export class EnoughPaymentsService {
@@ -30,8 +28,7 @@ export class EnoughPaymentsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(BACHS_PAYOUT_PORT) private readonly bachs: BachsPayoutPort,
-    @Inject(BACHS_CONNECT_ACCOUNT_PORT) private readonly bachsConnect: BachsConnectAccountPort,
+    @Inject(SETTLEMENT_PAYOUT_PORT) private readonly settlement: BachsPayoutPort,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
   ) {}
 
@@ -74,12 +71,12 @@ export class EnoughPaymentsService {
   }
 
   listBanks(): Promise<BankOption[]> {
-    return this.bachs.listBanks();
+    return this.settlement.listBanks();
   }
 
   async resolveAccount(userId: string, bankCode: string, accountNumber: string): Promise<ResolvedAccount> {
     await this.requireAccount(userId);
-    return this.bachs.resolveAccount(bankCode, accountNumber);
+    return this.settlement.resolveAccount(bankCode, accountNumber);
   }
 
   async listPayments(userId: string): Promise<PaymentEventView[]> {
@@ -106,8 +103,8 @@ export class EnoughPaymentsService {
     if (!pinMatches) throw new UnauthorizedException('Incorrect PIN.');
 
     // Resolved server-side, authoritative — never trusts a client-supplied name.
-    const resolved = await this.bachs.resolveAccount(bankCode, accountNumber);
-    const bank = (await this.bachs.listBanks()).find((b) => b.code === bankCode);
+    const resolved = await this.settlement.resolveAccount(bankCode, accountNumber);
+    const bank = (await this.settlement.listBanks()).find((b) => b.code === bankCode);
 
     let purposeId: string | null = null;
     if (source.type === 'purpose') {
@@ -152,8 +149,12 @@ export class EnoughPaymentsService {
     });
 
     try {
-      const transferId = await this.bachs.pullToPlatform(account.bachsAccountId, amountKobo);
-      const withdrawal = await this.bachs.createWithdrawal({
+      // pullToPlatform is a no-op for the settlement provider (Paga) —
+      // see PagaPayoutProvider's doc comment. account.bachsAccountId is
+      // passed through for record-keeping only; Paga never reads it, and
+      // this call never actually fails for a reason specific to it.
+      const transferId = await this.settlement.pullToPlatform(account.bachsAccountId, amountKobo);
+      const withdrawal = await this.settlement.createWithdrawal({
         bankCode,
         accountNumber,
         accountName: resolved.accountName,
@@ -161,44 +162,59 @@ export class EnoughPaymentsService {
         reference: paymentEvent.id,
         email: account.user.email,
       });
+      // Paga's depositToBank responds synchronously with a definitive
+      // "Successfully deposited..." result (see PagaPayoutProvider.
+      // createWithdrawal's doc comment) — unlike Nomba/Bachs, there's no
+      // async pending state to wait on a webhook for, and Paga's payout-
+      // webhook payload is unconfirmed anyway (PagaPayoutProvider.
+      // verifyWebhook fails closed), so a Paga-routed payment that waited
+      // on that webhook would never resolve. withdrawal.status ===
+      // 'completed' is the signal a provider gives when ITS OWN response
+      // is already final — resolve immediately rather than leaving the
+      // row in 'processing' purgatory. Nomba/Bachs never return this
+      // exact value today, so their existing webhook-resolved behavior
+      // (leaving the row 'processing' here) is unchanged.
+      const resolvedSynchronously = withdrawal.status === 'completed';
       const updated = await this.prisma.enoughPaymentEvent.update({
         where: { id: paymentEvent.id },
-        data: { bachsTransferId: transferId, bachsWithdrawalId: withdrawal.withdrawalId },
+        data: {
+          bachsTransferId: transferId,
+          bachsWithdrawalId: withdrawal.withdrawalId,
+          ...(resolvedSynchronously ? { status: 'completed' as const } : {}),
+        },
       });
+
+      // Mirrors handlePayoutWebhook's own notification exactly — that
+      // path never fires for a provider resolved synchronously here (no
+      // webhook is coming), so this is the only place a Paga-routed
+      // payment's "completed" email gets sent from.
+      if (resolvedSynchronously && account.user.email) {
+        this.notifications
+          .notify(
+            { userId: account.userId, email: account.user.email },
+            {
+              kind: 'enough_payment_status_changed',
+              completed: true,
+              amountKobo: Number(amountKobo),
+              recipientAccountName: resolved.accountName,
+              failureReason: null,
+            },
+          )
+          .catch((err) => {
+            this.logger.warn(`Payment status email failed for ${paymentEvent.id}: ${err instanceof Error ? err.message : err}`);
+          });
+      }
+
       return this.toView(updated);
     } catch (err) {
       // Synchronous failure — credit the source back and mark failed
       // immediately, rather than leaving money debited with nowhere to go.
+      // Most likely cause now: this account's balance hasn't been swept
+      // into the settlement provider yet (SettlementSweepService runs on
+      // a schedule, not synchronously per-payment) — surfaced as the same
+      // generic message as any other failure, since from the user's side
+      // there's nothing actionable to tell them apart.
       await this.creditBackAndMarkFailed(paymentEvent.id, account.id, purposeId, amountKobo, err instanceof Error ? err.message : 'Payment failed.');
-
-      if (err instanceof TransfersNotEnabledError) {
-        // Self-heal the REQUEST so a never-requested account doesn't stay
-        // stuck forever — but confirmed with Bachs support (2026-10-21):
-        // activating the capability itself needs a manual review pass on
-        // their side, not just satisfying requirements, and the only
-        // reliable signal that review has finished is a capability.updated
-        // webhook (EnoughAccountsService.handleTransfersCapabilityUpdated),
-        // not a quick retry. Repeating the request here is harmless —
-        // Bachs treats a repeat "requested: true" as a no-op — but "try
-        // again in a few seconds" was actively misleading and is gone.
-        //
-        // AWAITED, not fire-and-forget — confirmed live, 2026-10-20/21:
-        // a dangling un-awaited promise here raced against this serverless
-        // function's response being sent and Vercel freezing/killing the
-        // execution context, so the request sometimes never completed at
-        // all (no log, capability never actually requested). Awaiting adds
-        // a little latency to this error response but guarantees the
-        // request — and its diagnostic log — actually happens every time.
-        try {
-          await this.bachsConnect.requestTransfersCapability(account.bachsAccountId);
-        } catch (reqErr) {
-          this.logger.warn(`Failed to request transfers capability for ${account.bachsAccountId}: ${reqErr instanceof Error ? reqErr.message : reqErr}`);
-        }
-        throw new BadRequestException(
-          "Bank transfers aren't turned on for your account yet — this needs a one-time review on our payments partner's side, which can take a while. We'll email you the moment it's ready.",
-        );
-      }
-
       throw new BadRequestException('Could not send that payment right now — your money has not left your account.');
     }
   }

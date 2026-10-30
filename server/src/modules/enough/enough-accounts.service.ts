@@ -1,8 +1,11 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NOTIFICATIONS_PORT, NotificationsPort } from '../reputation-notifications/notifications.interface';
 import { BACHS_CONNECT_ACCOUNT_PORT, BachsConnectAccountPort, EnoughAccountView, HistoryEntry, SubmitIdentityInput } from './enough.interface';
+import { PagaConnectAccountProvider } from './providers/paga-connect-account.provider';
+import { SettlementSweepService } from './settlement-sweep.service';
 
 // Same rounds as IdentityService's own BCRYPT_ROUNDS — not imported, same
 // reasoning as that constant being module-local rather than shared.
@@ -20,8 +23,16 @@ export class EnoughAccountsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
     @Inject(BACHS_CONNECT_ACCOUNT_PORT) private readonly bachs: BachsConnectAccountPort,
     @Inject(NOTIFICATIONS_PORT) private readonly notifications: NotificationsPort,
+    // Injected directly (not via the switchable BACHS_CONNECT_ACCOUNT_PORT
+    // token) — migrateToPaga below must always target Paga specifically,
+    // regardless of what ENOUGH_PROVIDER_KEY currently points new signups
+    // at, same reasoning as SettlementSweepService/EnoughPaymentsService
+    // injecting concrete provider classes directly elsewhere.
+    private readonly paga: PagaConnectAccountProvider,
+    private readonly settlementSweep: SettlementSweepService,
   ) {}
 
   /**
@@ -47,7 +58,13 @@ export class EnoughAccountsService {
     }
 
     const displayName = `${input.firstName} ${input.lastName} — Enough`;
-    const bachsAccountId = await this.bachs.createAccount({ contactEmail: user.email, displayName });
+    const bachsAccountId = await this.bachs.createAccount({
+      contactEmail: user.email,
+      displayName,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      bvn: input.bvn,
+    });
     await this.bachs.submitRepresentative(bachsAccountId, input);
 
     // Sandbox activates virtual_accounts immediately on account creation
@@ -59,10 +76,20 @@ export class EnoughAccountsService {
     // works end to end.
     const capability = await this.bachs.checkCapability(bachsAccountId);
 
+    // PLAN.md "Settlement sweep" — stamps which rail this account's
+    // deposits actually land on, read once here (not re-derived later —
+    // switching ENOUGH_PROVIDER_KEY afterward must never silently change
+    // which provider an EXISTING account's money is tracked against).
+    // Paga is the default (unset, or anything other than 'bachs'/'nomba')
+    // — see enough.module.ts's factories for why.
+    const providerKey = this.config.get<string>('ENOUGH_PROVIDER_KEY');
+    const provider = providerKey === 'bachs' || providerKey === 'nomba' ? providerKey : 'paga';
+
     const account = await this.prisma.enoughAccount.create({
       data: {
         userId,
         bachsAccountId,
+        provider,
         displayName,
         capabilityStatus: capability.status,
         capabilityStatusDetail: capability.detail,
@@ -309,5 +336,93 @@ export class EnoughAccountsService {
           this.logger.warn(`Enough deposit email failed for user ${account.userId}: ${err instanceof Error ? err.message : err}`);
         });
     }
+  }
+
+  /**
+   * One-off, admin-triggered migration for an EXISTING account onto Paga
+   * — see EnoughController's admin route. Not something ENOUGH_PROVIDER_KEY
+   * or any webhook does automatically: a real user's deposit account
+   * number is changing (their OLD Bachs/Nomba virtual account stops being
+   * the one to send to), which needs telling them, not silently flipping.
+   *
+   * firstName/lastName/BVN aren't stored anywhere after the original
+   * submitIdentity call (BVN deliberately isn't duplicated in our own DB
+   * — see EnoughAccount.bachsAccountId's doc comment on Bachs/Nomba
+   * holding identity data, not us). Re-derives firstName/lastName from
+   * the stored displayName ("First Last — Enough") instead of asking the
+   * user to resubmit anything — Paga's financialIdentificationNumber
+   * (BVN) is OPTIONAL per its own docs (hashIndex-3, Required: False),
+   * so this doesn't need the BVN at all.
+   *
+   * Runs a full settlement sweep FIRST, before touching this account's
+   * `provider` column — SettlementSweepService's query is keyed off the
+   * CURRENT provider value, so anything still sitting un-swept in this
+   * account's old Bachs/Nomba sub-ledger would be silently orphaned
+   * (invisible to every future sweep) if the column flipped to 'paga'
+   * first. Safe to run anytime; a no-op if nothing's pending, and it
+   * sweeps every other account too, not just this one — that's fine,
+   * the whole point of the sweep is to keep every provider's balance
+   * consolidated into Paga regardless of which account triggered it.
+   */
+  async migrateToPaga(userId: string): Promise<EnoughAccountView> {
+    const account = await this.prisma.enoughAccount.findUnique({ where: { userId }, include: { user: true } });
+    if (!account) throw new NotFoundException('No Enough account for this user.');
+    if (account.provider === 'paga') throw new ConflictException('This account is already on Paga.');
+    if (!account.user.email) throw new BadRequestException('This account has no email on file — cannot register a Paga persistent payment account.');
+
+    const nameMatch = account.displayName.match(/^(\S+)\s+(.+?)\s*—\s*Enough\s*$/);
+    const firstName = nameMatch?.[1] ?? account.displayName;
+    const lastName = nameMatch?.[2] ?? '';
+
+    const oldAccountNumber = account.virtualAccountNumber;
+    const oldBankName = account.virtualAccountBankName;
+
+    await this.settlementSweep.runSweep();
+
+    const newAccountNumber = await this.paga.createAccount({
+      contactEmail: account.user.email,
+      displayName: account.displayName,
+      firstName,
+      lastName,
+      bvn: '',
+    });
+
+    await this.prisma.enoughAccount.update({
+      where: { id: account.id },
+      data: {
+        provider: 'paga',
+        bachsAccountId: newAccountNumber,
+        capabilityStatus: 'active',
+        capabilityStatusDetail: null,
+        virtualAccountId: newAccountNumber,
+        virtualAccountNumber: newAccountNumber,
+        virtualAccountBankName: 'Paga',
+        virtualAccountBankCode: null,
+      },
+    });
+
+    this.logger.log(`Migrated Enough account ${account.id} (user ${userId}) from ${account.provider} to Paga (new account ${newAccountNumber})`);
+
+    // Critical, not fire-and-log — the whole point is the user finds out
+    // their deposit account number changed before they (or whoever pays
+    // them) sends money to the old one.
+    try {
+      await this.notifications.notify(
+        { userId, email: account.user.email },
+        {
+          kind: 'enough_deposit_account_changed',
+          oldAccountNumber,
+          oldBankName,
+          newAccountNumber,
+          newBankName: 'Paga',
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Deposit-account-changed email FAILED for user ${userId} after migrating to Paga (new account ${newAccountNumber}) — tell them manually: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    return this.getAccountView(userId);
   }
 }
