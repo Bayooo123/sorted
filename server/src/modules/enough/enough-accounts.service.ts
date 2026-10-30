@@ -49,7 +49,13 @@ export class EnoughAccountsService {
     }
 
     const displayName = `${input.firstName} ${input.lastName} — Enough`;
-    const bachsAccountId = await this.bachs.createAccount({ contactEmail: user.email, displayName });
+    const bachsAccountId = await this.bachs.createAccount({
+      contactEmail: user.email,
+      displayName,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      bvn: input.bvn,
+    });
     await this.bachs.submitRepresentative(bachsAccountId, input);
 
     // Sandbox activates virtual_accounts immediately on account creation
@@ -65,7 +71,8 @@ export class EnoughAccountsService {
     // deposits actually land on, read once here (not re-derived later —
     // switching ENOUGH_PROVIDER_KEY afterward must never silently change
     // which provider an EXISTING account's money is tracked against).
-    const provider = this.config.get<string>('ENOUGH_PROVIDER_KEY') === 'nomba' ? 'nomba' : 'bachs';
+    const providerKey = this.config.get<string>('ENOUGH_PROVIDER_KEY');
+    const provider = providerKey === 'nomba' || providerKey === 'paga' ? providerKey : 'bachs';
 
     const account = await this.prisma.enoughAccount.create({
       data: {

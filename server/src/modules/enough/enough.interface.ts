@@ -104,8 +104,21 @@ export interface VirtualAccountResult {
  * entirely, even though it's the same vendor.
  */
 export interface BachsConnectAccountPort {
-  /** Creates the connected account with virtual_accounts AND transfers requested. Returns Bachs' acct_... id. */
-  createAccount(input: { contactEmail: string; displayName: string }): Promise<string>;
+  /**
+   * Creates the connected account with virtual_accounts AND transfers
+   * requested. Returns Bachs' acct_... id. firstName/lastName/bvn are
+   * part of this call's input (not just submitRepresentative's) because
+   * PagaConnectAccountProvider needs them here: Paga's
+   * registerPersistentPaymentAccount is ONE call that both creates the
+   * account AND returns its real, final bank account number — unlike
+   * Bachs/Nomba, there's no separate "create, then verify identity"
+   * step, so Paga does its real work in createAccount and leaves
+   * submitRepresentative a no-op (the mirror image of
+   * NombaConnectAccountProvider, which does its real work in
+   * submitRepresentative and leaves createAccount a no-op). Bachs and
+   * Nomba both ignore these three extra fields.
+   */
+  createAccount(input: { contactEmail: string; displayName: string; firstName: string; lastName: string; bvn: string }): Promise<string>;
   /** Submits the BVN representative — the actual identity-verification step. */
   submitRepresentative(accountId: string, input: SubmitIdentityInput): Promise<void>;
   /** Reads the virtual_accounts capability's current status straight from Bachs — never cached. */

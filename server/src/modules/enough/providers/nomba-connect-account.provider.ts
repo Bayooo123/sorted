@@ -117,7 +117,7 @@ export class NombaConnectAccountProvider implements BachsConnectAccountPort {
    * generic name, see enough.interface.ts's BachsConnectAccountPort doc
    * comment on why that column is provider-agnostic in practice already.
    */
-  async createAccount(): Promise<string> {
+  async createAccount(_input: { contactEmail: string; displayName: string; firstName: string; lastName: string; bvn: string }): Promise<string> {
     return `nomba_${randomUUID()}`;
   }
 

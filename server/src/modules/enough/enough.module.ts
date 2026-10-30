@@ -13,12 +13,15 @@ import { EnoughPaymentsController } from './enough-payments.controller';
 import { EnoughWebhookController } from './enough-webhook.controller';
 import { EnoughPayoutWebhookController } from './enough-payout-webhook.controller';
 import { NombaWebhookController } from './nomba-webhook.controller';
+import { PagaWebhookController } from './paga-webhook.controller';
 import { SettlementSweepService } from './settlement-sweep.service';
 import { SettlementCronController } from './settlement-cron.controller';
 import { BachsConnectAccountProvider } from './providers/bachs-connect-account.provider';
 import { BachsPayoutProvider } from './providers/bachs-payout.provider';
 import { NombaConnectAccountProvider } from './providers/nomba-connect-account.provider';
 import { NombaPayoutProvider } from './providers/nomba-payout.provider';
+import { PagaConnectAccountProvider } from './providers/paga-connect-account.provider';
+import { PagaPayoutProvider } from './providers/paga-payout.provider';
 import {
   BachsConnectAccountPort,
   BachsPayoutPort,
@@ -44,6 +47,7 @@ import {
     EnoughWebhookController,
     EnoughPayoutWebhookController,
     NombaWebhookController,
+    PagaWebhookController,
     SettlementCronController,
   ],
   providers: [
@@ -56,17 +60,28 @@ import {
     BachsPayoutProvider,
     NombaConnectAccountProvider,
     NombaPayoutProvider,
+    PagaConnectAccountProvider,
+    PagaPayoutProvider,
     {
       provide: BACHS_CONNECT_ACCOUNT_PORT,
-      useFactory: (config: ConfigService, bachs: BachsConnectAccountProvider, nomba: NombaConnectAccountProvider): BachsConnectAccountPort =>
-        config.get<string>('ENOUGH_PROVIDER_KEY') === 'nomba' ? nomba : bachs,
-      inject: [ConfigService, BachsConnectAccountProvider, NombaConnectAccountProvider],
+      useFactory: (
+        config: ConfigService,
+        bachs: BachsConnectAccountProvider,
+        nomba: NombaConnectAccountProvider,
+        paga: PagaConnectAccountProvider,
+      ): BachsConnectAccountPort => {
+        const key = config.get<string>('ENOUGH_PROVIDER_KEY');
+        return key === 'nomba' ? nomba : key === 'paga' ? paga : bachs;
+      },
+      inject: [ConfigService, BachsConnectAccountProvider, NombaConnectAccountProvider, PagaConnectAccountProvider],
     },
     {
       provide: BACHS_PAYOUT_PORT,
-      useFactory: (config: ConfigService, bachs: BachsPayoutProvider, nomba: NombaPayoutProvider): BachsPayoutPort =>
-        config.get<string>('ENOUGH_PROVIDER_KEY') === 'nomba' ? nomba : bachs,
-      inject: [ConfigService, BachsPayoutProvider, NombaPayoutProvider],
+      useFactory: (config: ConfigService, bachs: BachsPayoutProvider, nomba: NombaPayoutProvider, paga: PagaPayoutProvider): BachsPayoutPort => {
+        const key = config.get<string>('ENOUGH_PROVIDER_KEY');
+        return key === 'nomba' ? nomba : key === 'paga' ? paga : bachs;
+      },
+      inject: [ConfigService, BachsPayoutProvider, NombaPayoutProvider, PagaPayoutProvider],
     },
     // PLAN.md "Settlement sweep" — fixed to Nomba, never switched by
     // ENOUGH_PROVIDER_KEY. See SETTLEMENT_PAYOUT_PORT's doc comment.
