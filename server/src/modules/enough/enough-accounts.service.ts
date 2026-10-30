@@ -71,8 +71,10 @@ export class EnoughAccountsService {
     // deposits actually land on, read once here (not re-derived later —
     // switching ENOUGH_PROVIDER_KEY afterward must never silently change
     // which provider an EXISTING account's money is tracked against).
+    // Paga is the default (unset, or anything other than 'bachs'/'nomba')
+    // — see enough.module.ts's factories for why.
     const providerKey = this.config.get<string>('ENOUGH_PROVIDER_KEY');
-    const provider = providerKey === 'nomba' || providerKey === 'paga' ? providerKey : 'bachs';
+    const provider = providerKey === 'bachs' || providerKey === 'nomba' ? providerKey : 'paga';
 
     const account = await this.prisma.enoughAccount.create({
       data: {

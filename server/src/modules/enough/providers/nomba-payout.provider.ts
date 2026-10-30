@@ -11,8 +11,16 @@ interface CachedToken {
 }
 
 /**
- * PLAN.md "Nomba integration" — replaces Bachs for Enough's Make Payment
- * (real money out). Confirmed against Nomba's real published docs
+ * PLAN.md "Nomba integration" — originally replaced Bachs for Enough's
+ * Make Payment (real money out); since the Paga integration, Paga is the
+ * one fixed SETTLEMENT_PAYOUT_PORT rail instead (see that constant's doc
+ * comment), so this class's createWithdrawal is now reached two ways:
+ * directly, if a user's own account is explicitly tagged 'nomba' AND
+ * BACHS_PAYOUT_PORT is used for something provider-specific (currently
+ * just EnoughPayoutWebhookController's inbound events); and via
+ * SettlementSweepService, which sweeps Nomba-collected deposits into
+ * Paga's settlement balance the same way it already did for Bachs.
+ * Confirmed against Nomba's real published docs
  * (developer.nomba.com, pasted into chat 2026-10-27). Still never run
  * against Nomba's sandbox from this environment — test end to end in
  * sandbox before relying on this with real money.

@@ -64,6 +64,11 @@ import {
     PagaPayoutProvider,
     {
       provide: BACHS_CONNECT_ACCOUNT_PORT,
+      // Paga is the default (unset, or any value other than 'bachs'/
+      // 'nomba') — Bachs doesn't support real transfers out yet and
+      // Paga is the one rail confirmed to both collect AND pay out, so
+      // it's the safer default for new signups. 'bachs'/'nomba' stay
+      // explicitly selectable.
       useFactory: (
         config: ConfigService,
         bachs: BachsConnectAccountProvider,
@@ -71,7 +76,7 @@ import {
         paga: PagaConnectAccountProvider,
       ): BachsConnectAccountPort => {
         const key = config.get<string>('ENOUGH_PROVIDER_KEY');
-        return key === 'nomba' ? nomba : key === 'paga' ? paga : bachs;
+        return key === 'bachs' ? bachs : key === 'nomba' ? nomba : paga;
       },
       inject: [ConfigService, BachsConnectAccountProvider, NombaConnectAccountProvider, PagaConnectAccountProvider],
     },
@@ -79,13 +84,13 @@ import {
       provide: BACHS_PAYOUT_PORT,
       useFactory: (config: ConfigService, bachs: BachsPayoutProvider, nomba: NombaPayoutProvider, paga: PagaPayoutProvider): BachsPayoutPort => {
         const key = config.get<string>('ENOUGH_PROVIDER_KEY');
-        return key === 'nomba' ? nomba : key === 'paga' ? paga : bachs;
+        return key === 'bachs' ? bachs : key === 'nomba' ? nomba : paga;
       },
       inject: [ConfigService, BachsPayoutProvider, NombaPayoutProvider, PagaPayoutProvider],
     },
-    // PLAN.md "Settlement sweep" — fixed to Nomba, never switched by
+    // PLAN.md "Settlement sweep" — fixed to Paga, never switched by
     // ENOUGH_PROVIDER_KEY. See SETTLEMENT_PAYOUT_PORT's doc comment.
-    { provide: SETTLEMENT_PAYOUT_PORT, useExisting: NombaPayoutProvider },
+    { provide: SETTLEMENT_PAYOUT_PORT, useExisting: PagaPayoutProvider },
   ],
 })
 export class EnoughModule {}

@@ -13,14 +13,14 @@ import { BankOption, PaymentEventView, PaymentSource, ResolvedAccount, SETTLEMEN
  * 'processing' for the payout webhook to resolve. A webhook-reported
  * failure also credits back, since the money demonstrably never left.
  *
- * Always uses SETTLEMENT_PAYOUT_PORT (fixed to Nomba, never switched by
+ * Always uses SETTLEMENT_PAYOUT_PORT (fixed to Paga, never switched by
  * ENOUGH_PROVIDER_KEY) — NOT whichever provider this account's own
  * deposits happen to be tagged with (EnoughAccount.provider). A Bachs-
- * tagged account's money has to be physically swept into Nomba's
- * settlement account first (see SettlementSweepService) before a payout
- * for it can succeed; calling Bachs directly here would only ever see
- * that one account's own un-swept balance, not the platform's actual
- * settled liquidity.
+ * or Nomba-tagged account's money has to be physically swept into
+ * Paga's settlement balance first (see SettlementSweepService) before a
+ * payout for it can succeed; calling Bachs/Nomba directly here would
+ * only ever see that one account's own un-swept balance, not the
+ * platform's actual settled liquidity.
  */
 @Injectable()
 export class EnoughPaymentsService {
@@ -149,9 +149,9 @@ export class EnoughPaymentsService {
     });
 
     try {
-      // pullToPlatform is a no-op for the settlement provider (Nomba) —
-      // see NombaPayoutProvider's doc comment. account.bachsAccountId is
-      // passed through for record-keeping only; Nomba never reads it, and
+      // pullToPlatform is a no-op for the settlement provider (Paga) —
+      // see PagaPayoutProvider's doc comment. account.bachsAccountId is
+      // passed through for record-keeping only; Paga never reads it, and
       // this call never actually fails for a reason specific to it.
       const transferId = await this.settlement.pullToPlatform(account.bachsAccountId, amountKobo);
       const withdrawal = await this.settlement.createWithdrawal({
@@ -162,10 +162,49 @@ export class EnoughPaymentsService {
         reference: paymentEvent.id,
         email: account.user.email,
       });
+      // Paga's depositToBank responds synchronously with a definitive
+      // "Successfully deposited..." result (see PagaPayoutProvider.
+      // createWithdrawal's doc comment) — unlike Nomba/Bachs, there's no
+      // async pending state to wait on a webhook for, and Paga's payout-
+      // webhook payload is unconfirmed anyway (PagaPayoutProvider.
+      // verifyWebhook fails closed), so a Paga-routed payment that waited
+      // on that webhook would never resolve. withdrawal.status ===
+      // 'completed' is the signal a provider gives when ITS OWN response
+      // is already final — resolve immediately rather than leaving the
+      // row in 'processing' purgatory. Nomba/Bachs never return this
+      // exact value today, so their existing webhook-resolved behavior
+      // (leaving the row 'processing' here) is unchanged.
+      const resolvedSynchronously = withdrawal.status === 'completed';
       const updated = await this.prisma.enoughPaymentEvent.update({
         where: { id: paymentEvent.id },
-        data: { bachsTransferId: transferId, bachsWithdrawalId: withdrawal.withdrawalId },
+        data: {
+          bachsTransferId: transferId,
+          bachsWithdrawalId: withdrawal.withdrawalId,
+          ...(resolvedSynchronously ? { status: 'completed' as const } : {}),
+        },
       });
+
+      // Mirrors handlePayoutWebhook's own notification exactly — that
+      // path never fires for a provider resolved synchronously here (no
+      // webhook is coming), so this is the only place a Paga-routed
+      // payment's "completed" email gets sent from.
+      if (resolvedSynchronously && account.user.email) {
+        this.notifications
+          .notify(
+            { userId: account.userId, email: account.user.email },
+            {
+              kind: 'enough_payment_status_changed',
+              completed: true,
+              amountKobo: Number(amountKobo),
+              recipientAccountName: resolved.accountName,
+              failureReason: null,
+            },
+          )
+          .catch((err) => {
+            this.logger.warn(`Payment status email failed for ${paymentEvent.id}: ${err instanceof Error ? err.message : err}`);
+          });
+      }
+
       return this.toView(updated);
     } catch (err) {
       // Synchronous failure — credit the source back and mark failed
