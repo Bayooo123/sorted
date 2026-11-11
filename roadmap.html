@@ -131,6 +131,14 @@ textarea{resize:vertical;min-height:64px}
 .camp,.xmark{position:absolute;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:1}
 .camp b,.xmark b{display:block;font-family:var(--display);font-weight:800;font-size:15px;margin-top:4px}
 .camp small,.xmark small{display:block;font-size:12px;color:var(--muted);max-width:180px;line-height:1.3}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.filters button{height:34px;padding:0 14px;border-radius:17px;border:1.5px solid var(--line);background:var(--card);font-weight:600;font-size:13.5px}
+.filters button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.stop.dim{opacity:.35}
+.phase{position:absolute;transform:translate(-50%,-100%);z-index:3;text-align:center;background:rgba(251,235,200,.92);border:1px dashed rgba(154,91,0,.4);border-radius:12px;padding:4px 12px;pointer-events:none;width:max-content;max-width:min(260px,calc(100% - 40px))}
+.phase b{display:block;font-family:var(--display);font-style:italic;font-weight:700;color:var(--amber);font-size:16px}
+.phase span{display:block;font-size:11.5px;color:var(--muted)}
+.stop .ws{font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-top:-4px}
 .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:14px 4px 0}
 .legend span{display:flex;align-items:center;gap:7px}
 .legend i{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);display:inline-block;background:var(--card)}
@@ -140,6 +148,8 @@ textarea{resize:vertical;min-height:64px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:22px}
 .panel h3{font-size:20px;font-weight:700;margin-bottom:12px}
 .panel.wide{grid-column:1/-1}
+.below>*{min-width:0}
+.work-form select{width:100%;max-width:100%}
 .hint{font-size:14px;color:var(--muted);margin:-6px 0 12px}
 .work-form{display:flex;flex-direction:column;gap:10px}
 .work-form select{border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:10px 14px;font:inherit;font-size:15px}
@@ -244,6 +254,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       </div>
     </section>
 
+    <div class="filters" id="filters" role="group" aria-label="Show tasks"></div>
     <section class="map" id="map" aria-label="Roadmap to launch"></section>
     <div class="legend">
       <span><i></i>Not started</span>
@@ -309,7 +320,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
 
   // Codes stay in memory only, never localStorage, like the other admin pages.
   var code = null, me = null, state = null, persisted = false;
-  var picks = [], openId = null, altCode = false;
+  var picks = [], openId = null, altCode = false, filter = 'all';
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -372,8 +383,10 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     var total = state.stops.length;
     var done = state.stops.filter(function (s) { return s.status === 'done'; }).length;
     var toPilot = days(todayISO(), state.meta.pilotStart);
+    var toSalary = days(todayISO(), state.meta.salaryWeek);
     $('hero').innerHTML = done === total ? 'Ready to <em>launch</em>.' : done + ' of ' + total + ' tasks <em>done</em>.';
-    $('hero-sub').textContent = (toPilot > 0 ? plural(toPilot, 'day') + ' to pilot week (' + fmt(state.meta.pilotStart) + '). ' : toPilot >= -6 ? 'Pilot week is on. ' : '') +
+    $('hero-sub').textContent = (toPilot > 0 ? plural(toPilot, 'day') + ' to the pilot (' + fmt(state.meta.pilotStart) + '). ' : toPilot >= -6 ? 'Pilot week is on. ' : '') +
+      (toSalary > 0 ? plural(toSalary, 'day') + ' to the salary-week launch (' + fmt(state.meta.salaryWeek) + '). ' : '') +
       'Click a task to start it or mark it done.';
     $('rope').style.width = Math.max(3, done / total * 100) + '%';
     $('crew').innerHTML = PEOPLE.map(function (p) {
@@ -382,9 +395,17 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       var wk = state.log.filter(function (e) { return e.who === p && e.action === 'work'; }).length;
       return '<div class="crew-row">' + av(p, 'lg') + '<div><b>' + esc(state.people[p].name) + '</b><br><span>' + f + ' done · ' + u + ' in progress · ' + wk + (wk === 1 ? ' work entry' : ' work entries') + '</span></div></div>';
     }).join('');
-    renderMap(); renderFeed(); renderRoles(); renderWork();
+    renderFilters(); renderMap(); renderFeed(); renderRoles(); renderWork();
     if (openId && $('sheet').open) fillSheet(openId);
   }
+
+  function streams() { var out = []; state.stops.forEach(function (s) { if (out.indexOf(s.stream) < 0) out.push(s.stream); }); return out; }
+  function matches(s) { return filter === 'all' || (filter === 'mine' ? s.crew.indexOf(me) >= 0 : s.stream === filter); }
+  function renderFilters() {
+    var opts = [['all', 'All tasks'], ['mine', 'My tasks']].concat(streams().map(function (x) { return [x, x]; }));
+    $('filters').innerHTML = opts.map(function (o) { return '<button type="button" data-f="' + esc(o[0]) + '" aria-pressed="' + (filter === o[0]) + '">' + esc(o[1]) + '</button>'; }).join('');
+  }
+  $('filters').addEventListener('click', function (e) { var b = e.target.closest('[data-f]'); if (!b) return; filter = b.getAttribute('data-f'); renderFilters(); renderMap(); });
 
   // Lay stops out on a winding, serpentine trail sized to the screen.
   function renderMap() {
@@ -394,7 +415,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     var wide = W >= 700;
     var lw = wide ? 150 : Math.min(150, W / 2 - 22);
     var padX = wide ? 100 : lw / 2 + 12;
-    var rowH = wide ? 200 : 190;
+    var rowH = wide ? 240 : 230;
     var top = wide ? 175 : 150;
     var seq = [{ kind: 'camp' }].concat(state.stops.map(function (s) { return { kind: 'stop', s: s }; })).concat([{ kind: 'x' }]);
     var rows = Math.ceil(seq.length / perRow);
@@ -446,34 +467,33 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     art += '<path class="trail-todo" d="' + curve(pts, pts.length - 1) + '"/>';
     if (lit > 0) art += '<path class="trail-done" d="' + curve(pts, realIdx[lit]) + '"/>';
     // region names above the first stop of each region
-    var seen = {};
+    var seen = {}, phases = '';
     seq.forEach(function (n) {
       if (n.kind !== 'stop' || seen[n.s.region]) return;
       seen[n.s.region] = 1;
       var reg = state.regions.filter(function (r) { return r.id === n.s.region; })[0];
       var tx = Math.min(Math.max(n.x, 120), W - 120);
-      art += '<text class="region" x="' + tx + '" y="' + (n.y - 62) + '" text-anchor="middle">' + esc(reg.name) + '</text>' +
-        '<text class="region-sub" x="' + tx + '" y="' + (n.y - 46) + '" text-anchor="middle">' + esc(reg.blurb) + '</text>';
+      phases += '<div class="phase" style="left:' + tx + 'px;top:' + (n.y - 46) + 'px"><b>' + esc(reg.name) + '</b><span>' + esc(reg.blurb) + '</span></div>';
     });
     art += '</svg>';
 
-    var html = art;
+    var html = art + phases;
     seq.forEach(function (n, i) {
       if (n.kind === 'camp') {
         html += '<div class="camp" style="left:' + n.x + 'px;top:' + n.y + 'px"><svg width="46" height="46" viewBox="0 0 46 46"><path d="M6 40L23 8l17 32z" fill="#FFC23C" stroke="#2B1B0E" stroke-width="2.5" stroke-linejoin="round"/><path d="M23 8v32M18 40l5-10 5 10" stroke="#2B1B0E" stroke-width="2.5" fill="#FFF8EC" stroke-linejoin="round"/></svg><b>Start</b><small>2 Nov · MVP about 40% built</small></div>';
         return;
       }
       if (n.kind === 'x') {
-        html += '<div class="xmark" style="left:' + n.x + 'px;top:' + (n.y + 6) + 'px"><svg width="70" height="70" viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" fill="rgba(255,194,60,.35)"/><path d="M18 18l34 34M52 18L18 52" stroke="#C2502A" stroke-width="9" stroke-linecap="round"/></svg><b>Launch</b><small>Live on Play Store and App Store, with paying customers</small></div>';
+        html += '<div class="xmark" style="left:' + n.x + 'px;top:' + (n.y + 6) + 'px"><svg width="70" height="70" viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" fill="rgba(255,194,60,.35)"/><path d="M18 18l34 34M52 18L18 52" stroke="#C2502A" stroke-width="9" stroke-linecap="round"/></svg><b>Goal</b><small>Live on Play Store and App Store, with paying customers and revenue</small></div>';
         return;
       }
       var s = n.s, wait = waitingOn(s);
-      var cls = 'stop ' + s.status + (s.status === 'todo' && wait.length ? ' locked' : '') + (isLate(s) ? ' late' : '') + (picks.indexOf(s.id) >= 0 ? ' pick' : '');
+      var cls = 'stop ' + s.status + (s.status === 'todo' && wait.length ? ' locked' : '') + (isLate(s) ? ' late' : '') + (picks.indexOf(s.id) >= 0 ? ' pick' : '') + (matches(s) ? '' : ' dim');
       var dl = days(todayISO(), s.due);
       var meta = s.status === 'done' ? 'Done ' + fmt(s.at || s.due) : isLate(s) ? plural(-dl, 'day') + ' overdue' : 'Due ' + fmt(s.due);
       html += '<button type="button" class="' + cls + '" data-id="' + s.id + '" style="left:' + n.x + 'px;top:' + n.y + 'px;--lw:' + lw + 'px" aria-label="Task ' + i + ': ' + esc(s.title) + ', ' + (s.status === 'done' ? 'done' : s.status === 'doing' ? 'in progress' : 'not started') + '">' +
         '<span class="dot">' + (s.status === 'done' ? '✓' : i) + (s.by ? av(s.by, 'who') : '') + '</span>' +
-        '<span class="lbl">' + esc(s.title) + '</span><span class="meta">' + meta + '</span></button>';
+        '<span class="lbl">' + esc(s.title) + '</span><span class="ws">' + esc(s.stream) + '</span><span class="meta">' + meta + '</span></button>';
     });
     map.innerHTML = html;
   }
@@ -531,7 +551,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     var s = byId(id); if (!s) return;
     var reg = state.regions.filter(function (r) { return r.id === s.region; })[0];
     var idx = state.stops.indexOf(s) + 1;
-    $('sh-region').textContent = 'Task ' + idx + ' · ' + reg.name;
+    $('sh-region').textContent = 'Task ' + idx + ' · ' + reg.name + ' · ' + s.stream;
     $('sh-title').textContent = s.title;
     var dl = days(todayISO(), s.due);
     var coins = ''; for (var i = 0; i < 3; i++) coins += i < s.effort ? '●' : '○';

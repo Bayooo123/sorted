@@ -32,54 +32,95 @@ const PEOPLE = ['adebayo', 'lynn', 'jude'];
 const FIRST = { adebayo: 'Adebayo', lynn: 'Lynn', jude: 'Jude' };
 const MAX_LOG = 400;
 const EFFORT = { 1: 'small', 2: 'medium', 3: 'big' };
-// Sections of the map. Always taken from here (not storage) so renames apply.
+// Phases of the map, in time order. The path runs through these; each task
+// also carries a workstream. Definitions always come from here (not storage),
+// so edits to tasks apply while saved progress is kept.
 const REGIONS = [
-  { id: 'cove', name: 'Company setup', blurb: 'Incorporation, agreements, bank' },
-  { id: 'ridge', name: 'Legal and research', blurb: 'Licensing, partners, revenue' },
-  { id: 'bay', name: 'Product', blurb: 'Payments, app, store upload' },
-  { id: 'point', name: 'Pilot', blurb: 'Users, pilot run, fixes' },
+  { id: 'p1', name: 'Build and set up', blurb: 'Now to 29 Nov' },
+  { id: 'p2', name: 'Pilot', blurb: '30 Nov – 13 Dec' },
+  { id: 'p3', name: 'Beta and store submission', blurb: '14 Dec – 12 Jan' },
+  { id: 'p4', name: 'Launch', blurb: 'Soft launch 18–22 Jan · salary week 25–29 Jan' },
+  { id: 'p5', name: 'After launch', blurb: 'February' },
 ];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmt = (iso) => +iso.slice(8, 10) + ' ' + MON[+iso.slice(5, 7) - 1];
 
 // ---------------------------------------------------------------- seed data
-// Stops from "Enough Product Roadmap" (2 Nov 2026), split into smaller steps,
-// plus the decisions needed and Lynn's section 6 comments on the allocation.
+// From "Enough Product Roadmap" (2 Nov 2026), the allocation of functions and
+// Lynn's section 6 comments, plus Lynn's added workstreams (brand, marketing,
+// social, testing, pop-ups, launch essentials) built around a December pilot
+// and a salary-week launch on 25-29 Jan 2027.
 function seed() {
-  const s = (id, region, title, detail, effort, crew, due, after, extra) =>
-    Object.assign({ id, region, title, detail, effort, crew, due, after: after || [], status: 'todo', by: null, at: null, note: '' }, extra || {});
+  const A = 'adebayo', L = 'lynn', J = 'jude';
+  const s = (id, region, stream, title, detail, effort, crew, due, after, extra) =>
+    Object.assign({ id, region, stream, title, detail, effort, crew, due, after: after || [], status: 'todo', by: null, at: null, note: '' }, extra || {});
   return {
-    schema: 2,
+    schema: 3,
     version: 1,
     updatedAt: null,
     updatedBy: null,
     meta: {
       pilotStart: '2026-11-30',
       pilotEnd: '2026-12-06',
+      softLaunch: '2027-01-18',
+      salaryWeek: '2027-01-25',
       goal: 'A live Enough app on the Google Play Store and Apple App Store, with paying customers and revenue.',
+      keyDates: '20 Nov payments done; 29 Nov store upload; 13 Dec pilot review; 12 Jan store submission; 18–22 Jan soft launch; 25–29 Jan salary-week launch.',
     },
     regions: REGIONS,
     stops: [
-      s('split', 'cove', 'Agree the shareholding split', 'Settle the split between Adebayo and Lynn, including any vesting or option pool. It only binds once it is in the shareholders’ agreement and the CAC filings.', 2, ['adebayo', 'lynn'], '2026-11-06'),
-      s('roles', 'cove', 'Sign off the section 6 roles', 'Agree Lynn’s proposals: she takes company secretarial and tax filings and breaks technical ties; all three share fundraising; spend above a threshold needs Adebayo’s second approval, with Jude informed. Set the threshold.', 1, ['adebayo', 'lynn', 'jude'], '2026-11-13'),
-      s('name', 'cove', 'Pick the company name and directors', 'Choose the name to reserve and who the directors are for the CAC filing.', 1, ['adebayo', 'lynn'], '2026-11-08'),
-      s('cac', 'cove', 'Incorporate with CAC', 'Name reservation and incorporation. This gates the bank account, D-U-N-S number and payment partner, so it must land in the first fortnight.', 2, ['adebayo'], '2026-11-13', ['name']),
-      s('sha', 'cove', 'Sign the shareholders’ agreement', 'Draft, negotiate and sign the founders’ and shareholders’ agreement. The split and roles must match the CAC documents.', 3, ['adebayo', 'lynn'], '2026-11-13', ['split', 'roles']),
-      s('bank', 'cove', 'Open the corporate bank account', 'Open the company account once the CAC certificate is in hand.', 2, ['lynn'], '2026-11-20', ['cac']),
-      s('duns', 'cove', 'Apply for the D-U-N-S number', 'Needed for the Google Play organisation account. Free but can take up to 30 days, so apply the day the CAC certificate arrives.', 1, ['lynn'], '2026-11-20', ['cac']),
-      s('reg', 'ridge', 'Map the licensing route for customer funds', 'How customer funds may be held (CBN licensing, likely via a licensed partner), KYC/AML duties and data protection under the NDPA 2023. Settle this before locking the payment provider.', 3, ['adebayo'], '2026-11-13'),
-      s('partners', 'ridge', 'Shortlist payment partners', 'A shortlist of licensed partners for deposits and withdrawals, checked against the licensing route.', 2, ['adebayo', 'jude'], '2026-11-14', ['reg']),
-      s('revenue', 'ridge', 'Work out revenue models', 'How Enough makes money: options, pricing and what the pilot should test.', 2, ['lynn'], '2026-11-20'),
-      s('valuation', 'ridge', 'Value the product', 'A first view of product valuation for fundraising conversations.', 2, ['adebayo', 'lynn'], '2026-11-27', ['revenue']),
-      s('payments', 'bay', 'Make deposits and withdrawals work', 'Complete payment integration: money in and out of the account through the chosen partner.', 3, ['jude', 'adebayo'], '2026-11-20', ['partners'], { status: 'doing', by: 'jude', at: '2026-11-02' }),
-      s('app', 'bay', 'Finish the MVP', 'Take the mobile app from about 40% to complete.', 3, ['jude'], '2026-11-27', [], { status: 'doing', by: 'jude', at: '2026-11-02' }),
-      s('qa', 'bay', 'Test the build and sign it off', 'Test the pilot build end to end and sign off before anyone outside the team uses it.', 2, ['jude'], '2026-11-28', ['app', 'payments']),
-      s('stores', 'bay', 'Upload to Play testing and TestFlight', 'Put the build on the Play Store closed testing track and Apple TestFlight.', 1, ['jude'], '2026-11-29', ['qa', 'duns']),
-      s('pilotsize', 'point', 'Decide pilot size and who joins', 'At least 12 people if the pilot doubles as Google’s 14-day closed test.', 1, ['lynn'], '2026-11-16'),
-      s('metrics', 'point', 'Define the pilot metrics', 'What we will measure in the pilot and what counts as success.', 1, ['adebayo', 'lynn'], '2026-11-25'),
-      s('recruit', 'point', 'Recruit and onboard pilot users', 'Bring in at least 12 opted-in testers and get them set up.', 2, ['lynn'], '2026-11-29', ['pilotsize']),
-      s('pilot', 'point', 'Run the first pilot', 'Run the pilot on the closed testing track, 30 Nov to 6 Dec.', 3, ['lynn', 'jude', 'adebayo'], '2026-12-06', ['stores', 'recruit', 'metrics']),
-      s('review', 'point', 'Review the pilot and fix issues', 'Go through results and fix what broke. Fallback pilot date is end of December.', 2, ['lynn', 'jude'], '2026-12-13', ['pilot']),
+      // ---------------- Build and set up (to 29 Nov)
+      s('split', 'p1', 'Company', 'Agree the shareholding split', 'Settle the split between Adebayo and Lynn, including any vesting or option pool. It only binds once it is in the shareholders’ agreement and the CAC filings.', 2, [A, L], '2026-11-06'),
+      s('name', 'p1', 'Company', 'Pick the company name and directors', 'Choose the name to reserve and who the directors are for the CAC filing.', 1, [A, L], '2026-11-08'),
+      s('roles', 'p1', 'Company', 'Sign off the section 6 roles', 'Agree Lynn’s proposals: she takes company secretarial and tax filings and breaks technical ties; all three share fundraising; spend above a threshold needs Adebayo’s second approval, with Jude informed. Set the threshold.', 1, [A, L, J], '2026-11-13'),
+      s('cac', 'p1', 'Company', 'Incorporate with CAC', 'Name reservation and incorporation. This gates the bank account, D-U-N-S number and payment partner.', 2, [A], '2026-11-13', ['name']),
+      s('sha', 'p1', 'Company', 'Sign the shareholders’ agreement', 'Draft, negotiate and sign the founders’ and shareholders’ agreement. The split and roles must match the CAC documents.', 3, [A, L], '2026-11-13', ['split', 'roles']),
+      s('reg', 'p1', 'Legal and research', 'Map the licensing route for customer funds', 'How customer funds may be held (CBN licensing, likely via a licensed partner), KYC/AML duties and data protection under the NDPA 2023. Settle this before locking the payment provider.', 3, [A], '2026-11-13'),
+      s('domain', 'p1', 'Brand', 'Reserve the domain and social handles', 'Secure the domain and the Enough handles on the main social platforms now, before anything is announced.', 1, [L], '2026-11-14'),
+      s('partners', 'p1', 'Legal and research', 'Shortlist payment partners', 'A shortlist of licensed partners for deposits and withdrawals, checked against the licensing route.', 2, [A, J], '2026-11-14', ['reg']),
+      s('pilotsize', 'p1', 'Pilot', 'Decide pilot size and who joins', 'At least 12 people if the pilot doubles as Google’s 14-day closed test.', 1, [L], '2026-11-16'),
+      s('bank', 'p1', 'Company', 'Open the corporate bank account', 'Open the company account once the CAC certificate is in hand.', 2, [L], '2026-11-20', ['cac']),
+      s('duns', 'p1', 'Company', 'Apply for the D-U-N-S number', 'Needed for the Google Play organisation account. Free but can take up to 30 days, so apply the day the CAC certificate arrives.', 1, [L], '2026-11-20', ['cac']),
+      s('revenue', 'p1', 'Legal and research', 'Work out revenue models', 'How Enough makes money: options, pricing and what the pilot should test.', 2, [L], '2026-11-20'),
+      s('brandguide', 'p1', 'Brand', 'Logo, colours, tone of voice and brand guide', 'The core identity and a short brand guide everyone works from.', 2, [J, L], '2026-11-20'),
+      s('payments', 'p1', 'Product', 'Make deposits and withdrawals work', 'Complete payment integration: money in and out of the account through the chosen partner. Key date: 20 Nov.', 3, [J, A], '2026-11-20', ['partners'], { status: 'doing', by: J, at: '2026-11-02' }),
+      s('sandbox', 'p1', 'Testing', 'Test payments in the sandbox', 'Run deposits, withdrawals and failure cases end to end in the partner’s sandbox.', 2, [J], '2026-11-25', ['payments']),
+      s('metrics', 'p1', 'Pilot', 'Define the pilot metrics', 'What we will measure in the pilot and what counts as success.', 1, [A, L], '2026-11-25'),
+      s('strategy', 'p1', 'Marketing', 'Write the marketing strategy', 'Core audience (salaried workers, Abuja and Lagos first), positioning, key message, channels, budget and KPIs: waitlist signups, pilot activation, first-salary deposits.', 2, [L], '2026-11-27'),
+      s('employers', 'p1', 'Marketing', 'Plan employer and HR partnerships', 'Salaried workers are easiest to reach through their workplaces. Decide which employers and HR teams to approach and what we offer them.', 2, [A, L], '2026-11-27'),
+      s('storeassets', 'p1', 'Brand', 'App icon, store screenshots and listing copy', 'Everything the Play Store and App Store listings need.', 2, [J, L], '2026-11-27', ['brandguide']),
+      s('landing', 'p1', 'Brand', 'Landing page with waitlist on the new brand', 'Bring the landing page and waitlist in line with the brand guide.', 1, [J], '2026-11-27', ['brandguide']),
+      s('valuation', 'p1', 'Legal and research', 'Value the product', 'A first view of product valuation for fundraising conversations.', 2, [A, L], '2026-11-27', ['revenue']),
+      s('app', 'p1', 'Product', 'Finish the MVP', 'Take the mobile app from about 40% to complete.', 3, [J], '2026-11-27', [], { status: 'doing', by: J, at: '2026-11-02' }),
+      s('qa', 'p1', 'Testing', 'Internal QA and sign-off', 'Test the pilot build end to end and sign off before anyone outside the team uses it.', 2, [J], '2026-11-28', ['app', 'payments']),
+      s('security', 'p1', 'Testing', 'Security review', 'Review auth, data storage and payment flows before real users touch the app.', 2, [J, A], '2026-11-29', ['app']),
+      s('privacy', 'p1', 'Launch essentials', 'Privacy policy and terms of use', 'Both app stores require these before review, so they are needed by 29 Nov.', 1, [A], '2026-11-29'),
+      s('banksignoff', 'p1', 'Launch essentials', 'Partner bank sign-off', 'Written sign-off from the partner bank before any live-money pilot.', 2, [A], '2026-11-29', ['partners']),
+      s('support', 'p1', 'Launch essentials', 'Set up customer support', 'A WhatsApp line or support email, an FAQ, and an escalation path for failed transactions.', 2, [A], '2026-11-29'),
+      s('analytics', 'p1', 'Launch essentials', 'Set up analytics', 'Track the KPIs from the marketing strategy and the pilot metrics.', 1, [J], '2026-11-29'),
+      s('socialpre', 'p1', 'Social media', 'Pre-launch social content', 'From 16 Nov: teasers, “why we built Enough” founder content, budgeting tips and a waitlist push.', 2, [L], '2026-11-29'),
+      s('recruit', 'p1', 'Pilot', 'Recruit and onboard pilot users', 'Bring in at least 12 opted-in testers and get them set up.', 2, [L], '2026-11-29', ['pilotsize']),
+      s('stores', 'p1', 'Product', 'Upload to Play testing and TestFlight', 'Put the build on the Play Store closed testing track and Apple TestFlight. Key date: 29 Nov.', 1, [J], '2026-11-29', ['qa', 'duns', 'storeassets', 'privacy']),
+      // ---------------- Pilot (30 Nov - 13 Dec)
+      s('pilot', 'p2', 'Pilot', 'Run the first pilot', 'Run the pilot on the closed testing track, 30 Nov to 6 Dec.', 3, [L, J, A], '2026-12-06', ['stores', 'recruit', 'metrics', 'banksignoff', 'support']),
+      s('onboardpack', 'p2', 'Brand', 'Pilot onboarding pack', 'What pilot users receive: how to start, what to try, how to give feedback.', 1, [L], '2026-12-06'),
+      s('onepager', 'p2', 'Brand', 'Pitch one-pager', 'A one-page summary of Enough for investors and partners.', 1, [A, L], '2026-12-06'),
+      s('popuppilot', 'p2', 'Pop-ups', 'Pilot pop-up', 'A small pop-up during the pilot, for example at an office park.', 2, [L], '2026-12-13'),
+      s('socialpilot', 'p2', 'Social media', 'Pilot social content', 'Behind-the-scenes content and early-user stories from the pilot.', 1, [L], '2026-12-13'),
+      s('review', 'p2', 'Pilot', 'Review the pilot and fix issues', 'Go through results and fix what broke. Key date: 13 Dec.', 2, [L, J], '2026-12-13', ['pilot']),
+      // ---------------- Beta and store submission (14 Dec - 12 Jan)
+      s('budget', 'p3', 'Launch essentials', 'Set the launch budget', 'What we will spend on the launch, by channel and activation.', 1, [L], '2026-12-19', ['strategy']),
+      s('holiday', 'p3', 'Launch essentials', 'Plan for the holiday slowdown', 'Who covers what from 20 Dec to 3 Jan, and what must be done before the break.', 1, [A, L, J], '2026-12-19'),
+      s('beta', 'p3', 'Testing', 'Fixes and a wider closed beta', 'Apply pilot fixes and open a wider closed beta.', 2, [J, L], '2027-01-08', ['review']),
+      s('rc', 'p3', 'Testing', 'Release candidate', 'Lock a release candidate from the beta.', 2, [J], '2027-01-08', ['beta']),
+      s('submit', 'p3', 'Product', 'Submit to the Play Store and App Store', 'Submit for review by 12 Jan, leaving a buffer for review delays.', 1, [J], '2027-01-12', ['rc', 'privacy']),
+      // ---------------- Launch (13 - 29 Jan)
+      s('soft', 'p4', 'Launch', 'Soft launch', 'Go live quietly, 18–22 Jan, and watch for problems before salary week.', 3, [A, L, J], '2027-01-22', ['submit']),
+      s('sociallaunch', 'p4', 'Social media', 'Launch campaign', '18–29 Jan: countdown, salary-day campaign and a referral offer.', 2, [L], '2027-01-29', ['strategy']),
+      s('popupsalary', 'p4', 'Pop-ups', 'Salary-week activations', 'Sign-up booths, onboarding help and giveaways during salary week.', 3, [L, A], '2027-01-29', ['budget']),
+      s('salaryweek', 'p4', 'Launch', 'Salary-week launch', 'The full launch, timed to salary week, 25–29 Jan.', 3, [A, L, J], '2027-01-29', ['soft']),
+      // ---------------- After launch (February)
+      s('socialpost', 'p5', 'Social media', 'Post-launch content', 'Testimonials, monthly “salary week” content, and a retention and referral push.', 2, [L], '2027-02-26', ['salaryweek']),
     ],
     people: {
       adebayo: { name: 'Adebayo Gbadebo', role: 'Co-founder and CEO (also COO for now)', does: 'Vision, operations, legal and regulatory compliance, KYC/AML and fraud, data protection, partnerships incl. the BaaS partner, governance design, customer support, reconciliation of user funds, technical oversight with Jude, second approver on spend' },
@@ -140,7 +181,22 @@ async function load(req) {
   return { state: seed(), etag: null };
 }
 
-function normalise(state) { state.regions = REGIONS; return state; }
+// Task definitions always come from seed(); only progress (status, who,
+// when, note) and the activity log come from storage. New tasks appear,
+// edited titles/dates apply, and nothing anyone marked is lost.
+function normalise(stored) {
+  const fresh = seed();
+  const old = Object.fromEntries((stored.stops || []).map((x) => [x.id, x]));
+  fresh.stops = fresh.stops.map((x) => {
+    const o = old[x.id];
+    return o ? Object.assign(x, { status: o.status, by: o.by, at: o.at, note: o.note || '' }) : x;
+  });
+  fresh.version = stored.version || 1;
+  fresh.updatedAt = stored.updatedAt || null;
+  fresh.updatedBy = stored.updatedBy || null;
+  fresh.log = stored.log || [];
+  return fresh;
+}
 
 async function save(req, state, etag) {
   const auth = blobAuth(req);
@@ -283,7 +339,7 @@ async function aiGuide(req, state, me, mode, a, picks) {
     status: 'They ask how the team is doing. Give a frank progress read, name the biggest risk to the pilot date, and say who could use help.',
   }[mode];
   const stops = a.stops.map((s) => ({
-    id: s.id, title: s.title, region: s.region, effort: EFFORT[s.effort], crew: s.crew, due: s.due,
+    id: s.id, title: s.title, phase: s.region, workstream: s.stream, effort: EFFORT[s.effort], crew: s.crew, due: s.due,
     status: s.status, by: s.by, waitingOn: s.waitingOn, open: s.open, late: s.late, daysLeft: s.daysLeft,
   }));
   const body = {
@@ -302,7 +358,7 @@ async function aiGuide(req, state, me, mode, a, picks) {
       {
         role: 'user',
         content: JSON.stringify({
-          today: a.today, pilotWeek: state.meta.pilotStart + ' to ' + state.meta.pilotEnd, goal: state.meta.goal,
+          today: a.today, pilotWeek: state.meta.pilotStart + ' to ' + state.meta.pilotEnd, keyDates: state.meta.keyDates, goal: state.meta.goal,
           askedBy: { id: me, name: state.people[me].name, role: state.people[me].role, responsibilities: state.people[me].does },
           request: ask, workload: a.load, stops,
           ruleBasedSuggestion: picks.map((p) => p.id),
