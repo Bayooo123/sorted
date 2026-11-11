@@ -1,179 +1,117 @@
-// Vercel Node.js Serverless Function behind /roadmap (roadmap.html), the
-// founders' tracker for Enough. Same conventions as send-welcome-email.js:
-// no dependencies, no package.json, built-in fetch only.
+// Vercel Node.js Serverless Function behind /roadmap (roadmap.html): the
+// Enough founders' "treasure map" to launch. Same conventions as
+// send-welcome-email.js: no dependencies, no package.json, built-in fetch.
 //
-// Why the content lives here and not in roadmap.html: the roadmap and the
-// allocation of functions mention the shareholding split, licensing route
-// and other internal matters. The static page is public; this function
-// only returns anything to a caller holding the shared passcode.
+// Why the content lives here and not in roadmap.html: the stops mention the
+// shareholding split, licensing route and other internal matters. The static
+// page is public; this function only answers callers holding a crew code.
 //
-// Required env vars (Vercel project -> Settings -> Environment Variables):
-//   ROADMAP_PASSCODE  shared passcode the three founders type to unlock.
-//   BLOB_READ_WRITE_TOKEN  set automatically when the private Blob store
-//     "enough-roadmap" is connected to this project (Vercel -> Storage).
-//     Upstash Redis (KV_REST_API_URL / KV_REST_API_TOKEN) also works.
-//     Without storage the page still opens on the seed data below, read-only.
+// Env vars (Vercel project -> Settings -> Environment Variables):
+//   ROADMAP_CODE_ADEBAYO, ROADMAP_CODE_LYNN, ROADMAP_CODE_JUDE
+//     Each founder's personal code. The code identifies who did what.
+//   BLOB_READ_WRITE_TOKEN
+//     Set automatically when a private Blob store is connected to this
+//     project (Vercel -> Storage). Upstash (KV_REST_API_URL/TOKEN) also works.
+//     Without storage the map opens read-only on the seed below.
+//   ROADMAP_AI_MODEL (optional, default anthropic/claude-haiku-5.5)
+//     The guide calls Vercel AI Gateway with the function's OIDC token, so no
+//     AI key is needed on Vercel. AI_GATEWAY_API_KEY overrides it if set.
+//     If the gateway fails, the guide falls back to rule-based advice.
 //
-// API (all calls need header x-roadmap-key: <passcode>):
-//   GET  /api/roadmap                -> { state, persisted }
-//   POST /api/roadmap { by, op, ... } -> { state, persisted }
-// Writes are small operations applied server-side (not whole-state
-// overwrites), so two founders editing at once rarely clobber each other.
+// API (every call sends the caller's code in header x-roadmap-code):
+//   GET  /api/roadmap                       -> { state, persisted, me }
+//   POST /api/roadmap { op, id, note? }     -> { state, persisted, me }
+//        op = claim | done | reopen
+//   POST /api/roadmap { op: 'guide', mode } -> { text, picks, source }
+//        mode = next | easy | status
 
 const crypto = require('crypto');
 
-const STORE_KEY = 'enough:roadmap:v1';
 const PEOPLE = ['adebayo', 'lynn', 'jude'];
-const STATUSES = ['not_started', 'in_progress', 'blocked', 'done'];
-const MAX_LOG = 500;
+const FIRST = { adebayo: 'Adebayo', lynn: 'Lynn', jude: 'Jude' };
+const MAX_LOG = 400;
+const EFFORT = { 1: 'small', 2: 'medium', 3: 'big' };
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmt = (iso) => +iso.slice(8, 10) + ' ' + MON[+iso.slice(5, 7) - 1];
 
 // ---------------------------------------------------------------- seed data
-// From "Enough Product Roadmap" (2 Nov 2026) and "Allocation of Functions
-// Among the Founding Team" (4 Nov 2026), with Lynn's comments on section 6.
+// Stops from "Enough Product Roadmap" (2 Nov 2026), split into smaller steps,
+// plus the decisions needed and Lynn's section 6 comments on the allocation.
 function seed() {
-  const t = (id, workstream, title, start, due, status, owners, extra) =>
-    Object.assign({ id, workstream, title, start, due, status, owners, note: '', critical: false }, extra || {});
+  const s = (id, region, title, detail, effort, crew, due, after, extra) =>
+    Object.assign({ id, region, title, detail, effort, crew, due, after: after || [], status: 'todo', by: null, at: null, note: '' }, extra || {});
   return {
+    schema: 2,
     version: 1,
     updatedAt: null,
     updatedBy: null,
     meta: {
       pilotStart: '2026-11-30',
       pilotEnd: '2026-12-06',
-      fallback: 'End of December 2026',
-      goal: 'A live Enough app on the Google Play Store and the Apple App Store, with paying customers and revenue.',
-      timelineStart: '2026-11-02',
-      timelineEnd: '2026-12-13',
+      goal: 'A live Enough app on the Google Play Store and Apple App Store, with paying customers and revenue.',
     },
-    tasks: [
-      t('shareholding', 'Company and founders', 'Agree shareholding split between the co-founders', '2026-11-02', '2026-11-06', 'not_started', ['adebayo', 'lynn'], { critical: true }),
-      t('cac', 'Company and founders', 'Name reservation and incorporation with CAC', '2026-11-02', '2026-11-13', 'not_started', ['adebayo'], { critical: true }),
-      t('sha', 'Company and founders', "Draft, negotiate and sign the founders' and shareholders' agreement", '2026-11-04', '2026-11-13', 'not_started', ['adebayo', 'lynn'], { critical: true }),
-      t('bank', 'Company and founders', 'Open corporate bank account; apply for D-U-N-S number for store developer accounts', '2026-11-13', '2026-11-20', 'not_started', ['lynn'], { critical: true }),
-      t('regulatory', 'Research', 'Legal and regulatory obligations: licensing route for holding customer funds, KYC/AML, data protection (NDPA 2023)', '2026-11-02', '2026-11-13', 'not_started', ['adebayo'], { critical: true }),
-      t('revenue', 'Research', 'Revenue models', '2026-11-09', '2026-11-20', 'not_started', ['lynn']),
-      t('valuation', 'Research', 'Product valuation', '2026-11-16', '2026-11-27', 'not_started', ['adebayo', 'lynn']),
-      t('payments', 'Product', 'Complete payment integration: deposits into and withdrawals out of the account', '2026-11-02', '2026-11-20', 'in_progress', ['jude', 'adebayo'], { critical: true }),
-      t('app', 'Product', 'Technical development of the mobile app (MVP from ~40% to complete)', '2026-11-02', '2026-11-27', 'in_progress', ['jude'], { critical: true }),
-      t('stores', 'Product', 'Upload to Play Store testing track and App Store TestFlight', '2026-11-23', '2026-11-29', 'not_started', ['jude']),
-      t('recruit', 'Pilot', 'Recruit and onboard pilot users (at least 12 for Google’s closed test)', '2026-11-16', '2026-11-29', 'not_started', ['lynn']),
-      t('pilot', 'Pilot', 'Run first pilot test', '2026-11-30', '2026-12-06', 'not_started', ['lynn', 'jude', 'adebayo']),
-      t('review', 'Pilot', 'Review pilot results and fix issues', '2026-12-07', '2026-12-13', 'not_started', ['lynn', 'jude']),
+    regions: [
+      { id: 'cove', name: "Founders' Cove", blurb: 'Make the company real' },
+      { id: 'ridge', name: 'Regulation Ridge', blurb: 'Know the rules before touching money' },
+      { id: 'bay', name: "Builder's Bay", blurb: 'Finish the app' },
+      { id: 'point', name: 'Pilot Point', blurb: 'Put it in real hands' },
     ],
-    decisions: [
-      { id: 'd-split', text: 'Shareholding split between Adebayo and Lynn, including any vesting or option pool', done: false, by: null, at: null },
-      { id: 'd-owners', text: 'Owner for each workstream (legal and corporate, research, payments, app build, pilot)', done: false, by: null, at: null },
-      { id: 'd-name', text: 'Company name and directors for the CAC filing', done: false, by: null, at: null },
-      { id: 'd-partner', text: 'Payment partner shortlist for deposits and withdrawals', done: false, by: null, at: null },
-      { id: 'd-pilot-size', text: "Pilot size and who the pilot users will be (at least 12 if it doubles as Google's closed test)", done: false, by: null, at: null },
-      { id: 'd-pilot-date', text: 'Pilot date: first week of December, with end of December as fallback', done: false, by: null, at: null },
-    ],
-    risks: [
-      { title: 'Regulation before payments', text: 'The regulatory research decides how customer funds may be held. Enough should not hold deposits itself without the relevant CBN licence; the likely MVP route is a licensed partner that holds the funds. Settle this before locking the payment provider.' },
-      { title: 'Store accounts need the company', text: 'A Google Play organisation account needs a D-U-N-S number, which is free but can take up to 30 days to issue. Apply the day the CAC certificate arrives.' },
-      { title: "Google's 14-day test", text: 'A new personal Play account must run a closed test with at least 12 opted-in testers for 14 continuous days before production release. The pilot can double as this test if it runs on the closed testing track with 12 or more pilot users.' },
-      { title: 'Agreement before equity is real', text: "The shareholding split only binds once it is written into the founders' and shareholders' agreement and reflected in the CAC filings." },
-      { title: 'Tight window', text: 'With four weeks to the pilot, any slip in payments or the app build pushes the pilot to the end-of-December fallback.' },
+    stops: [
+      s('split', 'cove', 'Agree the shareholding split', 'Settle the split between Adebayo and Lynn, including any vesting or option pool. It only binds once it is in the shareholders’ agreement and the CAC filings.', 2, ['adebayo', 'lynn'], '2026-11-06'),
+      s('roles', 'cove', 'Sign off the section 6 roles', 'Agree Lynn’s proposals: she takes company secretarial and tax filings and breaks technical ties; all three share fundraising; spend above a threshold needs Adebayo’s second approval, with Jude informed. Set the threshold.', 1, ['adebayo', 'lynn', 'jude'], '2026-11-13'),
+      s('name', 'cove', 'Pick the company name and directors', 'Choose the name to reserve and who the directors are for the CAC filing.', 1, ['adebayo', 'lynn'], '2026-11-08'),
+      s('cac', 'cove', 'Incorporate with CAC', 'Name reservation and incorporation. This gates the bank account, D-U-N-S number and payment partner, so it must land in the first fortnight.', 2, ['adebayo'], '2026-11-13', ['name']),
+      s('sha', 'cove', 'Sign the shareholders’ agreement', 'Draft, negotiate and sign the founders’ and shareholders’ agreement. The split and roles must match the CAC documents.', 3, ['adebayo', 'lynn'], '2026-11-13', ['split', 'roles']),
+      s('bank', 'cove', 'Open the corporate bank account', 'Open the company account once the CAC certificate is in hand.', 2, ['lynn'], '2026-11-20', ['cac']),
+      s('duns', 'cove', 'Apply for the D-U-N-S number', 'Needed for the Google Play organisation account. Free but can take up to 30 days, so apply the day the CAC certificate arrives.', 1, ['lynn'], '2026-11-20', ['cac']),
+      s('reg', 'ridge', 'Map the licensing route for customer funds', 'How customer funds may be held (CBN licensing, likely via a licensed partner), KYC/AML duties and data protection under the NDPA 2023. Settle this before locking the payment provider.', 3, ['adebayo'], '2026-11-13'),
+      s('partners', 'ridge', 'Shortlist payment partners', 'A shortlist of licensed partners for deposits and withdrawals, checked against the licensing route.', 2, ['adebayo', 'jude'], '2026-11-14', ['reg']),
+      s('revenue', 'ridge', 'Work out revenue models', 'How Enough makes money: options, pricing and what the pilot should test.', 2, ['lynn'], '2026-11-20'),
+      s('valuation', 'ridge', 'Value the product', 'A first view of product valuation for fundraising conversations.', 2, ['adebayo', 'lynn'], '2026-11-27', ['revenue']),
+      s('payments', 'bay', 'Make deposits and withdrawals work', 'Complete payment integration: money in and out of the account through the chosen partner.', 3, ['jude', 'adebayo'], '2026-11-20', ['partners'], { status: 'doing', by: 'jude', at: '2026-11-02' }),
+      s('app', 'bay', 'Finish the MVP', 'Take the mobile app from about 40% to complete.', 3, ['jude'], '2026-11-27', [], { status: 'doing', by: 'jude', at: '2026-11-02' }),
+      s('qa', 'bay', 'Test the build and sign it off', 'Test the pilot build end to end and sign off before anyone outside the team uses it.', 2, ['jude'], '2026-11-28', ['app', 'payments']),
+      s('stores', 'bay', 'Upload to Play testing and TestFlight', 'Put the build on the Play Store closed testing track and Apple TestFlight.', 1, ['jude'], '2026-11-29', ['qa', 'duns']),
+      s('pilotsize', 'point', 'Decide pilot size and who joins', 'At least 12 people if the pilot doubles as Google’s 14-day closed test.', 1, ['lynn'], '2026-11-16'),
+      s('metrics', 'point', 'Define the pilot metrics', 'What we will measure in the pilot and what counts as success.', 1, ['adebayo', 'lynn'], '2026-11-25'),
+      s('recruit', 'point', 'Recruit and onboard pilot users', 'Bring in at least 12 opted-in testers and get them set up.', 2, ['lynn'], '2026-11-29', ['pilotsize']),
+      s('pilot', 'point', 'Run the first pilot', 'Run the pilot on the closed testing track, 30 Nov to 6 Dec.', 3, ['lynn', 'jude', 'adebayo'], '2026-12-06', ['stores', 'recruit', 'metrics']),
+      s('review', 'point', 'Review the pilot and fix issues', 'Go through results and fix what broke. Fallback pilot date is end of December.', 2, ['lynn', 'jude'], '2026-12-13', ['pilot']),
     ],
     people: {
-      adebayo: {
-        name: 'Adebayo Gbadebo',
-        role: 'Co-founder and Chief Executive Officer (also performing COO functions)',
-        short: 'CEO',
-        functions: [
-          'Vision and direction',
-          'Operations and growth',
-          'Legal and regulatory compliance',
-          'KYC, AML and fraud monitoring',
-          'Data protection',
-          'Partnerships and external relations, including the banking-as-a-service partner',
-          'Corporate governance design',
-          'Customer support and complaints',
-          "Reconciliation of user funds against the BaaS partner's records",
-          'Technical oversight, with Jude Odey',
-        ],
-      },
-      lynn: {
-        name: 'Lynn Eugene',
-        role: 'Co-founder and Chief Product Officer',
-        short: 'CPO',
-        functions: [
-          'Product management: roadmap, feature prioritisation, product decisions',
-          'Marketing and growth',
-          'Social media',
-          'Accounts and finances',
-          'Governance implementation',
-          'Pilots, including selection of pilot participants',
-          'Company secretarial and tax filings (from section 6)',
-          'Final say where Adebayo and Jude disagree on a technical matter (from section 6)',
-        ],
-      },
-      jude: {
-        name: 'Jude Odey',
-        role: 'Technical Lead',
-        short: 'Tech Lead',
-        functions: [
-          'Technical architecture and infrastructure',
-          'Product development of the Enough platform',
-          'Mobile development (Android and iOS)',
-          'UI/UX design',
-          'Quality assurance and release sign-off',
-        ],
-      },
+      adebayo: { name: 'Adebayo Gbadebo', role: 'Co-founder and CEO (also COO for now)', does: 'Vision, operations, legal and regulatory compliance, KYC/AML and fraud, data protection, partnerships incl. the BaaS partner, governance design, customer support, reconciliation of user funds, technical oversight with Jude, second approver on spend' },
+      lynn: { name: 'Lynn Eugene', role: 'Co-founder and Chief Product Officer', does: 'Product roadmap and prioritisation, marketing and growth, social media, accounts and finances, governance implementation, pilots, company secretarial and tax filings, final say on technical disagreements' },
+      jude: { name: 'Jude Odey', role: 'Technical Lead', does: 'Technical architecture, platform development, Android and iOS apps, UI/UX design, QA and release sign-off' },
     },
-    shared: [
-      { fn: 'Data and metrics', who: ['adebayo', 'lynn'], scope: 'Defining, tracking and reporting key performance indicators, including pilot metrics' },
-      { fn: 'People and hiring', who: ['adebayo', 'lynn'], scope: 'Recruitment, engagement terms and team matters' },
-      { fn: 'Technical oversight', who: ['adebayo', 'jude'], scope: 'Review of technical priorities, progress and decisions' },
-      { fn: 'Fundraising and investor relations', who: ['adebayo', 'lynn', 'jude'], scope: 'Pitch preparation, outreach and personal relationships, until the team can bring in people with those skills' },
-    ],
-    deferred: [
-      { item: 'Company secretarial and tax filings', resolution: 'Lynn Eugene takes these on from incorporation', who: ['lynn'], status: 'proposed', source: "Lynn's comment" },
-      { item: 'Fundraising and investor relations', resolution: 'All three: pitch preparation, outreach and personal relationships, until there is enough traction to bring in people with those skills', who: ['adebayo', 'lynn', 'jude'], status: 'proposed', source: "Lynn's comment" },
-      { item: 'Approval of expenditure', resolution: 'Payments above an agreed threshold need a second approval from Adebayo, with Jude kept informed. Threshold still to be set.', who: ['adebayo', 'lynn'], status: 'proposed', source: "Lynn's comment" },
-      { item: 'Technical decisions', resolution: 'Where Adebayo and Jude disagree on a technical matter, Lynn makes the final call', who: ['lynn'], status: 'proposed', source: "Lynn's comment" },
-    ],
-    log: [
-      { id: 'seed-1', who: 'adebayo', text: 'Prepared the Enough product roadmap with Lynn', task: null, date: '2026-11-02', kind: 'manual' },
-      { id: 'seed-2', who: 'lynn', text: 'Co-prepared the Enough product roadmap', task: null, date: '2026-11-02', kind: 'manual' },
-      { id: 'seed-3', who: 'adebayo', text: 'Drafted the allocation of functions among the founding team', task: 'd-owners', date: '2026-11-04', kind: 'manual' },
-      { id: 'seed-4', who: 'lynn', text: 'Commented on section 6: took company secretarial/tax filings and technical tie-breaks; proposed shared fundraising and a second approver on spend', task: null, date: '2026-11-11', kind: 'manual' },
-    ],
+    shared: 'Shared: data and metrics (Adebayo, Lynn); people and hiring (Adebayo, Lynn); technical oversight (Adebayo, Jude); fundraising and investor relations (all three).',
+    log: [],
   };
 }
 
 // ----------------------------------------------------------------- storage
-// Primary: a private Vercel Blob store (BLOB_READ_WRITE_TOKEN, set when the
-// store is connected to this project). One JSON file, overwritten with a
-// conditional write (x-if-match on the ETag we read), so two founders saving
-// at the same moment can't silently overwrite each other: the loser retries.
-// REST calls mirror what @vercel/blob 2.x sends; kept dependency-free on purpose.
-// Fallback: Upstash Redis REST (KV_REST_API_URL / KV_REST_API_TOKEN).
-const BLOB_PATH = 'enough/roadmap.json';
+// Primary: one JSON file in a private Vercel Blob store, overwritten with a
+// conditional write (x-if-match on the ETag we read) so simultaneous saves
+// retry instead of clobbering. REST calls mirror @vercel/blob 2.x.
+const BLOB_PATH = 'enough/roadmap-map.json';
 const BLOB_API = 'https://vercel.com/api/blob';
+const KV_KEY = 'enough:roadmap:map';
 
-function blobToken() { return process.env.BLOB_READ_WRITE_TOKEN || null; }
-function blobStoreId(token) { return token.split('_')[3] || ''; }
-
+const blobToken = () => process.env.BLOB_READ_WRITE_TOKEN || null;
+const blobStoreId = (t) => t.split('_')[3] || '';
 function kvConfig() {
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   return url && token ? { url: url.replace(/\/$/, ''), token } : null;
 }
-function storageReady() { return !!(blobToken() || kvConfig()); }
+const storageReady = () => !!(blobToken() || kvConfig());
 
 async function kv(cmd) {
   const cfg = kvConfig();
-  const r = await fetch(cfg.url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + cfg.token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd),
-  });
+  const r = await fetch(cfg.url, { method: 'POST', headers: { Authorization: 'Bearer ' + cfg.token, 'Content-Type': 'application/json' }, body: JSON.stringify(cmd) });
   if (!r.ok) throw new Error('KV ' + r.status);
   return (await r.json()).result;
 }
 
-// Returns { state, etag }.
 async function load() {
   const token = blobToken();
   if (token) {
@@ -184,13 +122,12 @@ async function load() {
     return { state: await r.json(), etag: r.headers.get('etag') };
   }
   if (kvConfig()) {
-    const raw = await kv(['GET', STORE_KEY]);
+    const raw = await kv(['GET', KV_KEY]);
     return { state: raw ? JSON.parse(raw) : seed(), etag: null };
   }
   return { state: seed(), etag: null };
 }
 
-// Returns true when written, false on a concurrent-write conflict.
 async function save(state, etag) {
   const token = blobToken();
   if (token) {
@@ -205,106 +142,164 @@ async function save(state, etag) {
       'x-cache-control-max-age': '60',
     };
     if (etag) headers['x-if-match'] = etag;
-    const r = await fetch(BLOB_API + '/?pathname=' + encodeURIComponent(BLOB_PATH), {
-      method: 'PUT', headers, body: JSON.stringify(state),
-    });
+    const r = await fetch(BLOB_API + '/?pathname=' + encodeURIComponent(BLOB_PATH), { method: 'PUT', headers, body: JSON.stringify(state) });
     if (r.ok) return true;
     const data = await r.json().catch(() => ({}));
     if (r.status === 412 || (data.error && data.error.code === 'precondition_failed')) return false;
     throw new Error('Blob write ' + r.status + ' ' + JSON.stringify(data));
   }
-  await kv(['SET', STORE_KEY, JSON.stringify(state)]);
+  await kv(['SET', KV_KEY, JSON.stringify(state)]);
   return true;
 }
 
-// --------------------------------------------------------------- helpers
-function authorised(req) {
-  const expected = process.env.ROADMAP_PASSCODE || '';
-  const given = String(req.headers['x-roadmap-key'] || '');
-  if (!expected || !given) return false;
-  const a = crypto.createHash('sha256').update(expected).digest();
-  const b = crypto.createHash('sha256').update(given).digest();
-  return crypto.timingSafeEqual(a, b);
+// ------------------------------------------------------------------ helpers
+function whoIs(code) {
+  if (!code) return null;
+  const given = crypto.createHash('sha256').update(String(code).trim().toLowerCase()).digest();
+  let found = null;
+  for (const p of PEOPLE) {
+    const expected = process.env['ROADMAP_CODE_' + p.toUpperCase()];
+    if (!expected) continue;
+    const e = crypto.createHash('sha256').update(expected.trim().toLowerCase()).digest();
+    if (crypto.timingSafeEqual(given, e)) found = p;
+  }
+  return found;
 }
-
+const codesConfigured = () => PEOPLE.some((p) => process.env['ROADMAP_CODE_' + p.toUpperCase()]);
 const clean = (s, max) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, max);
-const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const lagosToday = () => new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 10);
+const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 const newId = () => crypto.randomBytes(6).toString('hex');
 
-function addLog(state, entry) {
-  state.log.unshift(Object.assign({ id: newId(), date: lagosToday(), task: null, kind: 'auto' }, entry));
+function apply(state, who, body) {
+  const stop = state.stops.find((x) => x.id === body.id);
+  if (!stop) return 'Unknown stop';
+  const note = clean(body.note, 400);
+  const today = lagosToday();
+  if (body.op === 'claim') {
+    stop.status = 'doing'; stop.by = who; stop.at = today;
+  } else if (body.op === 'done') {
+    stop.status = 'done'; stop.by = who; stop.at = today;
+  } else if (body.op === 'reopen') {
+    stop.status = 'todo'; stop.by = null; stop.at = null;
+  } else {
+    return 'Unknown action';
+  }
+  if (note) stop.note = note;
+  state.log.unshift({ id: newId(), who, stop: stop.id, action: body.op, note, date: today, at: new Date().toISOString() });
   if (state.log.length > MAX_LOG) state.log.length = MAX_LOG;
+  return null;
 }
 
-const STATUS_LABEL = { not_started: 'Not started', in_progress: 'In progress', blocked: 'Blocked', done: 'Done' };
+// ------------------------------------------------------------------- guide
+function analyse(state, me) {
+  const today = lagosToday();
+  const byId = Object.fromEntries(state.stops.map((s) => [s.id, s]));
+  const stops = state.stops.map((s) => {
+    const waitingOn = s.after.filter((a) => byId[a] && byId[a].status !== 'done');
+    return Object.assign({}, s, {
+      open: s.status !== 'done' && waitingOn.length === 0,
+      waitingOn,
+      daysLeft: daysBetween(today, s.due),
+      late: s.status !== 'done' && s.due < today,
+      mine: s.crew.includes(me),
+    });
+  });
+  const load = {};
+  PEOPLE.forEach((p) => {
+    load[p] = {
+      doing: stops.filter((s) => s.status === 'doing' && s.by === p).map((s) => s.title),
+      done: stops.filter((s) => s.status === 'done' && s.by === p).length,
+      lateOnTheirCrew: stops.filter((s) => s.late && s.crew.includes(p)).length,
+    };
+  });
+  return { today, stops, load };
+}
 
-// Apply one operation. Returns an error string, or null on success.
-function apply(state, body) {
-  const by = body.by;
-  if (!PEOPLE.includes(by)) return 'Unknown founder';
-  const findTask = (id) => state.tasks.find((x) => x.id === id);
-
-  switch (body.op) {
-    case 'task': {
-      const task = findTask(body.id);
-      if (!task) return 'Unknown task';
-      const p = body.patch || {};
-      if (p.status !== undefined) {
-        if (!STATUSES.includes(p.status)) return 'Bad status';
-        if (p.status !== task.status) {
-          addLog(state, { who: by, task: task.id, text: 'Moved “' + task.title + '” to ' + STATUS_LABEL[p.status] });
-          task.status = p.status;
-          if (p.status === 'done') { task.doneAt = lagosToday(); task.doneBy = by; }
-        }
-      }
-      if (p.owners !== undefined) {
-        if (!Array.isArray(p.owners) || !p.owners.every((o) => PEOPLE.includes(o))) return 'Bad owners';
-        task.owners = PEOPLE.filter((o) => p.owners.includes(o));
-      }
-      if (p.note !== undefined) task.note = clean(p.note, 1000);
-      if (p.due !== undefined) { if (!isDate(p.due)) return 'Bad date'; task.due = p.due; }
-      task.updatedAt = new Date().toISOString();
-      task.updatedBy = by;
-      return null;
-    }
-    case 'log': {
-      const text = clean(body.text, 600);
-      if (!text) return 'Write what you did';
-      const who = PEOPLE.includes(body.who) ? body.who : by;
-      const task = body.task && (findTask(body.task) || state.decisions.find((d) => d.id === body.task)) ? body.task : null;
-      addLog(state, { who, text, task, date: isDate(body.date) ? body.date : lagosToday(), kind: 'manual', addedBy: by });
-      state.log.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-      return null;
-    }
-    case 'unlog': {
-      const i = state.log.findIndex((e) => e.id === body.id);
-      if (i < 0) return 'Unknown entry';
-      state.log.splice(i, 1);
-      return null;
-    }
-    case 'decision': {
-      const d = state.decisions.find((x) => x.id === body.id);
-      if (!d) return 'Unknown decision';
-      d.done = !!body.done;
-      d.by = d.done ? by : null;
-      d.at = d.done ? lagosToday() : null;
-      if (body.note !== undefined) d.note = clean(body.note, 600);
-      if (d.done) addLog(state, { who: by, task: d.id, text: 'Closed decision: ' + d.text });
-      return null;
-    }
-    case 'deferred': {
-      const d = state.deferred[body.index];
-      if (!d) return 'Unknown item';
-      if (!['proposed', 'agreed'].includes(body.status)) return 'Bad status';
-      d.status = body.status;
-      d.agreedBy = body.status === 'agreed' ? by : null;
-      if (body.status === 'agreed') addLog(state, { who: by, task: null, text: 'Marked allocation item agreed: ' + d.item });
-      return null;
-    }
-    default:
-      return 'Unknown operation';
+// Rule-based picks: grounds the AI, and is the answer if the AI is unavailable.
+function rulePicks(a, me, mode) {
+  const free = a.stops.filter((s) => s.open && !(s.status === 'doing' && s.by !== me));
+  const byDue = (x, y) => (x.due < y.due ? -1 : x.due > y.due ? 1 : 0);
+  if (mode === 'easy') {
+    const pool = free.filter((s) => s.status !== 'doing');
+    pool.sort((x, y) => x.effort - y.effort || (y.mine - x.mine) || byDue(x, y));
+    return pool.slice(0, 2);
   }
+  if (mode === 'next') {
+    const mineDoing = a.stops.filter((s) => s.status === 'doing' && s.by === me).sort(byDue);
+    const mineFree = free.filter((s) => s.mine && s.status !== 'doing').sort((x, y) => (y.late - x.late) || byDue(x, y));
+    return mineDoing.slice(0, 1).concat(mineFree).slice(0, 2);
+  }
+  return a.stops.filter((s) => s.late).sort(byDue).slice(0, 3);
+}
+
+function ruleText(state, a, me, mode, picks) {
+  const name = FIRST[me];
+  const done = a.stops.filter((s) => s.status === 'done').length;
+  if (mode === 'easy') {
+    if (!picks.length) return 'Every open stop is either taken or waiting on something else. Pick a teammate’s stop and offer to help.';
+    const p = picks[0];
+    return 'Take a breath, ' + name + '. The lightest open stop is “' + p.title + '”. It’s a ' + EFFORT[p.effort] + ' one and nothing is blocking it. Knock it out and the map moves forward.';
+  }
+  if (mode === 'next') {
+    if (!picks.length) return 'Nothing on your crew list is open right now, ' + name + '. Try the easiest stop, or help whoever has the most on their plate.';
+    const p = picks[0];
+    const when = p.late ? 'it’s ' + (-p.daysLeft) + ' days past due' : p.daysLeft + ' days left';
+    return (p.status === 'doing' ? 'Finish what you started, ' + name + ': “' : name + ', your next stop is “') + p.title + '” (' + when + ').' + (picks[1] ? ' Then “' + picks[1].title + '”.' : '');
+  }
+  const late = a.stops.filter((s) => s.late).length;
+  return done + ' of ' + a.stops.length + ' stops reached. ' + (late ? late + ' past due' + (picks[0] ? ', starting with “' + picks[0].title + '”' : '') + '.' : 'Nothing past due.') + ' Pilot week starts ' + fmt(state.meta.pilotStart) + '.';
+}
+
+async function aiGuide(req, state, me, mode, a, picks) {
+  const token = process.env.AI_GATEWAY_API_KEY || req.headers['x-vercel-oidc-token'] || process.env.VERCEL_OIDC_TOKEN;
+  if (!token) return null;
+  const ask = {
+    next: 'They ask: what should I do next? Recommend one or two stops, from their own crew list where possible, finishing anything they already started first.',
+    easy: 'They feel overwhelmed. Recommend the single easiest open stop they could finish today, gently and without guilt.',
+    status: 'They ask how the team is doing. Give a frank progress read, name the biggest risk to the pilot date, and say who could use help.',
+  }[mode];
+  const stops = a.stops.map((s) => ({
+    id: s.id, title: s.title, region: s.region, effort: EFFORT[s.effort], crew: s.crew, due: s.due,
+    status: s.status, by: s.by, waitingOn: s.waitingOn, open: s.open, late: s.late, daysLeft: s.daysLeft,
+  }));
+  const body = {
+    model: process.env.ROADMAP_AI_MODEL || 'anthropic/claude-haiku-5.5',
+    max_tokens: 400,
+    temperature: 0.4,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are the guide on the Enough founding team’s treasure map to launch. Enough is a Nigerian fintech app that plans a user’s salary so it lasts to payday. ' +
+          'Speak directly to the person asking, by first name. Be warm, concrete and brief: at most 90 words, plain English, at most one light map metaphor. ' +
+          'Only recommend stops that exist, quoting their exact titles. Prefer open stops (nothing blocking them). Respect who is on whose crew, but anyone may help. ' +
+          'Reply with JSON only: {"text": "...", "picks": ["stopId", ...]} with at most 3 picks.',
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          today: a.today, pilotWeek: state.meta.pilotStart + ' to ' + state.meta.pilotEnd, goal: state.meta.goal,
+          askedBy: { id: me, name: state.people[me].name, role: state.people[me].role, responsibilities: state.people[me].does },
+          request: ask, workload: a.load, stops,
+          ruleBasedSuggestion: picks.map((p) => p.id),
+        }),
+      },
+    ],
+  };
+  const r = await fetch('https://ai-gateway.vercel.sh/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error('AI ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  const data = await r.json();
+  const raw = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) return { text: clean(raw, 700), picks: picks.map((p) => p.id) };
+  const parsed = JSON.parse(m[0]);
+  const valid = new Set(state.stops.map((s) => s.id));
+  return { text: clean(parsed.text, 700), picks: (parsed.picks || []).filter((id) => valid.has(id)).slice(0, 3) };
 }
 
 // ---------------------------------------------------------------- handler
@@ -312,27 +307,24 @@ module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex');
 
-  if (!process.env.ROADMAP_PASSCODE) {
-    res.status(503).json({ error: 'Roadmap passcode is not configured on the server.' });
+  if (!codesConfigured()) {
+    res.status(503).json({ error: 'Crew codes are not configured on the server yet.' });
     return;
   }
-  if (!authorised(req)) {
-    res.status(401).json({ error: 'Wrong passcode.' });
+  const me = whoIs(req.headers['x-roadmap-code']);
+  if (!me) {
+    res.status(401).json({ error: 'That code didn’t match anyone on the crew.' });
     return;
   }
-
   const persisted = storageReady();
+
   try {
     if (req.method === 'GET') {
-      res.status(200).json({ state: (await load()).state, persisted });
+      res.status(200).json({ state: (await load()).state, persisted, me });
       return;
     }
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
-    if (!persisted) {
-      res.status(503).json({ error: 'Storage is not connected, so changes cannot be saved yet.' });
       return;
     }
     let body = req.body;
@@ -341,26 +333,39 @@ module.exports = async (req, res) => {
       res.status(400).json({ error: 'Bad request' });
       return;
     }
-    // read, apply, conditional write; retry if someone else saved in between
+
+    if (body.op === 'guide') {
+      const mode = ['next', 'easy', 'status'].includes(body.mode) ? body.mode : 'next';
+      const { state } = await load();
+      const a = analyse(state, me);
+      const picks = rulePicks(a, me, mode);
+      try {
+        const ai = await aiGuide(req, state, me, mode, a, picks);
+        if (ai && ai.text) { res.status(200).json(Object.assign({ source: 'ai' }, ai)); return; }
+      } catch (e) {
+        console.error('guide AI failed, using rules:', e.message);
+      }
+      res.status(200).json({ source: 'rules', text: ruleText(state, a, me, mode, picks), picks: picks.map((p) => p.id) });
+      return;
+    }
+
+    if (!persisted) {
+      res.status(503).json({ error: 'Storage isn’t connected yet, so the map can’t be saved.' });
+      return;
+    }
     let state;
     for (let attempt = 0; ; attempt++) {
       const loaded = await load();
       state = loaded.state;
-      const err = apply(state, body);
-      if (err) {
-        res.status(400).json({ error: err });
-        return;
-      }
+      const err = apply(state, me, body);
+      if (err) { res.status(400).json({ error: err }); return; }
       state.version = (state.version || 1) + 1;
       state.updatedAt = new Date().toISOString();
-      state.updatedBy = body.by;
+      state.updatedBy = me;
       if (await save(state, loaded.etag)) break;
-      if (attempt >= 3) {
-        res.status(409).json({ error: 'Someone else was saving at the same moment. Try again.' });
-        return;
-      }
+      if (attempt >= 3) { res.status(409).json({ error: 'Someone else was saving at the same moment. Try again.' }); return; }
     }
-    res.status(200).json({ state, persisted });
+    res.status(200).json({ state, persisted, me });
   } catch (e) {
     console.error('roadmap error', e);
     res.status(500).json({ error: 'Something went wrong on the server.' });
