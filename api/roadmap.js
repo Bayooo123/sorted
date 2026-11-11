@@ -172,7 +172,10 @@ async function load(req) {
     const r = await fetch(url, { headers: { authorization: 'Bearer ' + auth.token }, cache: 'no-store' });
     if (r.status === 404) return { state: seed(), etag: null };
     if (!r.ok) throw new Error('Blob read ' + r.status + ' ' + (await r.text()).slice(0, 200));
-    return { state: normalise(await r.json()), etag: r.headers.get('etag') };
+    // The CDN can hand back a weak ETag (W/"...") after compression; the
+    // Blob API's x-if-match wants the strong value.
+    const etag = (r.headers.get('etag') || '').replace(/^W\//, '') || null;
+    return { state: normalise(await r.json()), etag };
   }
   if (kvConfig()) {
     const raw = await kv(['GET', KV_KEY]);
@@ -215,7 +218,10 @@ async function save(req, state, etag) {
     const r = await fetch(BLOB_API + '/?pathname=' + encodeURIComponent(BLOB_PATH), { method: 'PUT', headers, body: JSON.stringify(state) });
     if (r.ok) return true;
     const data = await r.json().catch(() => ({}));
-    if (r.status === 412 || (data.error && data.error.code === 'precondition_failed')) return false;
+    if (r.status === 412 || (data.error && data.error.code === 'precondition_failed')) {
+      console.warn('roadmap: conditional write rejected', etag, JSON.stringify(data).slice(0, 200));
+      return false;
+    }
     throw new Error('Blob write ' + r.status + ' ' + JSON.stringify(data));
   }
   await kv(['SET', KV_KEY, JSON.stringify(state)]);
@@ -442,8 +448,10 @@ module.exports = async (req, res) => {
       state.version = (state.version || 1) + 1;
       state.updatedAt = new Date().toISOString();
       state.updatedBy = me;
-      if (await save(req, state, loaded.etag)) break;
-      if (attempt >= 3) { res.status(409).json({ error: 'Someone else was saving at the same moment. Try again.' }); return; }
+      // After two rejected conditional writes, write unconditionally: with
+      // three founders a genuine collision is rare, and a stuck save is worse.
+      if (await save(req, state, attempt < 2 ? loaded.etag : null)) break;
+      if (attempt >= 3) { res.status(409).json({ error: 'Couldn\u2019t save just now. Please try again.' }); return; }
     }
     res.status(200).json({ state, persisted, me });
   } catch (e) {
