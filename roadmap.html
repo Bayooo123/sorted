@@ -378,7 +378,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       var f = state.stops.filter(function (s) { return s.status === 'done' && s.by === p; }).length;
       var u = state.stops.filter(function (s) { return s.status === 'doing' && s.by === p; }).length;
       var wk = state.log.filter(function (e) { return e.who === p && e.action === 'work'; }).length;
-      return '<div class="crew-row">' + av(p, 'lg') + '<div><b>' + esc(state.people[p].name) + '</b><br><span>' + f + ' done · ' + u + ' in progress · ' + wk + ' other work logged</span></div></div>';
+      return '<div class="crew-row">' + av(p, 'lg') + '<div><b>' + esc(state.people[p].name) + '</b><br><span>' + f + ' done · ' + u + ' in progress · ' + wk + (wk === 1 ? ' work entry' : ' work entries') + '</span></div></div>';
     }).join('');
     renderMap(); renderFeed(); renderRoles(); renderWork();
     if (openId && $('sheet').open) fillSheet(openId);
