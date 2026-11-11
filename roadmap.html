@@ -179,6 +179,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
 .sign{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line-soft);padding-top:14px}
 .sign small{color:var(--muted);font-size:13px}
 .sign small button{border:0;background:none;color:var(--amber);font-weight:700;text-decoration:underline;padding:0;font-size:13px}
+.sh-err{background:#FBE3D9;border:1px solid #F0C3B0;color:var(--ember);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:600}
 .acts{display:flex;gap:10px;flex-wrap:wrap}
 .acts .btn{flex:1 1 auto}
 
@@ -288,6 +289,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       <textarea id="sh-note" maxlength="400" placeholder="e.g. Filed on the CAC portal, awaiting approval"></textarea>
       <small id="sh-signer"></small>
       <input type="password" id="sh-code" placeholder="Your code" aria-label="Your code" hidden>
+      <p class="sh-err" id="sh-err" role="alert" hidden></p>
       <div class="acts" id="sh-acts"></div>
     </div>
   </div>
@@ -552,7 +554,9 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     if (s.status === 'todo' || (s.status === 'doing' && s.by !== me)) acts += '<button type="button" class="btn btn-sun" data-op="claim">I’m working on it</button>';
     if (s.status !== 'todo') acts += '<button type="button" class="btn btn-ghost" data-op="reopen">Reopen</button>';
     $('sh-acts').innerHTML = acts;
+    sheetErr(persisted ? '' : 'Saving is switched off until storage is connected in Vercel (Storage → Blob). Nothing you click here will be kept yet.');
   }
+  function sheetErr(m) { $('sh-err').textContent = m; $('sh-err').hidden = !m; }
   function openSheet(id) {
     openId = id; altCode = false; $('sh-note').value = ''; $('sh-code').value = '';
     fillSheet(id); $('sheet').showModal();
@@ -563,9 +567,9 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     if (e.target === $('sheet')) { $('sheet').close(); return; }
     if (e.target.id === 'sh-other') { altCode = true; fillSheet(openId); $('sh-code').focus(); return; }
     var b = e.target.closest('[data-op]'); if (!b) return;
-    if (!persisted) { toast('Storage isn’t connected yet, so this can’t be saved.', true); return; }
+    if (!persisted) { sheetErr('Can’t save yet: storage isn’t connected in Vercel.'); return; }
     var signCode = altCode ? $('sh-code').value.trim() : code;
-    if (!signCode) { toast('Enter your code to sign this.', true); $('sh-code').focus(); return; }
+    if (!signCode) { sheetErr('Enter your code to sign this.'); $('sh-code').focus(); return; }
     var op = b.getAttribute('data-op');
     Array.prototype.forEach.call($('sh-acts').querySelectorAll('button'), function (x) { x.disabled = true; });
     api('POST', { op: op, id: openId, note: $('sh-note').value }, signCode).then(function (d) {
@@ -574,7 +578,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       $('sheet').close(); picks = picks.filter(function (p) { return p !== openId; }); render();
       toast(op === 'done' ? 'Marked done by ' + FIRST[d.me] + '.' : op === 'claim' ? FIRST[d.me] + ' is working on “' + s.title + '”.' : 'Reopened.');
     }).catch(function (err) {
-      toast(err.message, true);
+      sheetErr(err.message);
       Array.prototype.forEach.call($('sh-acts').querySelectorAll('button'), function (x) { x.disabled = false; });
     });
   });
