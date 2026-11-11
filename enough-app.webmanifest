@@ -1,0 +1,18 @@
+{
+  "name": "Enough",
+  "short_name": "Enough",
+  "description": "Plan every naira of your salary so it lasts to payday.",
+  "id": "/enough/app",
+  "start_url": "/enough/app",
+  "scope": "/enough/app",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF8EC",
+  "theme_color": "#FFF8EC",
+  "categories": ["finance"],
+  "icons": [
+    { "src": "/icons/enough-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/enough-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/enough-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

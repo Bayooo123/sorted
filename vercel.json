@@ -1,9 +1,40 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/enough/roadmap", "destination": "/roadmap" },
-    { "source": "/app/api/:path*", "destination": "https://sorted-api.vercel.app/:path*" },
-    { "source": "/app", "destination": "https://sorted-app-preview.vercel.app/app" },
-    { "source": "/app/:path*", "destination": "https://sorted-app-preview.vercel.app/app/:path*" }
+    {
+      "source": "/enough/app",
+      "destination": "/enough-pwa"
+    },
+    {
+      "source": "/enough/app/:path*",
+      "destination": "/enough-pwa"
+    },
+    {
+      "source": "/enough/roadmap",
+      "destination": "/roadmap"
+    },
+    {
+      "source": "/app/api/:path*",
+      "destination": "https://sorted-api.vercel.app/:path*"
+    },
+    {
+      "source": "/app",
+      "destination": "https://sorted-app-preview.vercel.app/app"
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "https://sorted-app-preview.vercel.app/app/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/enough-sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
   ]
 }

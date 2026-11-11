@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Enough</title>
+<meta name="description" content="Plan every naira of your salary so it lasts to payday.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFF8EC">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Enough">
+<link rel="manifest" href="/enough-app.webmanifest">
+<link rel="icon" href="/icons/enough-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/enough-apple-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=DM+Sans:opsz,wght@9..40,400..700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Enough V1 design tokens. Brand colours and type from enough.html.
+   Rules: one primary action per screen (sun on ink or ink on sun),
+   money is always set in the display face, amounts never wrap,
+   every tap target is at least 44px.
+   ===================================================================== */
+:root{
+  --ink:#2B1B0E; --ink-2:#3D2814; --ground:#FFF8EC; --card:#FFFDF7; --line:#F0E2C6; --line-soft:#F6ECD8;
+  --muted:#6B5843; --faint:#9C8A72; --amber:#9A5B00; --sun:#FFC23C; --sun-soft:#FFE3A3; --sun-pale:#FFF1D1;
+  --orange:#F28C28; --ember:#C2502A; --deep:#8A3B1E; --night:#3A2615;
+  --good:#2E7D4F; --good-soft:#E3F2E8; --bad:#B53D1E; --bad-soft:#FBE3D9;
+  --display:'Bricolage Grotesque','Trebuchet MS',sans-serif;
+  --body:'DM Sans','Segoe UI',Arial,sans-serif;
+  --r-sm:12px; --r-md:18px; --r-lg:24px; --r-xl:30px;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  --nav-h:72px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:#EFE3CC;color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px;border-radius:10px}
+a{color:var(--amber);font-weight:600}
+.note svg,.err svg{flex:none}
+[hidden]{display:none!important}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.02em;line-height:1.08}
+p{margin:0}
+.money{font-family:var(--display);font-weight:800;letter-spacing:-.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .faint{color:var(--faint)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* App frame: full-bleed on phones, a phone-sized column on larger screens */
+#shell{position:relative;max-width:440px;min-height:100%;margin:0 auto;background:var(--ground);box-shadow:0 0 0 1px rgba(43,27,14,.05),0 30px 80px -40px rgba(43,27,14,.35);display:flex;flex-direction:column}
+@media (min-width:480px){#shell{min-height:calc(100% - 40px);margin:20px auto;border-radius:34px;overflow:hidden}}
+.screen{flex:1;display:flex;flex-direction:column;padding:calc(18px + var(--safe-t)) 22px 24px;animation:in .22s ease both}
+.screen.has-nav{padding-bottom:calc(var(--nav-h) + var(--safe-b) + 18px)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen,.sheet,.backdrop{animation:none!important}}
+.grow{flex:1}
+
+/* Top bar */
+.top{display:flex;align-items:center;gap:10px;min-height:44px;margin-bottom:14px}
+.top h2{font-size:17px;font-weight:700;flex:1;text-align:center;margin-right:44px}
+.back{width:44px;height:44px;border-radius:22px;border:1.5px solid var(--line);background:var(--card);display:grid;place-items:center;flex:none}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em}
+.steps{display:flex;gap:5px;margin-left:auto}
+.steps i{width:18px;height:4px;border-radius:2px;background:var(--line)}
+.steps i.on{background:var(--orange)}
+
+/* Type */
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.title{font-size:30px;font-weight:800;margin-top:6px}
+.lede{color:var(--muted);margin-top:8px;font-size:15.5px}
+
+/* Fields */
+.field{display:flex;flex-direction:column;gap:6px;margin-top:16px}
+.field label{font-size:13px;font-weight:700;color:var(--muted)}
+.input,select.input,textarea.input{width:100%;height:54px;border:1.5px solid var(--line);background:var(--card);border-radius:var(--r-md);padding:0 16px;font-size:16px}
+textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;resize:none}
+.input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 4px rgba(242,140,40,.15)}
+.input-wrap{position:relative}
+.input-wrap .peek{position:absolute;right:8px;top:7px;height:40px;padding:0 12px;border:0;background:none;color:var(--amber);font-weight:700;font-size:14px}
+.hint{font-size:13px;color:var(--muted)}
+.err{background:var(--bad-soft);color:var(--bad);border-radius:var(--r-sm);padding:12px 14px;font-size:14px;font-weight:600;margin-top:14px}
+.note{background:var(--sun-pale);border:1px solid var(--sun-soft);color:var(--amber);border-radius:var(--r-sm);padding:12px 14px;font-size:14px;margin-top:14px}
+
+/* Buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:56px;border-radius:28px;border:0;font-weight:700;font-size:16.5px;transition:transform .12s ease,opacity .12s ease}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-sun{background:var(--sun);color:var(--ink)}
+.btn-ink{background:var(--ink);color:var(--sun)}
+.btn-line{background:transparent;border:1.5px solid var(--ink);color:var(--ink)}
+.btn-text{background:none;height:44px;color:var(--amber);font-size:15px}
+.btn-row{display:flex;gap:10px}
+.btn-row .btn{flex:1}
+.cta{margin-top:auto;padding-top:20px;display:flex;flex-direction:column;gap:6px}
+.cta small{text-align:center;color:var(--muted);font-size:12.5px}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Segmented control */
+.seg{display:flex;background:var(--sun-pale);border-radius:16px;padding:4px;gap:4px}
+.seg button{flex:1;height:42px;border:0;background:none;border-radius:12px;font-weight:700;font-size:14.5px;color:var(--amber)}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(43,27,14,.12)}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px}
+.list{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line-soft);min-height:60px;background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left}
+.row:last-child{border-bottom:0}
+.row .t{font-weight:700;font-size:15px}
+.row .s{font-size:13px;color:var(--muted);margin-top:1px}
+.row .r{margin-left:auto;text-align:right}
+.chev{color:var(--faint);flex:none}
+.row > div:not(.r) + .chev,.row > span:not(.r) + .chev{margin-left:auto}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.section-h{display:flex;align-items:baseline;justify-content:space-between;margin:24px 2px 10px}
+.section-h h3{font-size:13px;font-family:var(--body);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+.section-h button{border:0;background:none;color:var(--amber);font-weight:700;font-size:14px;padding:6px 0}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:999px}
+.pill.wait{background:var(--sun-pale);color:var(--amber)}
+.pill.ok{background:var(--good-soft);color:var(--good)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill i{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* Account card (bank details) */
+.acct{background:linear-gradient(160deg,var(--deep),#6E2D16);color:#FFF1DE;border-radius:var(--r-lg);padding:20px;position:relative;overflow:hidden}
+.acct::after{content:"";position:absolute;right:-50px;top:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,194,60,.35),transparent 65%)}
+.acct .k{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#E9B98F}
+.acct .v{font-family:var(--display);font-weight:700;font-size:19px;margin:2px 0 12px}
+.acct .num{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:.04em;margin:2px 0 12px}
+.acct .copy{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;border-radius:14px;border:0;background:rgba(255,241,222,.14);color:#FFF1DE;font-weight:700}
+
+/* Home hero */
+.hello{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.hello h1{font-size:24px;font-weight:800}
+.avatar{width:44px;height:44px;border-radius:22px;background:var(--orange);color:var(--ink);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:18px;border:0}
+.hero{background:var(--ink);color:var(--ground);border-radius:var(--r-xl);padding:22px 20px 20px;position:relative;overflow:hidden}
+.hero .sunrise{position:absolute;right:-70px;bottom:-110px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--sun) 0 34%,rgba(255,194,60,.35) 35% 52%,rgba(255,194,60,.12) 53% 70%,transparent 71%);pointer-events:none}
+.hero .k{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sun)}
+.hero .big{font-size:42px;margin-top:6px;position:relative}
+.hero .sub{color:#E8D3AE;font-size:14px;margin-top:4px;position:relative;max-width:26ch}
+.hero .btn{margin-top:16px;position:relative;width:auto;padding:0 22px;height:48px;display:inline-flex}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.quick button{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:13.5px}
+.quick svg{color:var(--amber)}
+
+/* Purpose tiles */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:14px;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:112px}
+.tile .n{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:7px}
+.tile .money{font-size:21px;margin-top:2px}
+.tile .meta{font-size:12px;color:var(--muted);margin-top:auto}
+.bar{height:6px;border-radius:3px;background:var(--line-soft);overflow:hidden;display:flex;margin-top:6px}
+.bar i{display:block;height:100%}
+.lock{display:inline-flex;align-items:center;gap:4px}
+.planbar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:14px 0 4px}
+.planbar i{display:block;height:100%}
+
+/* Bottom nav */
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:440px;height:calc(var(--nav-h) + var(--safe-b));padding-bottom:var(--safe-b);background:rgba(255,253,247,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;z-index:20}
+@media (min-width:480px){.nav{bottom:20px;border-radius:0 0 34px 34px}}
+.nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--faint)}
+.nav button[aria-current=page]{color:var(--ink)}
+.nav button[aria-current=page] svg{color:var(--orange)}
+
+/* Sheets */
+.backdrop{position:fixed;inset:0;background:rgba(43,27,14,.45);z-index:40;animation:fade .2s ease both}
+@keyframes fade{from{opacity:0}}
+.sheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:440px;max-height:92%;overflow:auto;background:var(--ground);border-radius:28px 28px 0 0;z-index:41;padding:10px 22px calc(22px + var(--safe-b));animation:up .25s cubic-bezier(.2,.8,.2,1) both}
+@keyframes up{from{transform:translate(-50%,100%)}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px}
+.sheet h2{font-size:22px;font-weight:800}
+
+/* PIN pad */
+.pin-dots{display:flex;justify-content:center;gap:16px;margin:22px 0 8px}
+.pin-dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink)}
+.pin-dots i.on{background:var(--ink)}
+.pin-dots.shake{animation:shake .35s ease}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.pad button{height:62px;border-radius:18px;border:0;background:var(--card);border:1px solid var(--line);font-family:var(--display);font-weight:700;font-size:24px}
+.pad button:active{background:var(--sun-pale)}
+.pad .blank{visibility:hidden}
+
+/* Amount entry */
+.amount{display:flex;align-items:baseline;justify-content:center;gap:4px;margin:18px 0 6px}
+.amount span{font-family:var(--display);font-weight:800;font-size:28px;color:var(--muted)}
+.amount input{border:0;background:none;font-family:var(--display);font-weight:800;font-size:46px;letter-spacing:-.02em;width:2ch;min-width:1.2ch;max-width:300px;text-align:left;padding:0}
+.amount input:focus{outline:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;height:40px;padding:0 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--card);font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+
+/* Plan editor */
+.pe-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+.pe-row input.name{flex:1;height:46px}
+.pe-row .pct{width:84px;display:flex;align-items:center;border:1.5px solid var(--line);border-radius:var(--r-md);background:var(--card);height:46px;padding:0 10px}
+.pe-row .pct input{width:100%;border:0;background:none;text-align:right;font-weight:700;font-size:16px}
+.pe-row .pct input:focus{outline:none}
+.pe-row .x{width:40px;height:40px;border-radius:20px;border:0;background:none;color:var(--faint);font-size:22px}
+.total{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-top:12px}
+.total.off{color:var(--bad)}
+
+/* Level cards */
+.levels{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.level{display:flex;gap:14px;align-items:flex-start;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:16px}
+.level[aria-pressed=true]{border-color:var(--orange);background:var(--sun-pale)}
+.level .radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none;margin-top:2px;display:grid;place-items:center}
+.level[aria-pressed=true] .radio{border-color:var(--orange)}
+.level[aria-pressed=true] .radio::after{content:"";width:11px;height:11px;border-radius:50%;background:var(--orange)}
+.level b{display:block;font-size:16px}
+.level span{font-size:13.5px;color:var(--muted)}
+.tag{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--orange);color:var(--ink);padding:3px 8px;border-radius:8px;margin-left:6px;vertical-align:2px}
+
+/* Building animation */
+.orb{width:120px;height:120px;border-radius:50%;margin:40px auto 24px;background:radial-gradient(circle,var(--sun) 0 30%,rgba(255,194,60,.45) 31% 50%,rgba(255,194,60,.18) 51% 70%,transparent 71%);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.ticks{list-style:none;padding:0;margin:22px 0 0;display:flex;flex-direction:column;gap:12px}
+.ticks li{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--faint)}
+.ticks li.on{color:var(--ink)}
+.ticks li i{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;flex:none}
+.ticks li.on i{background:var(--orange);border-color:var(--orange)}
+
+/* Result */
+.result{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:30px}
+.result .badge{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;margin-bottom:18px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-soft);font-size:14.5px}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--muted)}
+.kv span:last-child{font-weight:700;text-align:right}
+
+/* Split sheet */
+.split-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.split-row:last-child{border-bottom:0}
+.toggle{position:relative;width:46px;height:28px;flex:none}
+.toggle input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.toggle span{position:absolute;inset:0;border-radius:14px;background:var(--line);transition:background .15s}
+.toggle span::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .15s}
+.toggle input:checked+span{background:var(--orange)}
+.toggle input:checked+span::after{transform:translateX(18px)}
+.toggle input:focus-visible+span{outline:3px solid var(--orange);outline-offset:2px}
+
+/* Activity */
+.day{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:20px 4px 8px}
+.ico{width:40px;height:40px;border-radius:20px;display:grid;place-items:center;flex:none}
+.in{color:var(--good)}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + var(--safe-b) + 14px);transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--ground);padding:12px 18px;border-radius:16px;font-weight:600;font-size:14.5px;z-index:60;transition:all .2s ease;max-width:calc(100% - 32px);pointer-events:none;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--bad)}
+
+/* Splash */
+.splash{flex:1;display:grid;place-items:center}
+.empty{text-align:center;padding:26px 16px;color:var(--muted);font-size:14.5px}
+.install{display:flex;gap:12px;align-items:center;background:var(--sun-pale);border:1px solid var(--sun-soft);border-radius:var(--r-md);padding:12px 14px;margin-top:14px}
+.install p{font-size:13.5px;flex:1}
+.install button{border:0;background:var(--ink);color:var(--sun);font-weight:700;border-radius:14px;height:38px;padding:0 14px;font-size:13.5px}
+.install .x{background:none;color:var(--faint);padding:0 6px;font-size:20px}
+</style>
+</head>
+<body>
+<div id="shell"><main id="app" class="splash" aria-live="polite"><div class="spin" style="color:var(--orange)"></div></main></div>
+<nav class="nav" id="nav" hidden aria-label="Main"></nav>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =================================================================
+     Config. The API base can be overridden on localhost only, for
+     testing against a local mock: /enough/app?api=http://localhost:4100
+     ================================================================= */
+  var API = 'https://sorted-api.vercel.app';
+  try {
+    var q = new URLSearchParams(location.search).get('api');
+    if (q && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) API = q;
+  } catch (e) {}
+  var TOKEN_KEY = 'enough_access_token';   // same key as /enough-app, so existing sessions carry over
+  var PREFS_KEY = 'enough_prefs';          // device-only preferences (level, install prompt dismissed)
+
+  var STATES = ['Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT (Abuja)', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'];
+  // Purpose colours: the Enough sunrise, light to deep.
+  var PALETTE = ['#FFC23C', '#F5A623', '#F28C28', '#E2702A', '#C2502A', '#A8411F', '#8A3B1E', '#5A2A14'];
+  // Names that read as obligations paid in one go (never paced) vs everyday spending (paced on Balanced).
+  var LUMP = /rent|bill|school|fee|tithe|mum|mom|dad|parent|family|loan|debt|insur|pension|save|saving|invest|emergency|goal|car/i;
+  var EVERYDAY = /food|grocer|market|transport|fuel|eat|fun|free|spend|data|airtime|personal|misc|enjoy|entertain|outing|shopping|gym|treat/i;
+
+  /* ========================================================= state */
+  var S = {
+    token: null, me: null, account: null, purposes: null, history: null, payments: null, banks: null,
+    draftPlan: null, prefs: {}
+  };
+  try { S.token = localStorage.getItem(TOKEN_KEY); } catch (e) {}
+  try { S.prefs = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch (e) { S.prefs = {}; }
+  function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(S.prefs)); } catch (e) {} }
+
+  /* ======================================================= helpers */
+  var app = document.getElementById('app');
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function kobo(v) { return Number(v || 0); }
+  function naira(k, opts) {
+    var n = kobo(k) / 100;
+    var dp = opts && opts.exact ? 2 : (n % 1 ? 2 : 0);
+    return '₦' + n.toLocaleString('en-NG', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  }
+  function first(name) { return String(name || '').trim().split(/\s+/)[0] || 'there'; }
+  function initials(name) { var p = String(name || '').trim().split(/\s+/); return ((p[0] || '')[0] || '') + ((p[1] || '')[0] || ''); }
+  function acctNum(n) { return String(n || '').replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'); }
+  function colorFor(i) { return PALETTE[i % PALETTE.length]; }
+  function greeting() { var h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function dDate(iso) { var d = new Date(iso); return d.getDate() + ' ' + MON[d.getMonth()]; }
+  function dTime(iso) { var d = new Date(iso); return d.toLocaleTimeString('en-NG', { hour: 'numeric', minute: '2-digit' }); }
+  function dayLabel(iso) {
+    var d = new Date(iso), t = new Date(); t.setHours(0, 0, 0, 0);
+    var x = new Date(d); x.setHours(0, 0, 0, 0);
+    var diff = Math.round((t - x) / 86400000);
+    return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : d.getDate() + ' ' + MON[d.getMonth()] + (d.getFullYear() !== t.getFullYear() ? ' ' + d.getFullYear() : '');
+  }
+  function untilLabel(iso) {
+    var ms = new Date(iso) - Date.now();
+    if (ms <= 0) return 'now';
+    var d = Math.ceil(ms / 86400000);
+    return d === 1 ? 'tomorrow' : 'in ' + d + ' days';
+  }
+  var toastT;
+  function toast(msg, bad) { var t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : ''); clearTimeout(toastT); toastT = setTimeout(function () { t.className = 'toast'; }, 2800); }
+  function busy(btn, on, label) {
+    if (!btn) return;
+    if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>' + (label ? '<span>' + label + '</span>' : ''); }
+    else { btn.disabled = false; if (btn.dataset.label) btn.innerHTML = btn.dataset.label; }
+  }
+  function showErr(el, msg) { if (!el) return; el.textContent = msg || ''; el.hidden = !msg; }
+
+  /* =========================================================== icons */
+  var I = {
+    back: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+    chev: '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
+    sun: '<svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="#FFC23C" stroke="#2B1B0E" stroke-width="1.6"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="#2B1B0E" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    home: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>',
+    plan: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg>',
+    activity: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>',
+    me: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+    add: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    send: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>',
+    split: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M12 10l-6 6v5M12 10l6 6v5"/></svg>',
+    copy: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>',
+    lock: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
+    check: '<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    tick: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    clock: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    x: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+    arrowIn: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M15 17H7V9"/></svg>',
+    shield: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/></svg>'
+  };
+
+  /* ============================================================= API */
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json' };
+    if (S.token) headers.Authorization = 'Bearer ' + S.token;
+    return fetch(API + path, { method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .catch(function () { throw new Error('You seem to be offline. Check your connection and try again.'); })
+      .then(function (res) {
+        return res.text().then(function (text) {
+          var data; try { data = text ? JSON.parse(text) : undefined; } catch (e) { data = undefined; }
+          if (res.status === 401 && S.token) { signOut(true); throw new Error('Your session ended. Please log in again.'); }
+          if (!res.ok) {
+            var m = (data && (data.message || data.error)) || 'Something went wrong (' + res.status + ').';
+            var err = new Error(Array.isArray(m) ? m.join('. ') : m); err.status = res.status; throw err;
+          }
+          return data;
+        });
+      });
+  }
+  function loadCore() {
+    return Promise.all([api('/me'), api('/enough/account')]).then(function (r) { S.me = r[0]; S.account = r[1]; });
+  }
+  function loadPurposes() { return api('/enough/purposes').then(function (p) { S.purposes = p || []; return S.purposes; }); }
+  function loadMoney() {
+    return Promise.all([api('/enough/account'), loadPurposes()]).then(function (r) { S.account = r[0]; });
+  }
+  function signOut(silent) {
+    S.token = null; S.me = S.account = S.purposes = S.history = S.payments = null;
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    if (!silent) go('welcome');
+  }
+  function isActive() { return S.account && S.account.status === 'active'; }
+  function spendable(p) { return Math.max(0, kobo(p.balanceKobo) - kobo(p.lockedKobo)); }
+  function landing() { return kobo(S.account && S.account.availableBalanceKobo); }
+  function totalBalance() { return landing() + (S.purposes || []).reduce(function (s, p) { return s + kobo(p.balanceKobo); }, 0); }
+  function ordered() {
+    return (S.purposes || []).slice().sort(function (a, b) { return (b.targetPercent || 0) - (a.targetPercent || 0) || a.name.localeCompare(b.name); });
+  }
+
+  /* ========================================================== router */
+  var routes = {};
+  var current = null;
+  function go(name, params, replace) {
+    var hash = '#/' + name + (params ? '/' + encodeURIComponent(params) : '');
+    if (replace) history.replaceState(null, '', hash); else if (location.hash !== hash) history.pushState(null, '', hash);
+    render();
+  }
+  function parse() {
+    var h = location.hash.replace(/^#\/?/, '').split('/');
+    return { name: h[0] || '', param: h[1] ? decodeURIComponent(h[1]) : null };
+  }
+  window.addEventListener('popstate', render);
+
+  var PUBLIC = { welcome: 1, signup: 1, login: 1, forgot: 1 };
+  var TABS = { home: 1, plan: 1, activity: 1, profile: 1 };
+
+  // Where a signed-in user belongs, based on what's actually set up on the server.
+  function nextStep() {
+    if (!S.account || S.account.status === 'unrequested') return 'verify';
+    if (!S.purposes || !S.purposes.length) return S.account.description ? 'building' : 'describe';
+    if (!S.account.hasTransactionPin) return 'pin';
+    return 'home';
+  }
+
+  function render() {
+    closeSheet();
+    var r = parse();
+    if (!S.token) {
+      if (!PUBLIC[r.name]) return go('welcome', null, true);
+    } else if (!S.me) {
+      app.className = 'splash'; app.innerHTML = '<div class="spin" style="color:var(--orange)"></div>'; $('#nav').hidden = true;
+      return loadCore().then(loadPurposes).then(function () {
+        if (!r.name || PUBLIC[r.name]) return go(nextStep(), null, true);
+        render();
+      }).catch(function (e) { if (S.token) fatal(e); });
+    } else if (PUBLIC[r.name] || !r.name) {
+      return go(nextStep(), null, true);
+    }
+    var fn = routes[r.name];
+    if (!fn) return go(S.token ? 'home' : 'welcome', null, true);
+    current = r.name;
+    app.className = '';
+    window.scrollTo(0, 0);
+    fn(r.param);
+    renderNav(TABS[r.name] ? r.name : null);
+  }
+  function fatal(e) {
+    app.className = 'screen';
+    app.innerHTML = '<div class="splash"><div style="text-align:center;max-width:300px"><h2 style="font-size:22px">We couldn’t load your account</h2><p class="lede">' + esc(e.message) + '</p><button class="btn btn-ink" style="margin-top:20px" id="retry">Try again</button></div></div>';
+    $('#retry').onclick = function () { S.me = null; render(); };
+  }
+
+  function renderNav(active) {
+    var nav = $('#nav');
+    if (!active) { nav.hidden = true; return; }
+    var items = [['home', 'Home', I.home], ['plan', 'Plan', I.plan], ['activity', 'Activity', I.activity], ['profile', 'Profile', I.me]];
+    nav.hidden = false;
+    nav.innerHTML = items.map(function (it) { return '<button type="button" data-go="' + it[0] + '"' + (it[0] === active ? ' aria-current="page"' : '') + '>' + it[2] + it[1] + '</button>'; }).join('');
+    $$('[data-go]', nav).forEach(function (b) { b.onclick = function () { go(b.getAttribute('data-go')); }; });
+  }
+
+  function screen(html, opts) {
+    app.className = 'screen' + (opts && opts.nav ? ' has-nav' : '');
+    app.innerHTML = html;
+    $$('[data-back]', app).forEach(function (b) { b.onclick = function () { if (history.length > 1) history.back(); else go(b.getAttribute('data-back') || 'home'); }; });
+  }
+  function topbar(title, back, extra) {
+    return '<div class="top">' + (back !== false ? '<button class="back" type="button" data-back="' + (back || 'home') + '" aria-label="Back">' + I.back + '</button>' : '') +
+      (title ? '<h2>' + esc(title) + '</h2>' : '') + (extra || '') + '</div>';
+  }
+  function steps(n, of) { var s = ''; for (var i = 1; i <= of; i++) s += '<i class="' + (i <= n ? 'on' : '') + '"></i>'; return '<div class="steps" aria-label="Step ' + n + ' of ' + of + '">' + s + '</div>'; }
+
+  /* ===================================================== sheet + PIN */
+  var sheetEl = null, backdropEl = null;
+  function openSheet(html, onClose) {
+    closeSheet();
+    backdropEl = document.createElement('div'); backdropEl.className = 'backdrop';
+    sheetEl = document.createElement('div'); sheetEl.className = 'sheet'; sheetEl.setAttribute('role', 'dialog'); sheetEl.setAttribute('aria-modal', 'true');
+    sheetEl.innerHTML = '<div class="grab"></div>' + html;
+    backdropEl.onclick = function () { closeSheet(); if (onClose) onClose(); };
+    document.body.appendChild(backdropEl); document.body.appendChild(sheetEl);
+    var f = sheetEl.querySelector('input,button:not(.grab)'); if (f) setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (e) {} }, 60);
+    return sheetEl;
+  }
+  function closeSheet() { if (sheetEl) { sheetEl.remove(); backdropEl.remove(); sheetEl = backdropEl = null; } }
+
+  // Asks for the 4-digit PIN. `submit(pin)` returns a promise; a rejection shakes and shows the error.
+  function askPin(title, sub, submit) {
+    var pin = '';
+    var el = openSheet('<h2>' + esc(title) + '</h2><p class="lede">' + esc(sub) + '</p>' +
+      '<div class="pin-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="err" id="pin-err" hidden></p>' +
+      '<div class="pad">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map(function (k) { return '<button type="button" class="' + (k === '' ? 'blank' : '') + '" data-k="' + k + '" aria-label="' + (k === '⌫' ? 'Delete' : k) + '">' + k + '</button>'; }).join('') + '</div>' +
+      '<input class="sr" id="pin-kb" inputmode="numeric" autocomplete="one-time-code" aria-label="PIN">');
+    var dots = $$('.pin-dots i', el), err = $('#pin-err', el), locked = false;
+    function paint() { dots.forEach(function (d, i) { d.className = i < pin.length ? 'on' : ''; }); }
+    function key(k) {
+      if (locked) return;
+      if (k === '⌫') pin = pin.slice(0, -1); else if (/\d/.test(k) && pin.length < 4) pin += k;
+      paint();
+      if (pin.length === 4) {
+        locked = true; showErr(err, '');
+        submit(pin).then(function () { closeSheet(); }).catch(function (e) {
+          locked = false; pin = ''; paint(); showErr(err, e.message);
+          var d = $('.pin-dots', el); d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
+        });
+      }
+    }
+    $$('[data-k]', el).forEach(function (b) { b.onclick = function () { key(b.getAttribute('data-k')); }; });
+    el.addEventListener('keydown', function (e) { if (/^\d$/.test(e.key)) key(e.key); else if (e.key === 'Backspace') key('⌫'); });
+  }
+
+  function copy(text, label) {
+    var done = function () { toast((label || 'Copied') + ' copied'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+    else { var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); done(); }
+  }
+
+  /* =================================================================
+     SCREENS: getting in
+     ================================================================= */
+  routes.welcome = function () {
+    screen(
+      '<div class="brand" style="margin-top:8px">' + I.sun + 'enough</div>' +
+      '<div style="margin:auto 0;padding:30px 0">' +
+        '<div style="position:relative;height:190px;margin-bottom:26px"><div style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:300px;height:150px;border-radius:150px 150px 0 0;background:radial-gradient(circle at 50% 100%,var(--sun) 0 28%,rgba(255,194,60,.5) 29% 48%,rgba(255,194,60,.22) 49% 70%,transparent 71%)"></div><div style="position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--ink)"></div></div>' +
+        '<h1 style="font-size:40px;font-weight:800;letter-spacing:-.035em">Make your salary <span style="background:linear-gradient(transparent 62%,var(--sun) 62%)">enough</span>.</h1>' +
+        '<p class="lede" style="font-size:17px">Tell Enough about your life. Get a plan for every naira. Make it to payday.</p>' +
+      '</div>' +
+      '<div class="cta"><button class="btn btn-ink" id="go-signup">Create my account</button><button class="btn btn-text" id="go-login">I already have an account</button></div>');
+    $('#go-signup').onclick = function () { go('signup'); };
+    $('#go-login').onclick = function () { go('login'); };
+  };
+
+  routes.signup = function () {
+    screen(topbar('', 'welcome', steps(1, 5)) +
+      '<p class="eyebrow">Create your account</p><h1 class="title">Let’s get you set up</h1><p class="lede">Takes about two minutes. You’ll verify your identity next.</p>' +
+      '<form id="f" novalidate>' +
+        '<div class="field"><label for="name">Full name</label><input class="input" id="name" autocomplete="name" required placeholder="As it appears on your bank account"></div>' +
+        '<div class="field"><label for="phone">Phone number</label><input class="input" id="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="0801 234 5678"></div>' +
+        '<div class="field"><label for="email">Email</label><input class="input" id="email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com"></div>' +
+        '<div class="field"><label for="state">State you live in</label><select class="input" id="state" required><option value="">Choose a state</option>' + STATES.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="pw">Password</label><div class="input-wrap"><input class="input" id="pw" type="password" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"><button type="button" class="peek" data-peek="pw">Show</button></div></div>' +
+        '<p class="err" id="err" hidden></p>' +
+        '<div class="cta"><button class="btn btn-ink" type="submit">Continue</button><small>By continuing you agree to Enough’s <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</small></div>' +
+      '</form>');
+    bindPeek();
+    $('#f').onsubmit = function (e) {
+      e.preventDefault();
+      var err = $('#err'), btn = $('button[type=submit]', this);
+      var phone = normPhone($('#phone').value);
+      var body = { name: $('#name').value.trim(), phone: phone, email: $('#email').value.trim(), state: $('#state').value, password: $('#pw').value };
+      if (!body.name) return showErr(err, 'Enter your full name.');
+      if (!/^\+?[1-9]\d{7,14}$/.test(phone)) return showErr(err, 'Enter a valid phone number, like 0801 234 5678.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) return showErr(err, 'Enter a valid email address.');
+      if (!body.state) return showErr(err, 'Choose the state you live in.');
+      if (body.password.length < 8) return showErr(err, 'Your password needs at least 8 characters.');
+      showErr(err, ''); busy(btn, true, 'Creating your account');
+      api('/auth/signup', { method: 'POST', body: body }).then(signedIn).catch(function (x) { busy(btn, false); showErr(err, x.message); });
+    };
+  };
+  function normPhone(v) {
+    var d = String(v).replace(/[^\d+]/g, '');
+    if (/^0\d{10}$/.test(d)) return '+234' + d.slice(1);
+    if (/^234\d{10}$/.test(d)) return '+' + d;
+    return d;
+  }
+  function bindPeek() {
+    $$('[data-peek]').forEach(function (b) { b.onclick = function () { var i = document.getElementById(b.getAttribute('data-peek')); var show = i.type === 'password'; i.type = show ? 'text' : 'password'; b.textContent = show ? 'Hide' : 'Show'; }; });
+  }
+  function signedIn(res) {
+    S.token = res.accessToken; S.me = null;
+    try { localStorage.setItem(TOKEN_KEY, S.token); } catch (e) {}
+    go('', null, true);
+  }
+
+  routes.login = function () {
+    screen(topbar('', 'welcome') +
+      '<p class="eyebrow">Welcome back</p><h1 class="title">Log in to Enough</h1>' +
+      '<form id="f" novalidate>' +
+        '<div class="field"><label for="id">Email or phone</label><input class="input" id="id" autocomplete="username" required></div>' +
+        '<div class="field"><label for="pw">Password</label><div class="input-wrap"><input class="input" id="pw" type="password" autocomplete="current-password" required><button type="button" class="peek" data-peek="pw">Show</button></div></div>' +
+        '<button type="button" class="btn btn-text" id="forgot" style="width:auto;padding:0;justify-content:flex-start;margin-top:6px">Forgot password?</button>' +
+        '<p class="err" id="err" hidden></p>' +
+        '<div class="cta"><button class="btn btn-ink" type="submit">Log in</button></div>' +
+      '</form>');
+    bindPeek();
+    $('#forgot').onclick = function () { go('forgot'); };
+    $('#f').onsubmit = function (e) {
+      e.preventDefault();
+      var err = $('#err'), btn = $('button[type=submit]', this);
+      var id = $('#id').value.trim(); if (/^[\d\s+]+$/.test(id)) id = normPhone(id);
+      if (!id || !$('#pw').value) return showErr(err, 'Enter your email or phone and your password.');
+      showErr(err, ''); busy(btn, true);
+      api('/auth/login', { method: 'POST', body: { identifier: id, password: $('#pw').value } }).then(signedIn).catch(function (x) { busy(btn, false); showErr(err, x.message); });
+    };
+  };
+
+  routes.forgot = function () {
+    var stage = 'request', ident = '';
+    function draw() {
+      screen(topbar('', 'login') +
+        (stage === 'request'
+          ? '<p class="eyebrow">Reset password</p><h1 class="title">Forgot your password?</h1><p class="lede">Enter your email or phone. We’ll email you a code.</p>' +
+            '<form id="f" novalidate><div class="field"><label for="id">Email or phone</label><input class="input" id="id" autocomplete="username" required></div><p class="err" id="err" hidden></p><div class="cta"><button class="btn btn-ink" type="submit">Send code</button></div></form>'
+          : '<p class="eyebrow">Check your email</p><h1 class="title">Enter the code</h1><p class="lede">We sent a code to the email on your account.</p>' +
+            '<form id="f" novalidate><div class="field"><label for="code">Code</label><input class="input" id="code" inputmode="numeric" autocomplete="one-time-code" required></div>' +
+            '<div class="field"><label for="pw">New password</label><div class="input-wrap"><input class="input" id="pw" type="password" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"><button type="button" class="peek" data-peek="pw">Show</button></div></div>' +
+            '<p class="err" id="err" hidden></p><div class="cta"><button class="btn btn-ink" type="submit">Set new password</button></div></form>'));
+      bindPeek();
+      $('#f').onsubmit = function (e) {
+        e.preventDefault();
+        var err = $('#err'), btn = $('button[type=submit]', this);
+        if (stage === 'request') {
+          ident = $('#id').value.trim(); if (/^[\d\s+]+$/.test(ident)) ident = normPhone(ident);
+          if (!ident) return showErr(err, 'Enter your email or phone.');
+          busy(btn, true);
+          api('/auth/forgot-password', { method: 'POST', body: { identifier: ident } }).then(function () { stage = 'reset'; draw(); }).catch(function (x) { busy(btn, false); showErr(err, x.message); });
+        } else {
+          var code = $('#code').value.trim(), pw = $('#pw').value;
+          if (!code) return showErr(err, 'Enter the code from the email.');
+          if (pw.length < 8) return showErr(err, 'Your new password needs at least 8 characters.');
+          busy(btn, true);
+          api('/auth/reset-password', { method: 'POST', body: { identifier: ident, code: code, newPassword: pw } })
+            .then(function () { return api('/auth/login', { method: 'POST', body: { identifier: ident, password: pw } }); })
+            .then(function (res) { toast('Password updated'); signedIn(res); })
+            .catch(function (x) { busy(btn, false); showErr(err, x.message); });
+        }
+      };
+    }
+    draw();
+  };
+
+  /* =================================================================
+     SCREENS: identity and account number
+     ================================================================= */
+  routes.verify = function () {
+    if (S.account && S.account.status !== 'unrequested') return go('account', null, true);
+    var parts = String((S.me && S.me.name) || '').trim().split(/\s+/);
+    screen(topbar('', false, steps(2, 5)) +
+      '<p class="eyebrow">Verify your identity</p><h1 class="title">Open your Enough account</h1>' +
+      '<p class="lede">Your BVN confirms it’s really you and opens an account number in your name for your salary.</p>' +
+      '<form id="f" novalidate>' +
+        '<div class="field"><label for="fn">First name</label><input class="input" id="fn" autocomplete="given-name" value="' + esc(parts[0] || '') + '"></div>' +
+        '<div class="field"><label for="ln">Last name</label><input class="input" id="ln" autocomplete="family-name" value="' + esc(parts.length > 1 ? parts[parts.length - 1] : '') + '"></div>' +
+        '<div class="field"><label for="bvn">BVN</label><input class="input" id="bvn" inputmode="numeric" maxlength="11" autocomplete="off" placeholder="11 digits"><span class="hint">Dial *565*0# on the line linked to your bank to get it.</span></div>' +
+        '<div class="note" style="display:flex;gap:10px;align-items:flex-start">' + I.shield + '<span>Use your names exactly as they appear on your BVN. We only use it to confirm your identity with our partner bank.</span></div>' +
+        '<p class="err" id="err" hidden></p>' +
+        '<div class="cta"><button class="btn btn-ink" type="submit">Verify and open account</button></div>' +
+      '</form>');
+    $('#bvn').oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 11); };
+    $('#f').onsubmit = function (e) {
+      e.preventDefault();
+      var err = $('#err'), btn = $('button[type=submit]', this);
+      var body = { firstName: $('#fn').value.trim(), lastName: $('#ln').value.trim(), bvn: $('#bvn').value };
+      if (!body.firstName || !body.lastName) return showErr(err, 'Enter your first and last name.');
+      if (!/^\d{11}$/.test(body.bvn)) return showErr(err, 'Your BVN is 11 digits.');
+      showErr(err, ''); busy(btn, true, 'Verifying');
+      api('/enough/account', { method: 'POST', body: body }).then(function (acct) { S.account = acct; go('account', null, true); })
+        .catch(function (x) { busy(btn, false); showErr(err, x.message); });
+    };
+  };
+
+  function statusPill() {
+    var st = S.account && S.account.status;
+    if (st === 'active') return '<span class="pill ok"><i></i>Ready for transfers</span>';
+    if (st === 'unsupported') return '<span class="pill bad"><i></i>Couldn’t verify</span>';
+    return '<span class="pill wait"><i></i>Verifying your identity</span>';
+  }
+  function acctCard() {
+    var a = S.account || {};
+    if (!a.virtualAccountNumber) {
+      return '<div class="acct"><p class="k">Your account number</p><p class="v" style="margin-bottom:4px">Being created…</p><p style="font-size:14px;color:#E9B98F;position:relative">It appears here as soon as your bank partner issues it, usually within minutes.</p></div>';
+    }
+    return '<div class="acct"><p class="k">Account name</p><p class="v">' + esc(a.accountName || '') + '</p>' +
+      '<p class="k">Account number</p><p class="num">' + esc(acctNum(a.virtualAccountNumber)) + '</p>' +
+      '<p class="k">Bank</p><p class="v">' + esc(a.bankName || '') + '</p>' +
+      '<button class="copy" type="button" id="copy-acct">' + I.copy + 'Copy account number</button></div>';
+  }
+  function bindAcctCopy() { var b = $('#copy-acct'); if (b) b.onclick = function () { copy(S.account.virtualAccountNumber, 'Account number'); }; }
+
+  routes.account = function () {
+    var a = S.account || {};
+    if (a.status === 'unsupported') {
+      screen(topbar('', false) + '<div class="result"><div class="badge" style="background:var(--bad-soft);color:var(--bad)">' + I.x + '</div><h1 class="title">We couldn’t verify you</h1><p class="lede">' + esc(a.statusDetail || 'The details didn’t match your BVN record.') + '</p><p class="lede">Email <a href="mailto:hello@sorted.com.ng">hello@sorted.com.ng</a> and we’ll sort it out with you.</p></div>' +
+        '<div class="cta"><button class="btn btn-line" id="out">Log out</button></div>');
+      $('#out').onclick = function () { signOut(); };
+      return;
+    }
+    screen(topbar('', false, steps(2, 5)) + statusPill() +
+      '<h1 class="title" style="margin-top:12px">Your Enough account</h1>' +
+      '<p class="lede">' + (isActive() ? 'This is your number. Ask your employer to pay your salary here, or send money in from any bank.' : 'We’re confirming your identity with our partner bank. You can build your plan while that finishes; money can move once it’s done.') + '</p>' +
+      '<div style="margin-top:20px">' + acctCard() + '</div>' +
+      (a.statusDetail && !isActive() ? '<p class="note">' + esc(a.statusDetail) + '</p>' : '') +
+      '<div class="cta"><button class="btn btn-sun" id="next">Build my plan</button>' + (!isActive() ? '<button class="btn btn-text" id="refresh">Check status</button>' : '') + '</div>');
+    bindAcctCopy();
+    $('#next').onclick = function () { go(nextStep()); };
+    var r = $('#refresh'); if (r) r.onclick = function () { busy(r, true); api('/enough/account').then(function (x) { S.account = x; routes.account(); if (isActive()) toast('Your account is ready'); }).catch(function (e) { busy(r, false); toast(e.message, true); }); };
+  };
+
+  /* =================================================================
+     SCREENS: onboarding (describe -> level -> plan -> PIN)
+     ================================================================= */
+  routes.describe = function () {
+    var pre = (S.account && S.account.description) || '';
+    screen(topbar('', S.purposes && S.purposes.length ? 'plan' : false, steps(3, 5)) +
+      '<p class="eyebrow">Your plan</p><h1 class="title">Tell Enough about your life</h1>' +
+      '<p class="lede">In your own words: what you earn and when, rent, people you support, how you get around, what you’re saving for.</p>' +
+      '<div class="field"><label for="d" class="sr">About your life</label><textarea class="input" id="d" maxlength="2000" placeholder="e.g. I’m a nurse in Yaba, paid ₦380,000 on the 25th. Rent is ₦1.2m a year. I send my mum ₦30k monthly, take BRT to work, eat out on Fridays and want to save for a laptop.">' + esc(pre) + '</textarea>' +
+      '<span class="hint" id="count"></span></div>' +
+      '<p class="err" id="err" hidden></p>' +
+      '<div class="cta"><button class="btn btn-ink" id="next">Continue</button><small>The more you share, the better the plan. You can change it any time.</small></div>');
+    var ta = $('#d');
+    function count() { $('#count').textContent = ta.value.length + ' / 2000'; }
+    ta.oninput = count; count();
+    $('#next').onclick = function () {
+      var err = $('#err'), btn = this, text = ta.value.trim();
+      if (text.length < 20) return showErr(err, 'Tell us a little more: at least what you earn and your main costs.');
+      busy(btn, true);
+      api('/enough/account/description', { method: 'PATCH', body: { description: text } })
+        .then(function (a) { if (a) S.account = a; else S.account.description = text; go('level'); })
+        .catch(function (x) { busy(btn, false); showErr(err, x.message); });
+    };
+  };
+
+  var LEVELS = [
+    ['flexible', 'Flexible', 'All the money in each purpose is yours to spend right away.'],
+    ['balanced', 'Balanced', 'Everyday spending like food and transport is released weekly, so it lasts the month.'],
+    ['strict', 'Strict', 'Everything except bills and family is released weekly. Unlocking early needs your PIN.']
+  ];
+  function level() { return S.prefs.level || 'balanced'; }
+  routes.level = function () {
+    var sel = level();
+    function draw() {
+      screen(topbar('', 'describe', steps(4, 5)) +
+        '<p class="eyebrow">Your plan</p><h1 class="title">How strict do you want to be?</h1><p class="lede">Set your limits now, while you’re calm. You can change this any time.</p>' +
+        '<div class="levels" role="radiogroup">' + LEVELS.map(function (l) {
+          return '<button type="button" class="level" role="radio" data-l="' + l[0] + '" aria-pressed="' + (sel === l[0]) + '" aria-checked="' + (sel === l[0]) + '"><span class="radio"></span><div><b>' + l[1] + (l[0] === 'balanced' ? '<span class="tag">Recommended</span>' : '') + '</b><span>' + l[2] + '</span></div></button>';
+        }).join('') + '</div>' +
+        '<div class="cta"><button class="btn btn-ink" id="next">Build my plan</button></div>');
+      $$('[data-l]').forEach(function (b) { b.onclick = function () { sel = b.getAttribute('data-l'); draw(); }; });
+      $('#next').onclick = function () { S.prefs.level = sel; savePrefs(); S.draftPlan = null; go('building'); };
+    }
+    draw();
+  };
+
+  routes.building = function () {
+    var lines = ['Reading what you told us', 'Finding your fixed costs', 'Pacing your everyday spending', 'Putting it all together'];
+    screen('<div class="orb" aria-hidden="true"></div><h1 class="title" style="text-align:center">Building your plan</h1><p class="lede" style="text-align:center">Turning your words into purposes for every naira.</p>' +
+      '<ul class="ticks">' + lines.map(function (l) { return '<li><i>' + I.tick + '</i>' + l + '</li>'; }).join('') + '</ul><p class="err" id="err" hidden></p>' +
+      '<div class="cta" id="retry-wrap" hidden><button class="btn btn-ink" id="retry">Try again</button><button class="btn btn-text" id="manual">Build it myself instead</button></div>');
+    var lis = $$('.ticks li'), i = 0;
+    var t = setInterval(function () { if (i < lis.length - 1) lis[i++].className = 'on'; }, 900);
+    var started = Date.now();
+    api('/enough/plan/generate', { method: 'POST' }).then(function (plan) {
+      var wait = Math.max(0, 2600 - (Date.now() - started));
+      setTimeout(function () { clearInterval(t); lis.forEach(function (l) { l.className = 'on'; }); S.draftPlan = plan; setTimeout(function () { if (current === 'building') go('review', null, true); }, 450); }, wait);
+    }).catch(function (x) {
+      clearInterval(t); showErr($('#err'), x.message); $('#retry-wrap').hidden = false;
+      $('#retry').onclick = function () { routes.building(); };
+      $('#manual').onclick = function () { S.draftPlan = [{ name: 'Rent', targetPercent: 30 }, { name: 'Food', targetPercent: 25 }, { name: 'Transport', targetPercent: 15 }, { name: 'Savings', targetPercent: 10 }, { name: 'Free to spend', targetPercent: 20 }]; go('review', null, true); };
+    });
+  };
+
+  // Plan review/editor, used in onboarding and from the Plan tab.
+  routes.review = function () {
+    var onboarding = !(S.purposes && S.purposes.length);
+    var rows = (S.draftPlan || ordered().map(function (p) { return { name: p.name, targetPercent: p.targetPercent || 0 }; })).map(function (p) { return { name: p.name, targetPercent: p.targetPercent }; });
+    if (!rows.length) return go('building', null, true);
+    var editing = false;
+    function sum() { return rows.reduce(function (s, r) { return s + (Number(r.targetPercent) || 0); }, 0); }
+    function draw() {
+      var total = sum();
+      var body = editing
+        ? '<div>' + rows.map(function (r, i) {
+            return '<div class="pe-row"><span class="dot" style="background:' + colorFor(i) + '"></span><input class="input name" data-i="' + i + '" value="' + esc(r.name) + '" maxlength="100" aria-label="Purpose name"><label class="pct"><input data-p="' + i + '" inputmode="numeric" value="' + (r.targetPercent || '') + '" aria-label="Percent for ' + esc(r.name) + '">%</label><button class="x" type="button" data-x="' + i + '" aria-label="Remove ' + esc(r.name) + '">×</button></div>';
+          }).join('') + '</div>' +
+          (rows.length < 8 ? '<button class="btn btn-text" id="add" style="justify-content:flex-start;padding:0">' + I.add + 'Add a purpose</button>' : '') +
+          '<div class="total' + (total !== 100 ? ' off' : '') + '"><span>Total</span><span>' + total + '%' + (total !== 100 ? ' — needs to be 100%' : '') + '</span></div>'
+        : '<div class="planbar" aria-hidden="true">' + rows.map(function (r, i) { return '<i style="flex:' + r.targetPercent + ';background:' + colorFor(i) + '"></i>'; }).join('') + '</div>' +
+          '<div class="list" style="margin-top:14px">' + rows.map(function (r, i) {
+            return '<div class="row"><span class="dot" style="background:' + colorFor(i) + '"></span><div><p class="t">' + esc(r.name) + '</p><p class="s">' + paceLabel(r.name) + '</p></div><div class="r"><p class="money" style="font-size:18px">' + r.targetPercent + '%</p></div></div>';
+          }).join('') + '</div>';
+      screen(topbar('', onboarding ? 'level' : 'plan', onboarding ? steps(4, 5) : '') +
+        '<p class="eyebrow">' + (onboarding ? 'Your plan' : 'Edit plan') + '</p><h1 class="title">' + (onboarding ? 'Your plan, ' + esc(first(S.me && S.me.name)) : 'Your purposes') + '</h1>' +
+        '<p class="lede">Every naira that comes in is split by these shares. ' + LEVELS.filter(function (l) { return l[0] === level(); })[0][1] + ' pacing.</p>' +
+        body + '<p class="err" id="err" hidden></p>' +
+        '<div class="cta"><div class="btn-row"><button class="btn btn-line" id="edit">' + (editing ? 'Done editing' : 'Adjust') + '</button><button class="btn btn-sun" id="ok"' + (total !== 100 ? ' disabled' : '') + '>' + (onboarding ? 'Approve plan' : 'Save plan') + '</button></div>' +
+        (onboarding ? '' : '<button class="btn btn-text" id="redo">Rebuild from my description</button>') + '</div>');
+      $('#edit').onclick = function () { editing = !editing; rows = rows.filter(function (r) { return r.name.trim(); }); draw(); };
+      $$('[data-i]').forEach(function (inp) { inp.oninput = function () { rows[+inp.getAttribute('data-i')].name = inp.value; }; });
+      $$('[data-p]').forEach(function (inp) { inp.oninput = function () { inp.value = inp.value.replace(/\D/g, '').slice(0, 3); rows[+inp.getAttribute('data-p')].targetPercent = Number(inp.value) || 0; var t = sum(); var el = $('.total'); el.className = 'total' + (t !== 100 ? ' off' : ''); el.lastChild.textContent = t + '%' + (t !== 100 ? ' — needs to be 100%' : ''); $('#ok').disabled = t !== 100; }; });
+      $$('[data-x]').forEach(function (b) { b.onclick = function () { rows.splice(+b.getAttribute('data-x'), 1); draw(); }; });
+      var add = $('#add'); if (add) add.onclick = function () { rows.push({ name: '', targetPercent: 0 }); draw(); var ins = $$('input.name'); ins[ins.length - 1].focus(); };
+      var redo = $('#redo'); if (redo) redo.onclick = function () { go('describe'); };
+      $('#ok').onclick = function () {
+        var err = $('#err'), btn = this;
+        var clean = rows.map(function (r) { return { name: r.name.trim(), targetPercent: Number(r.targetPercent) || 0 }; }).filter(function (r) { return r.name; });
+        if (clean.some(function (r) { return r.targetPercent < 1; })) return showErr(err, 'Every purpose needs at least 1%. Remove the ones you don’t need.');
+        var names = clean.map(function (r) { return r.name.toLowerCase(); });
+        if (names.some(function (n, i) { return names.indexOf(n) !== i; })) return showErr(err, 'Two purposes have the same name.');
+        if (sum() !== 100) return showErr(err, 'Your shares need to add up to 100%.');
+        busy(btn, true);
+        api('/enough/plan/apply', { method: 'POST', body: { purposes: clean } }).then(loadPurposes).then(function () {
+          S.draftPlan = null;
+          if (onboarding) go(S.account.hasTransactionPin ? 'home' : 'pin', null, true); else { toast('Plan saved'); go('plan', null, true); }
+        }).catch(function (x) { busy(btn, false); showErr(err, x.message); });
+      };
+    }
+    draw();
+  };
+  function paced(name, lvl) {
+    lvl = lvl || level();
+    if (lvl === 'flexible') return false;
+    if (lvl === 'strict') return !LUMP.test(name);
+    return EVERYDAY.test(name) && !LUMP.test(name);
+  }
+  function paceLabel(name) { return paced(name) ? 'Released weekly' : 'Available right away'; }
+
+  routes.pin = function () {
+    screen(topbar('', false, steps(5, 5)) +
+      '<p class="eyebrow">Last step</p><h1 class="title">Set your transaction PIN</h1>' +
+      '<p class="lede">You’ll use these 4 digits to send money and to unlock money early. Don’t use your birthday or 1234.</p>' +
+      '<div class="note" style="display:flex;gap:10px;align-items:flex-start;margin-top:20px">' + I.shield + '<span>Enough will never ask for your PIN by phone, WhatsApp or email.</span></div>' +
+      '<div class="cta"><button class="btn btn-ink" id="set">Set my PIN</button></div>');
+    $('#set').onclick = function () { setPinFlow(false, function () { go('home', null, true); toast('You’re all set'); }); };
+  };
+  function setPinFlow(change, done) {
+    var current = null;
+    function chooseNew() {
+      askPin('Choose a 4-digit PIN', 'You’ll enter it twice.', function (p1) {
+        if (/^(\d)\1{3}$/.test(p1) || p1 === '1234' || p1 === '0123' || p1 === '4321') return Promise.reject(new Error('That PIN is too easy to guess. Try another.'));
+        setTimeout(function () {
+          askPin('Enter it again', 'Just to be sure.', function (p2) {
+            if (p2 !== p1) { setTimeout(chooseNew, 0); return Promise.reject(new Error('Those didn’t match. Start again.')); }
+            var body = { pin: p2 }; if (current) body.currentPin = current;
+            return api('/enough/account/pin', { method: 'PATCH', body: body }).then(function (a) { if (a) S.account = a; else S.account.hasTransactionPin = true; setTimeout(done, 0); });
+          });
+        }, 0);
+        return Promise.resolve();
+      });
+    }
+    if (change) askPin('Enter your current PIN', 'Then choose a new one.', function (p) { current = p; setTimeout(chooseNew, 0); return Promise.resolve(); });
+    else chooseNew();
+  }
+
+  /* =================================================================
+     SCREENS: Home
+     ================================================================= */
+  routes.home = function () {
+    var ps = ordered(), land = landing(), name = first(S.me && S.me.name);
+    var hero = land > 0
+      ? '<div class="hero"><div class="sunrise"></div><p class="k">Ready to split</p><p class="money big">' + naira(land) + '</p><p class="sub">Arrived in your account. Split it across your plan so every naira has a job.</p><button class="btn btn-sun" id="split">' + I.split + 'Split now</button></div>'
+      : '<div class="hero"><div class="sunrise"></div><p class="k">Across your plan</p><p class="money big">' + naira(totalBalance()) + '</p><p class="sub">' + (totalBalance() ? 'Every naira has a job.' : (isActive() ? 'Send your salary to your Enough account to fill your plan.' : 'Your account is still being verified.')) + '</p>' + (totalBalance() ? '' : '<button class="btn btn-sun" id="fund2">' + I.add + 'Add money</button>') + '</div>';
+    screen(
+      '<div class="hello"><div><p class="muted" style="font-size:14px">' + greeting() + ',</p><h1>' + esc(name) + '</h1></div><button class="avatar" type="button" id="me" aria-label="Profile">' + esc(initials(S.me && S.me.name).toUpperCase()) + '</button></div>' +
+      (!isActive() ? '<button class="note" id="verifying" style="display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1px solid var(--sun-soft);margin:0 0 14px">' + I.clock.replace('36', '20').replace('36', '20') + '<span style="flex:1">We’re still verifying your identity. Funding and payments unlock when it’s done.</span></button>' : '') +
+      hero +
+      '<div class="quick"><button type="button" data-q="fund">' + I.add + 'Add money</button><button type="button" data-q="pay">' + I.send + 'Pay</button><button type="button" data-q="split">' + I.split + 'Split</button></div>' +
+      installBanner() +
+      '<div class="section-h"><h3>Your purposes</h3><button type="button" id="edit">Edit plan</button></div>' +
+      (ps.length ? '<div class="tiles">' + ps.map(function (p, i) {
+        var bal = kobo(p.balanceKobo), lk = kobo(p.lockedKobo);
+        return '<button type="button" class="tile" data-p="' + esc(p.id) + '"><span class="n"><span class="dot" style="background:' + colorFor(i) + '"></span>' + esc(p.name) + '</span>' +
+          '<span class="money">' + naira(spendable(p)) + '</span>' +
+          '<span class="bar"><i style="width:' + (bal ? Math.round(spendable(p) / bal * 100) : 0) + '%;background:' + colorFor(i) + '"></i></span>' +
+          '<span class="meta">' + (lk ? '<span class="lock">' + I.lock + naira(lk) + ' unlocks later</span>' : bal ? 'Ready to use' : (p.targetPercent ? p.targetPercent + '% of each split' : 'Empty')) + '</span></button>';
+      }).join('') + '</div>' : '<div class="card empty">No purposes yet. <button class="btn btn-text" id="mk" style="width:auto;display:inline">Build your plan</button></div>'),
+      { nav: true });
+    $('#me').onclick = function () { go('profile'); };
+    var v = $('#verifying'); if (v) v.onclick = function () { go('account'); };
+    var sp = $('#split'); if (sp) sp.onclick = splitSheet;
+    var f2 = $('#fund2'); if (f2) f2.onclick = function () { go('fund'); };
+    $('#edit').onclick = function () { go('plan'); };
+    var mk = $('#mk'); if (mk) mk.onclick = function () { go('describe'); };
+    $$('[data-q]').forEach(function (b) { b.onclick = function () { var q = b.getAttribute('data-q'); if (q === 'split') splitSheet(); else if (q === 'pay') go('pay'); else go('fund'); }; });
+    $$('[data-p]').forEach(function (b) { b.onclick = function () { go('purpose', b.getAttribute('data-p')); }; });
+    bindInstall();
+    // Refresh quietly so a salary that just landed shows up.
+    if (!routes.home.fresh) { routes.home.fresh = true; loadMoney().then(function () { if (current === 'home') routes.home(); }).catch(function () {}).then(function () { setTimeout(function () { routes.home.fresh = false; }, 30000); }); }
+  };
+
+  /* -------------------------------------------- Split (the core moment) */
+  function splitSheet() {
+    var land = landing(), ps = ordered().filter(function (p) { return p.targetPercent; });
+    if (!land) { toast('Nothing waiting to split. New money shows up here when it lands.'); return; }
+    if (!ps.length) { toast('Set up your plan first.'); go('describe'); return; }
+    // Shares by target %, rounding down to whole naira; the remainder goes to the biggest share.
+    var tp = ps.reduce(function (s, p) { return s + p.targetPercent; }, 0);
+    var amounts = ps.map(function (p) { return Math.floor(land * p.targetPercent / tp / 100) * 100; });
+    var rem = land - amounts.reduce(function (a, b) { return a + b; }, 0); amounts[0] += rem;
+    var pace = ps.map(function (p) { return paced(p.name); });
+    var el = openSheet('<p class="eyebrow">Split</p><h2 style="margin-top:4px"><span class="money">' + naira(land) + '</span> across your plan</h2>' +
+      '<p class="lede" style="font-size:14.5px">Weekly release gives you a quarter now and the rest over the next three weeks.</p>' +
+      '<div style="margin-top:8px">' + ps.map(function (p, i) {
+        return '<div class="split-row"><span class="dot" style="background:' + colorFor(i) + '"></span><div style="flex:1;min-width:0"><p class="t" style="font-weight:700">' + esc(p.name) + '</p><p class="s" style="font-size:12.5px;color:var(--muted)">' + p.targetPercent + '% · <span data-lbl="' + i + '">' + (pace[i] ? 'released weekly' : 'all now') + '</span></p></div>' +
+          '<p class="money" style="font-size:17px">' + naira(amounts[i]) + '</p>' +
+          '<label class="toggle" title="Release weekly"><input type="checkbox" data-t="' + i + '"' + (pace[i] ? ' checked' : '') + ' aria-label="Release ' + esc(p.name) + ' weekly"><span></span></label></div>';
+      }).join('') + '</div>' +
+      '<p class="err" id="serr" hidden></p><button class="btn btn-ink" id="go" style="margin-top:18px">Split ' + naira(land) + '</button>');
+    $$('[data-t]', el).forEach(function (t) { t.onchange = function () { var i = +t.getAttribute('data-t'); pace[i] = t.checked; $('[data-lbl="' + i + '"]', el).textContent = t.checked ? 'released weekly' : 'all now'; }; });
+    $('#go', el).onclick = function () {
+      var btn = this; busy(btn, true, 'Splitting');
+      var i = 0, done = [];
+      (function next() {
+        if (i >= ps.length) return finish();
+        if (!amounts[i]) { i++; return next(); }
+        var body = { amountKobo: amounts[i] }; if (pace[i]) body.schedule = { tranches: 4, intervalDays: 7 };
+        api('/enough/purposes/' + encodeURIComponent(ps[i].id) + '/allocate', { method: 'POST', body: body })
+          .then(function () { done.push(ps[i].name); i++; next(); })
+          .catch(function (x) { busy(btn, false); showErr($('#serr', el), (done.length ? 'Split ' + done.length + ' of ' + ps.length + ' purposes, then stopped: ' : '') + x.message); loadMoney().then(function () { if (current === 'home') routes.home(); }); });
+      })();
+      function finish() { loadMoney().then(function () { closeSheet(); go('home', null, true); toast('Split done. Every naira has a job.'); }); }
+    };
+  }
+
+  /* -------------------------------------------------- Purpose detail */
+  routes.purpose = function (id) {
+    var p = (S.purposes || []).filter(function (x) { return x.id === id; })[0];
+    if (!p) return go('home', null, true);
+    var idx = ordered().indexOf(p);
+    screen(topbar(p.name, 'home') +
+      '<div class="card" style="text-align:center;padding:24px 18px"><p class="eyebrow">Ready to use</p><p class="money" style="font-size:44px;margin-top:4px">' + naira(spendable(p)) + '</p>' +
+      (kobo(p.lockedKobo) ? '<p class="muted lock" style="justify-content:center;margin-top:6px">' + I.lock + naira(p.lockedKobo) + ' unlocks on schedule</p>' : '') +
+      '<div class="bar" style="margin-top:14px"><i style="width:' + (kobo(p.balanceKobo) ? Math.round(spendable(p) / kobo(p.balanceKobo) * 100) : 0) + '%;background:' + colorFor(idx) + '"></i></div>' +
+      '<p class="hint" style="margin-top:8px">' + (p.targetPercent ? p.targetPercent + '% of every split' : 'Not part of the split') + ' · ' + naira(p.balanceKobo) + ' in total</p></div>' +
+      '<div class="btn-row" style="margin-top:14px"><button class="btn btn-sun" id="pay">' + I.send + 'Pay from ' + esc(p.name) + '</button></div>' +
+      (landing() ? '<button class="btn btn-line" id="top" style="margin-top:10px">Move money in</button>' : '') +
+      '<div class="section-h"><h3>Release schedule</h3></div><div id="tr" class="list"><div class="empty"><span class="spin" style="color:var(--orange);display:inline-block"></span></div></div>');
+    $('#pay').onclick = function () { go('pay', p.id); };
+    var top = $('#top'); if (top) top.onclick = function () { moveIn(p); };
+    api('/enough/purposes/' + encodeURIComponent(p.id) + '/tranches').then(function (ts) { drawTranches(p, ts || []); }).catch(function (e) { $('#tr').innerHTML = '<p class="empty">' + esc(e.message) + '</p>'; });
+  };
+  function drawTranches(p, ts) {
+    var box = $('#tr'); if (!box) return;
+    var pending = ts.filter(function (t) { return !t.released && new Date(t.releaseAt) > Date.now(); }).sort(function (a, b) { return new Date(a.releaseAt) - new Date(b.releaseAt); });
+    if (!pending.length) { box.outerHTML = '<p class="empty card">Nothing locked. Everything here is yours to use.</p>'; return; }
+    box.innerHTML = pending.map(function (t) {
+      return '<div class="row"><span class="ico" style="background:var(--sun-pale);color:var(--amber)">' + I.lock + '</span><div><p class="t">' + naira(t.amountKobo) + '</p><p class="s">Unlocks ' + dDate(t.releaseAt) + ' \u00b7 ' + untilLabel(t.releaseAt) + '</p></div><button class="r btn btn-line" style="width:auto;height:38px;padding:0 16px;font-size:14px;white-space:nowrap;flex:none" data-u="' + esc(t.id) + '">Unlock</button></div>';
+    }).join('') + '<button class="row" id="respace" style="color:var(--amber);font-weight:700">Change how often money is released' + I.chev + '</button>';
+    $$('[data-u]', box).forEach(function (b) {
+      b.onclick = function () {
+        var t = pending.filter(function (x) { return x.id === b.getAttribute('data-u'); })[0];
+        askPin('Unlock ' + naira(t.amountKobo) + ' early?', 'This breaks the pace you set. Enter your PIN to confirm.', function (pin) {
+          return api('/enough/purposes/' + encodeURIComponent(p.id) + '/tranches/' + encodeURIComponent(t.id) + '/unlock', { method: 'POST', body: { pin: pin } })
+            .then(loadMoney).then(function () { toast(naira(t.amountKobo) + ' unlocked'); routes.purpose(p.id); });
+        });
+      };
+    });
+    $('#respace').onclick = function () {
+      var el = openSheet('<h2>Release every…</h2><p class="lede">Applies to the money still locked in ' + esc(p.name) + '.</p><div class="chips" style="margin-top:16px;flex-wrap:wrap">' +
+        [[3, '3 days'], [7, 'Week'], [14, '2 weeks'], [30, 'Month']].map(function (o) { return '<button class="chip" data-d="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="err" id="rerr" hidden></p>');
+      $$('[data-d]', el).forEach(function (b) {
+        b.onclick = function () {
+          busy(b, true);
+          api('/enough/purposes/' + encodeURIComponent(p.id) + '/tranches/schedule', { method: 'PATCH', body: { intervalDays: +b.getAttribute('data-d') } })
+            .then(function () { closeSheet(); toast('Schedule updated'); routes.purpose(p.id); })
+            .catch(function (x) { busy(b, false); showErr($('#rerr', el), x.message); });
+        };
+      });
+    };
+  }
+  function moveIn(p, after) {
+    var land = landing();
+    var el = openSheet('<h2>Move money into ' + esc(p.name) + '</h2><p class="lede">From money waiting to be split: <b class="money">' + naira(land) + '</b> available.</p>' +
+      '<div class="amount"><span>₦</span><input id="amt" inputmode="decimal" placeholder="0" aria-label="Amount in naira"></div>' +
+      '<div class="chips" style="justify-content:center">' + [0.25, 0.5, 1].map(function (f) { return '<button class="chip" data-f="' + f + '">' + (f === 1 ? 'All' : f * 100 + '%') + '</button>'; }).join('') + '</div>' +
+      '<p class="err" id="merr" hidden></p><button class="btn btn-ink" id="mv" style="margin-top:16px">Move money</button>');
+    var amt = $('#amt', el); fitAmount(amt);
+    amt.oninput = function () { amt.value = fmtTyping(amt.value); };
+    $$('[data-f]', el).forEach(function (b) { b.onclick = function () { amt.value = fmtTyping(String(Math.floor(land * +b.getAttribute('data-f')) / 100)); fitAmount(amt); }; });
+    $('#mv', el).onclick = function () {
+      var k = toKobo(amt.value), btn = this;
+      if (!k) return showErr($('#merr', el), 'Enter an amount.');
+      if (k > land) return showErr($('#merr', el), 'You only have ' + naira(land) + ' waiting to be split.');
+      busy(btn, true);
+      api('/enough/purposes/' + encodeURIComponent(p.id) + '/allocate', { method: 'POST', body: { amountKobo: k } }).then(loadMoney)
+        .then(function () { closeSheet(); toast(naira(k) + ' moved into ' + p.name); if (after) after(); else routes.purpose(p.id); })
+        .catch(function (x) { busy(btn, false); showErr($('#merr', el), x.message); });
+    };
+  }
+  function fmtTyping(v) {
+    var s = String(v).replace(/[^\d.]/g, ''); var parts = s.split('.');
+    var whole = parts[0].replace(/^0+(?=\d)/, '').slice(0, 12);
+    var out = whole ? Number(whole).toLocaleString('en-NG') : '';
+    if (parts.length > 1) out = (out || '0') + '.' + parts[1].slice(0, 2);
+    return out;
+  }
+  function fitAmount(inp) { inp.style.width = Math.max(1.2, (inp.value || inp.placeholder || '0').length * 0.62 + 0.3) + 'em'; }
+  document.addEventListener('input', function (e) { if (e.target && e.target.closest && e.target.closest('.amount')) fitAmount(e.target); });
+  function toKobo(v) { var n = Number(String(v).replace(/,/g, '')); return isFinite(n) && n > 0 ? Math.round(n * 100) : 0; }
+
+  /* =================================================================
+     SCREENS: Add money
+     ================================================================= */
+  routes.fund = function () {
+    screen(topbar('Add money', 'home') +
+      '<p class="lede" style="margin-top:0">Send your salary, or any amount, to your Enough account from any bank. It shows up here ready to split.</p>' +
+      '<div style="margin-top:18px">' + acctCard() + '</div>' +
+      (!isActive() ? '<p class="note">' + statusPill() + '<br>Transfers in will work as soon as verification finishes.</p>' : '') +
+      '<div class="section-h"><h3>Tell your employer</h3></div>' +
+      '<div class="card"><p style="font-size:14.5px">Ask HR or payroll to pay your salary into your Enough account. Share the details in one tap.</p>' +
+      '<button class="btn btn-line" id="share" style="margin-top:14px">Share account details</button></div>' +
+      '<p class="hint" style="text-align:center;margin-top:18px">Transfers usually arrive within minutes.</p>');
+    bindAcctCopy();
+    $('#share').onclick = function () {
+      var a = S.account || {};
+      if (!a.virtualAccountNumber) return toast('Your account number isn’t ready yet.', true);
+      var text = 'Please pay my salary into:\n' + a.accountName + '\n' + a.virtualAccountNumber + '\n' + a.bankName;
+      if (navigator.share) navigator.share({ title: 'My salary account', text: text }).catch(function () {}); else copy(text, 'Account details');
+    };
+  };
+
+  /* =================================================================
+     SCREENS: Pay (from -> to -> amount -> review -> PIN -> result)
+     ================================================================= */
+  var payDraft = null;
+  routes.pay = function (preId) {
+    if (!isActive()) {
+      screen(topbar('', 'home') + '<div class="result"><div class="badge" style="background:var(--sun-pale);color:var(--amber)">' + I.clock + '</div><h1 class="title">Finish verifying to pay</h1><p class="lede">We’re still confirming your identity, usually just a few minutes. Payments unlock the moment it’s done.</p></div>' +
+        '<div class="cta"><button class="btn btn-sun" id="chk">Check status</button><button class="btn btn-text" data-back="home">Back</button></div>');
+      $('#chk').onclick = function () { var b = this; busy(b, true); api('/enough/account').then(function (a) { S.account = a; if (isActive()) { toast('Your account is ready'); routes.pay(preId); } else { busy(b, false); toast('Still verifying. We’ll keep checking.'); } }).catch(function (e) { busy(b, false); toast(e.message, true); }); };
+      return;
+    }
+    if (!S.account.hasTransactionPin) { toast('Set your PIN first'); return go('pin'); }
+    payDraft = payDraft && payDraft.fresh ? payDraft : { source: preId || null, bankCode: '', accountNumber: '', accountName: '', amount: 0, fresh: true };
+    if (preId) payDraft.source = preId;
+    var ps = ordered();
+    if (!payDraft.source) { var best = ps.filter(function (p) { return spendable(p) > 0; })[0]; payDraft.source = best ? best.id : 'landing'; }
+    function srcAvail() { if (payDraft.source === 'landing') return landing(); var p = ps.filter(function (x) { return x.id === payDraft.source; })[0]; return p ? spendable(p) : 0; }
+    function srcName() { if (payDraft.source === 'landing') return 'Waiting to split'; var p = ps.filter(function (x) { return x.id === payDraft.source; })[0]; return p ? p.name : ''; }
+
+    screen(topbar('Pay', 'home') +
+      '<p class="eyebrow">From</p><div class="chips" style="margin-top:8px">' +
+        ps.map(function (p, i) { return '<button class="chip" data-s="' + esc(p.id) + '" aria-pressed="' + (payDraft.source === p.id) + '"><span class="dot" style="background:' + colorFor(i) + '"></span>' + esc(p.name) + '</button>'; }).join('') +
+        (landing() ? '<button class="chip" data-s="landing" aria-pressed="' + (payDraft.source === 'landing') + '">Waiting to split</button>' : '') +
+      '</div><p class="hint" id="avail" style="margin-top:4px"></p>' +
+      '<div class="amount"><span>₦</span><input id="amt" inputmode="decimal" placeholder="0" aria-label="Amount in naira" value="' + (payDraft.amount ? fmtTyping(String(payDraft.amount / 100)) : '') + '"></div>' +
+      '<p class="eyebrow" style="margin-top:14px">To</p>' +
+      '<div id="recents"></div>' +
+      '<div class="field" style="margin-top:8px"><label for="bank">Bank</label><select class="input" id="bank"><option value="">Loading banks…</option></select></div>' +
+      '<div class="field"><label for="acn">Account number</label><input class="input" id="acn" inputmode="numeric" maxlength="10" placeholder="10 digits" value="' + esc(payDraft.accountNumber) + '"></div>' +
+      '<p id="who" class="hint" style="margin-top:8px;min-height:20px"></p>' +
+      '<p class="err" id="err" hidden></p>' +
+      '<div class="cta"><button class="btn btn-ink" id="review" disabled>Review payment</button></div>');
+
+    function paintAvail() { $('#avail').innerHTML = esc(srcName()) + ': <b>' + naira(srcAvail()) + '</b> available'; }
+    paintAvail(); fitAmount($('#amt'));
+    $$('[data-s]').forEach(function (b) { b.onclick = function () { payDraft.source = b.getAttribute('data-s'); $$('[data-s]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); paintAvail(); check(); }; });
+    var amt = $('#amt'), bank = $('#bank'), acn = $('#acn'), who = $('#who');
+    amt.oninput = function () { amt.value = fmtTyping(amt.value); payDraft.amount = toKobo(amt.value); check(); };
+    acn.oninput = function () { acn.value = acn.value.replace(/\D/g, '').slice(0, 10); payDraft.accountNumber = acn.value; payDraft.accountName = ''; resolve(); };
+    bank.onchange = function () { payDraft.bankCode = bank.value; payDraft.accountName = ''; resolve(); };
+
+    var banksP = S.banks ? Promise.resolve(S.banks) : api('/enough/payments/banks').then(function (b) { S.banks = (b || []).slice().sort(function (x, y) { return x.name.localeCompare(y.name); }); return S.banks; });
+    banksP.then(function (bs) {
+      bank.innerHTML = '<option value="">Choose bank</option>' + bs.map(function (b) { return '<option value="' + esc(b.code) + '"' + (b.code === payDraft.bankCode ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('');
+      if (payDraft.bankCode && payDraft.accountNumber.length === 10) resolve();
+    }).catch(function (e) { bank.innerHTML = '<option value="">Couldn’t load banks</option>'; showErr($('#err'), e.message); });
+
+    // Recent recipients from real payment history (no separate payee store in V1).
+    (S.payments ? Promise.resolve(S.payments) : api('/enough/payments').then(function (p) { S.payments = p || []; return S.payments; })).then(function (list) {
+      var seen = {}, rec = [];
+      list.forEach(function (p) { var k = p.recipientBankCode + p.recipientAccountNumber; if (!seen[k] && p.status !== 'failed') { seen[k] = 1; rec.push(p); } });
+      rec = rec.slice(0, 6);
+      if (!rec.length || !$('#recents')) return;
+      $('#recents').innerHTML = '<div class="chips" style="margin-top:6px">' + rec.map(function (r, i) { return '<button class="chip" data-r="' + i + '">' + esc(r.recipientAccountName.split(' ').slice(0, 2).join(' ')) + '</button>'; }).join('') + '</div>';
+      $$('[data-r]').forEach(function (b) { b.onclick = function () { var r = rec[+b.getAttribute('data-r')]; payDraft.bankCode = r.recipientBankCode; payDraft.accountNumber = r.recipientAccountNumber; bank.value = r.recipientBankCode; acn.value = r.recipientAccountNumber; payDraft.accountName = ''; resolve(); }; });
+    }).catch(function () {});
+
+    var rT, rSeq = 0;
+    function resolve() {
+      clearTimeout(rT); who.innerHTML = ''; check();
+      if (!payDraft.bankCode || payDraft.accountNumber.length !== 10) return;
+      who.innerHTML = '<span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:-2px;color:var(--orange)"></span> Checking account…';
+      var seq = ++rSeq;
+      rT = setTimeout(function () {
+        api('/enough/payments/resolve', { method: 'POST', body: { bankCode: payDraft.bankCode, accountNumber: payDraft.accountNumber } }).then(function (r) {
+          if (seq !== rSeq) return;
+          payDraft.accountName = r.accountName;
+          who.innerHTML = '<span style="color:var(--good);font-weight:700">✓ ' + esc(r.accountName) + '</span>'; check();
+        }).catch(function (e) { if (seq !== rSeq) return; who.innerHTML = '<span style="color:var(--bad);font-weight:600">' + esc(e.message) + '</span>'; });
+      }, 350);
+    }
+    function check() {
+      var ok = payDraft.amount > 0 && payDraft.amount <= srcAvail() && payDraft.accountName;
+      $('#review').disabled = !ok;
+      showErr($('#err'), payDraft.amount > srcAvail() ? 'That’s more than ' + srcName() + ' has available (' + naira(srcAvail()) + ').' : '');
+    }
+    check();
+    $('#review').onclick = function () { reviewPay(srcName()); };
+  };
+
+  function reviewPay(fromName) {
+    var d = payDraft, bankName = ((S.banks || []).filter(function (b) { return b.code === d.bankCode; })[0] || {}).name || '';
+    var el = openSheet('<p class="eyebrow">Review</p><h2 style="margin-top:4px">Send <span class="money">' + naira(d.amount) + '</span></h2>' +
+      '<div class="card" style="margin-top:16px;padding:6px 16px">' +
+        '<div class="kv"><span>To</span><span>' + esc(d.accountName) + '</span></div>' +
+        '<div class="kv"><span>Bank</span><span>' + esc(bankName) + ' · ' + esc(d.accountNumber) + '</span></div>' +
+        '<div class="kv"><span>From</span><span>' + esc(fromName) + '</span></div>' +
+      '</div><p class="hint" style="margin-top:12px">Only ' + esc(fromName) + ' is used. Your other purposes stay untouched.</p>' +
+      '<button class="btn btn-ink" id="send" style="margin-top:18px">Confirm with PIN</button>');
+    $('#send', el).onclick = function () {
+      askPin('Enter your PIN', 'To send ' + naira(d.amount) + ' to ' + d.accountName + '.', function (pin) {
+        var source = d.source === 'landing' ? { type: 'landing_spot' } : { type: 'purpose', purposeId: d.source };
+        return api('/enough/payments', { method: 'POST', body: { source: source, amountKobo: d.amount, bankCode: d.bankCode, accountNumber: d.accountNumber, pin: pin } })
+          .then(function (res) { S.payments = null; S.history = null; payDraft = null; loadMoney().catch(function () {}); setTimeout(function () { payResult(res, fromName, bankName); }, 0); });
+      });
+    };
+  }
+
+  function payResult(r, fromName, bankName) {
+    var st = r.status;
+    var badge = st === 'failed' ? ['var(--bad-soft)', 'var(--bad)', I.x] : st === 'completed' ? ['var(--orange)', 'var(--ink)', I.check] : ['var(--sun-pale)', 'var(--amber)', I.clock];
+    var head = st === 'failed' ? 'Payment failed' : st === 'completed' ? 'Sent' : 'On its way';
+    var sub = st === 'failed' ? esc(r.failureReason || 'The bank didn’t accept it.') + ' Your money has been returned.' : st === 'completed' ? naira(r.amountKobo) + ' to ' + esc(r.recipientAccountName) : 'Banks usually confirm within a minute. You’ll see it in Activity.';
+    history.replaceState(null, '', '#/home');
+    screen('<div class="result"><div class="badge" style="background:' + badge[0] + ';color:' + badge[1] + '">' + badge[2] + '</div><h1 class="title">' + head + '</h1><p class="lede">' + sub + '</p></div>' +
+      '<div class="card" style="margin-top:22px;padding:6px 16px">' +
+        '<div class="kv"><span>Amount</span><span class="money" style="font-size:16px">' + naira(r.amountKobo) + '</span></div>' +
+        '<div class="kv"><span>To</span><span>' + esc(r.recipientAccountName) + '</span></div>' +
+        '<div class="kv"><span>Bank</span><span>' + esc(r.recipientBankName || bankName) + ' · ' + esc(r.recipientAccountNumber) + '</span></div>' +
+        '<div class="kv"><span>From</span><span>' + esc(fromName) + '</span></div>' +
+        '<div class="kv"><span>Date</span><span>' + dDate(r.createdAt) + ', ' + dTime(r.createdAt) + '</span></div>' +
+        '<div class="kv"><span>Reference</span><span>' + esc(String(r.id).slice(0, 12).toUpperCase()) + '</span></div>' +
+      '</div><div class="cta"><button class="btn btn-sun" id="done">Done</button></div>');
+    $('#done').onclick = function () { go('home', null, true); };
+  }
+
+  /* =================================================================
+     SCREENS: Plan tab
+     ================================================================= */
+  routes.plan = function () {
+    var ps = ordered(), tp = ps.reduce(function (s, p) { return s + (p.targetPercent || 0); }, 0);
+    var lv = LEVELS.filter(function (l) { return l[0] === level(); })[0];
+    screen('<div class="hello"><h1>Your plan</h1><button class="pill wait" id="lvl" style="border:0">' + lv[1] + ' · change</button></div>' +
+      '<p class="lede" style="margin-top:-8px">How every naira you receive is split.</p>' +
+      (ps.length ? '<div class="planbar" aria-hidden="true">' + ps.filter(function (p) { return p.targetPercent; }).map(function (p, i) { return '<i style="flex:' + p.targetPercent + ';background:' + colorFor(ps.indexOf(p)) + '"></i>'; }).join('') + '</div>' : '') +
+      '<div class="list" style="margin-top:14px">' + (ps.length ? ps.map(function (p, i) {
+        return '<button class="row" data-p="' + esc(p.id) + '"><span class="dot" style="background:' + colorFor(i) + '"></span><div><p class="t">' + esc(p.name) + '</p><p class="s">' + (p.targetPercent ? p.targetPercent + '% · ' + paceLabel(p.name).toLowerCase() : 'Not in the split') + '</p></div><div class="r"><p class="money" style="font-size:16px">' + naira(p.balanceKobo) + '</p></div>' + I.chev + '</button>';
+      }).join('') : '<p class="empty">No purposes yet.</p>') + '</div>' +
+      (tp && tp !== 100 ? '<p class="note">Your shares add up to ' + tp + '%. Edit your plan so they make 100%.</p>' : '') +
+      '<div class="btn-row" style="margin-top:16px"><button class="btn btn-sun" id="edit">Edit plan</button></div>' +
+      '<button class="btn btn-text" id="redo">Rebuild from my description</button>',
+      { nav: true });
+    $$('[data-p]').forEach(function (b) { b.onclick = function () { go('purpose', b.getAttribute('data-p')); }; });
+    $('#edit').onclick = function () { S.draftPlan = null; go('review'); };
+    $('#redo').onclick = function () { go('describe'); };
+    $('#lvl').onclick = function () {
+      var el = openSheet('<h2>Pacing</h2><p class="lede">Applies the next time you split. Money already split keeps its schedule.</p><div class="levels">' + LEVELS.map(function (l) {
+        return '<button type="button" class="level" data-l="' + l[0] + '" aria-pressed="' + (level() === l[0]) + '"><span class="radio"></span><div><b>' + l[1] + '</b><span>' + l[2] + '</span></div></button>';
+      }).join('') + '</div>');
+      $$('[data-l]', el).forEach(function (b) { b.onclick = function () { var l = b.getAttribute('data-l'); S.prefs.level = l; savePrefs(); closeSheet(); routes.plan(); toast('Pacing set to ' + LEVELS.filter(function (x) { return x[0] === l; })[0][1]); }; });
+    };
+  };
+
+  /* =================================================================
+     SCREENS: Activity tab
+     ================================================================= */
+  routes.activity = function () {
+    screen('<div class="hello"><h1>Activity</h1></div><div id="feed"><div class="empty"><span class="spin" style="color:var(--orange);display:inline-block"></span></div></div>', { nav: true });
+    Promise.all([api('/enough/account/history'), api('/enough/payments')]).then(function (r) {
+      S.history = r[0] || []; S.payments = r[1] || [];
+      var byId = {}; S.payments.forEach(function (p) { byId[p.id] = p; });
+      var items = S.history.slice().sort(function (a, b) { return new Date(b.occurredAt) - new Date(a.occurredAt); });
+      if (!items.length) { $('#feed').innerHTML = '<div class="card empty">Nothing yet. Money in, splits and payments will show here.</div>'; return; }
+      var groups = [], cur = null;
+      items.forEach(function (e) { var l = dayLabel(e.occurredAt); if (!cur || cur.l !== l) { cur = { l: l, items: [] }; groups.push(cur); } cur.items.push(e); });
+      $('#feed').innerHTML = groups.map(function (g) {
+        return '<p class="day">' + g.l + '</p><div class="list">' + g.items.map(function (e) {
+          if (e.type === 'deposit') return '<div class="row"><span class="ico" style="background:var(--good-soft);color:var(--good)">' + I.arrowIn + '</span><div><p class="t">Money in</p><p class="s">' + dTime(e.occurredAt) + '</p></div><p class="r money in" style="font-size:16px">+' + naira(e.amountKobo) + '</p></div>';
+          if (e.type === 'allocation') return '<div class="row"><span class="ico" style="background:var(--sun-pale);color:var(--amber)">' + I.split + '</span><div><p class="t">Split to ' + esc(e.purposeName || 'a purpose') + '</p><p class="s">' + dTime(e.occurredAt) + '</p></div><p class="r money muted" style="font-size:15px">' + naira(e.amountKobo) + '</p></div>';
+          var st = e.paymentStatus || 'processing';
+          return '<div class="row"><span class="ico" style="background:var(--line-soft);color:var(--ink)">' + I.send + '</span><div><p class="t">' + esc(e.recipientAccountName || 'Payment') + '</p><p class="s">' + dTime(e.occurredAt) + (st !== 'completed' ? ' · <span class="' + (st === 'failed' ? 'pill bad' : 'pill wait') + '" style="padding:1px 7px;font-size:11px">' + (st === 'failed' ? 'Failed, refunded' : 'Processing') + '</span>' : '') + '</p></div><p class="r money" style="font-size:16px;' + (st === 'failed' ? 'text-decoration:line-through;color:var(--faint)' : '') + '">−' + naira(e.amountKobo) + '</p></div>';
+        }).join('') + '</div>';
+      }).join('');
+    }).catch(function (e) { $('#feed').innerHTML = '<p class="err">' + esc(e.message) + '</p>'; });
+  };
+
+  /* =================================================================
+     SCREENS: Profile tab
+     ================================================================= */
+  routes.profile = function () {
+    var m = S.me || {}, a = S.account || {};
+    screen('<div class="hello" style="justify-content:flex-start;gap:14px"><span class="avatar" style="width:56px;height:56px;border-radius:28px;font-size:22px;background:var(--deep);color:#FFF1DE">' + esc(initials(m.name).toUpperCase()) + '</span><div><h1 style="font-size:22px">' + esc(m.name || '') + '</h1><p class="muted" style="font-size:14px">' + esc(m.email || '') + '</p></div></div>' +
+      '<div class="section-h"><h3>Account</h3></div><div class="list">' +
+        '<button class="row" id="acct"><div><p class="t">Account details</p><p class="s">' + (a.virtualAccountNumber ? esc(a.bankName) + ' · ' + esc(a.virtualAccountNumber) : 'Being created') + '</p></div><span class="r">' + statusPill() + '</span></button>' +
+        '<div class="row"><div><p class="t">Phone</p><p class="s">' + esc(m.phone || '') + '</p></div></div>' +
+        '<div class="row"><div><p class="t">State</p><p class="s">' + esc(m.state || '') + '</p></div></div>' +
+      '</div>' +
+      '<div class="section-h"><h3>Security</h3></div><div class="list">' +
+        '<button class="row" id="pin"><div><p class="t">Transaction PIN</p><p class="s">' + (a.hasTransactionPin ? 'Set. Used to pay and unlock money early.' : 'Not set yet') + '</p></div><span class="r" style="color:var(--amber);font-weight:700;font-size:14px">' + (a.hasTransactionPin ? 'Change' : 'Set') + '</span></button>' +
+      '</div>' +
+      '<div class="section-h"><h3>Your plan</h3></div><div class="list">' +
+        '<button class="row" id="desc"><div><p class="t">About your life</p><p class="s" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + esc(a.description || 'Not written yet') + '</p></div>' + I.chev + '</button>' +
+        '<button class="row" id="pace"><div><p class="t">Pacing</p><p class="s">' + LEVELS.filter(function (l) { return l[0] === level(); })[0][1] + '</p></div>' + I.chev + '</button>' +
+      '</div>' +
+      '<div class="section-h"><h3>Help</h3></div><div class="list">' +
+        '<a class="row" href="mailto:hello@sorted.com.ng" style="color:inherit;text-decoration:none"><div><p class="t">Contact support</p><p class="s">hello@sorted.com.ng</p></div>' + I.chev + '</a>' +
+        '<a class="row" href="/privacy" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Privacy policy</p></div>' + I.chev + '</a>' +
+        '<a class="row" href="/terms" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Terms of use</p></div>' + I.chev + '</a>' +
+      '</div>' +
+      '<button class="btn btn-line" id="out" style="margin-top:22px;color:var(--bad);border-color:var(--bad-soft)">Log out</button>' +
+      '<p class="hint" style="text-align:center;margin-top:16px">Enough by Sorted · V1</p>',
+      { nav: true });
+    $('#acct').onclick = function () { go('fund'); };
+    $('#pin').onclick = function () { setPinFlow(a.hasTransactionPin, function () { toast('PIN saved'); routes.profile(); }); };
+    $('#desc').onclick = function () { go('describe'); };
+    $('#pace').onclick = function () { go('plan'); setTimeout(function () { var b = $('#lvl'); if (b) b.click(); }, 50); };
+    $('#out').onclick = function () { signOut(); };
+  };
+
+  /* =================================================================
+     Install (Add to Home Screen)
+     ================================================================= */
+  var deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; if (current === 'home') routes.home(); });
+  function standalone() { return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone; }
+  function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+  function installBanner() {
+    if (standalone() || S.prefs.installDismissed) return '';
+    if (deferredInstall) return '<div class="install"><img src="/icons/enough-192.png" width="36" height="36" alt="" style="border-radius:9px"><p><b>Add Enough to your home screen</b><br>Opens like an app, no download needed.</p><button id="inst">Add</button><button class="x" id="instx" aria-label="Dismiss">×</button></div>';
+    if (isIOS()) return '<div class="install"><img src="/icons/enough-192.png" width="36" height="36" alt="" style="border-radius:9px"><p><b>Add Enough to your home screen</b><br>Tap Share, then “Add to Home Screen”.</p><button class="x" id="instx" aria-label="Dismiss">×</button></div>';
+    return '';
+  }
+  function bindInstall() {
+    var b = $('#inst'); if (b) b.onclick = function () { deferredInstall.prompt(); deferredInstall.userChoice.then(function () { deferredInstall = null; routes.home(); }); };
+    var x = $('#instx'); if (x) x.onclick = function () { S.prefs.installDismissed = true; savePrefs(); routes.home(); };
+  }
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('/enough-sw.js', { scope: '/enough/app' }).catch(function () {});
+  }
+  // Pick up a salary that landed while the app was in the background.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && S.token && S.me && (current === 'home' || current === 'plan')) loadMoney().then(function () { if (routes[current]) routes[current](); }).catch(function () {});
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
