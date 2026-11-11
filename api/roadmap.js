@@ -287,7 +287,6 @@ function analyse(state, me) {
   PEOPLE.forEach((p) => {
     load[p] = {
       doing: stops.filter((s) => s.status === 'doing' && s.by === p).map((s) => s.title),
-      done: stops.filter((s) => s.status === 'done' && s.by === p).length,
       overdueAssigned: stops.filter((s) => s.late && s.crew.includes(p)).length,
       otherWorkLast7Days: state.log.filter((e) => e.who === p && e.action === 'work' && daysBetween(e.date, today) < 7).map((e) => e.note),
     };
@@ -352,7 +351,8 @@ async function aiGuide(req, state, me, mode, a, picks) {
         content: 'You advise the three-person founding team of Enough, a Nigerian fintech app that plans a user’s salary so it lasts to payday, on their roadmap to launch. ' +
           'Speak directly to the person asking, by first name. Be warm, concrete and brief: at most 90 words, plain English, no metaphors or themed language. ' +
           'Only recommend tasks that exist, quoting their exact titles. Prefer open tasks (nothing blocking them). Respect who each task is assigned to, but anyone may help. ' +
-          'Take other logged work into account when judging workload. ' +
+          'Take other logged work into account when judging who has a lot on. ' +
+          'Never count, compare or rank individual founders\u2019 output, and never say one person has done more or less than another: talk about the team\u2019s progress as a whole. If a task needs help, frame it as the team supporting the task, not a person falling behind. ' +
           'Reply with JSON only: {"text": "...", "picks": ["stopId", ...]} with at most 3 picks.',
       },
       {

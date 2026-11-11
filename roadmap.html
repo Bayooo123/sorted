@@ -77,7 +77,7 @@ textarea{resize:vertical;min-height:64px}
 .rope i{position:absolute;inset:0 auto 0 0;background:repeating-linear-gradient(-45deg,var(--orange) 0 8px,var(--sun) 8px 16px);border-radius:7px;transition:width .5s ease}
 .crew{display:flex;flex-direction:column;gap:10px}
 .crew-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px 14px}
-.crew-row b{font-weight:700}
+.crew-row b{font-family:var(--display);font-weight:800;font-size:22px;line-height:1.1}
 .crew-row span{color:var(--muted);font-size:14px}
 @media (max-width:860px){.top{grid-template-columns:1fr}}
 
@@ -235,7 +235,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
         <p class="sub" id="hero-sub"></p>
         <div class="rope" aria-hidden="true"><i id="rope"></i></div>
       </div>
-      <div class="crew" id="crew" aria-label="Progress by person"></div>
+      <div class="crew" id="crew" aria-label="Team progress"></div>
     </section>
 
     <section class="guide" aria-labelledby="guide-h">
@@ -267,7 +267,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     <section class="below">
       <div class="panel" id="work">
         <h3>Log work done</h3>
-        <p class="hint">Anything not on the map: calls, meetings, drafts, fixes. It counts toward your total.</p>
+        <p class="hint">Anything not on the map: calls, meetings, drafts, fixes. It shows up in recent activity.</p>
         <form id="work-form" class="work-form">
           <textarea id="work-text" maxlength="600" placeholder="e.g. Met two BaaS partners about pooled accounts" required aria-label="What did you do?"></textarea>
           <select id="work-task" aria-label="Related task"><option value="">Not linked to a task</option></select>
@@ -389,12 +389,14 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       (toSalary > 0 ? plural(toSalary, 'day') + ' to the salary-week launch (' + fmt(state.meta.salaryWeek) + '). ' : '') +
       'Click a task to start it or mark it done.';
     $('rope').style.width = Math.max(3, done / total * 100) + '%';
-    $('crew').innerHTML = PEOPLE.map(function (p) {
-      var f = state.stops.filter(function (s) { return s.status === 'done' && s.by === p; }).length;
-      var u = state.stops.filter(function (s) { return s.status === 'doing' && s.by === p; }).length;
-      var wk = state.log.filter(function (e) { return e.who === p && e.action === 'work'; }).length;
-      return '<div class="crew-row">' + av(p, 'lg') + '<div><b>' + esc(state.people[p].name) + '</b><br><span>' + f + ' done · ' + u + ' in progress · ' + wk + (wk === 1 ? ' work entry' : ' work entries') + '</span></div></div>';
-    }).join('');
+    // Team-level only: no per-person tallies, so nobody is ranked against anyone else.
+    var doing = state.stops.filter(function (s) { return s.status === 'doing'; }).length;
+    var overdue = state.stops.filter(isLate).length;
+    var next = state.stops.filter(function (s) { return s.status !== 'done' && s.due >= todayISO(); }).sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; })[0];
+    $('crew').innerHTML =
+      '<div class="crew-row"><div><b>' + doing + '</b><br><span>in progress across the team</span></div></div>' +
+      '<div class="crew-row"><div><b>' + overdue + '</b><br><span>' + (overdue === 1 ? 'task overdue' : 'tasks overdue') + '</span></div></div>' +
+      (next ? '<div class="crew-row"><div><b>' + fmt(next.due) + '</b><br><span>next deadline: ' + esc(next.title) + '</span></div></div>' : '');
     renderFilters(); renderMap(); renderFeed(); renderRoles(); renderWork();
     if (openId && $('sheet').open) fillSheet(openId);
   }
