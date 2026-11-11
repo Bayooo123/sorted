@@ -9,10 +9,10 @@
 //
 // Required env vars (Vercel project -> Settings -> Environment Variables):
 //   ROADMAP_PASSCODE  shared passcode the three founders type to unlock.
-//   KV_REST_API_URL + KV_REST_API_TOKEN  (set automatically when an Upstash
-//     Redis store is connected via Vercel -> Storage; UPSTASH_REDIS_REST_URL
-//     / UPSTASH_REDIS_REST_TOKEN are accepted too). Without these the page
-//     still opens on the seed data below, but nothing is saved.
+//   BLOB_READ_WRITE_TOKEN  set automatically when the private Blob store
+//     "enough-roadmap" is connected to this project (Vercel -> Storage).
+//     Upstash Redis (KV_REST_API_URL / KV_REST_API_TOKEN) also works.
+//     Without storage the page still opens on the seed data below, read-only.
 //
 // API (all calls need header x-roadmap-key: <passcode>):
 //   GET  /api/roadmap                -> { state, persisted }
@@ -143,11 +143,24 @@ function seed() {
 }
 
 // ----------------------------------------------------------------- storage
+// Primary: a private Vercel Blob store (BLOB_READ_WRITE_TOKEN, set when the
+// store is connected to this project). One JSON file, overwritten with a
+// conditional write (x-if-match on the ETag we read), so two founders saving
+// at the same moment can't silently overwrite each other: the loser retries.
+// REST calls mirror what @vercel/blob 2.x sends; kept dependency-free on purpose.
+// Fallback: Upstash Redis REST (KV_REST_API_URL / KV_REST_API_TOKEN).
+const BLOB_PATH = 'enough/roadmap.json';
+const BLOB_API = 'https://vercel.com/api/blob';
+
+function blobToken() { return process.env.BLOB_READ_WRITE_TOKEN || null; }
+function blobStoreId(token) { return token.split('_')[3] || ''; }
+
 function kvConfig() {
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   return url && token ? { url: url.replace(/\/$/, ''), token } : null;
 }
+function storageReady() { return !!(blobToken() || kvConfig()); }
 
 async function kv(cmd) {
   const cfg = kvConfig();
@@ -157,18 +170,51 @@ async function kv(cmd) {
     body: JSON.stringify(cmd),
   });
   if (!r.ok) throw new Error('KV ' + r.status);
-  const data = await r.json();
-  return data.result;
+  return (await r.json()).result;
 }
 
+// Returns { state, etag }.
 async function load() {
-  if (!kvConfig()) return seed();
-  const raw = await kv(['GET', STORE_KEY]);
-  return raw ? JSON.parse(raw) : seed();
+  const token = blobToken();
+  if (token) {
+    const url = 'https://' + blobStoreId(token) + '.private.blob.vercel-storage.com/' + BLOB_PATH + '?cache=0';
+    const r = await fetch(url, { headers: { authorization: 'Bearer ' + token }, cache: 'no-store' });
+    if (r.status === 404) return { state: seed(), etag: null };
+    if (!r.ok) throw new Error('Blob read ' + r.status);
+    return { state: await r.json(), etag: r.headers.get('etag') };
+  }
+  if (kvConfig()) {
+    const raw = await kv(['GET', STORE_KEY]);
+    return { state: raw ? JSON.parse(raw) : seed(), etag: null };
+  }
+  return { state: seed(), etag: null };
 }
 
-async function save(state) {
+// Returns true when written, false on a concurrent-write conflict.
+async function save(state, etag) {
+  const token = blobToken();
+  if (token) {
+    const headers = {
+      authorization: 'Bearer ' + token,
+      'x-api-version': '13',
+      'x-vercel-blob-store-id': blobStoreId(token),
+      'x-vercel-blob-access': 'private',
+      'x-content-type': 'application/json',
+      'x-add-random-suffix': '0',
+      'x-allow-overwrite': '1',
+      'x-cache-control-max-age': '60',
+    };
+    if (etag) headers['x-if-match'] = etag;
+    const r = await fetch(BLOB_API + '/?pathname=' + encodeURIComponent(BLOB_PATH), {
+      method: 'PUT', headers, body: JSON.stringify(state),
+    });
+    if (r.ok) return true;
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 412 || (data.error && data.error.code === 'precondition_failed')) return false;
+    throw new Error('Blob write ' + r.status + ' ' + JSON.stringify(data));
+  }
   await kv(['SET', STORE_KEY, JSON.stringify(state)]);
+  return true;
 }
 
 // --------------------------------------------------------------- helpers
@@ -275,10 +321,10 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const persisted = !!kvConfig();
+  const persisted = storageReady();
   try {
     if (req.method === 'GET') {
-      res.status(200).json({ state: await load(), persisted });
+      res.status(200).json({ state: (await load()).state, persisted });
       return;
     }
     if (req.method !== 'POST') {
@@ -295,16 +341,25 @@ module.exports = async (req, res) => {
       res.status(400).json({ error: 'Bad request' });
       return;
     }
-    const state = await load();
-    const err = apply(state, body);
-    if (err) {
-      res.status(400).json({ error: err });
-      return;
+    // read, apply, conditional write; retry if someone else saved in between
+    let state;
+    for (let attempt = 0; ; attempt++) {
+      const loaded = await load();
+      state = loaded.state;
+      const err = apply(state, body);
+      if (err) {
+        res.status(400).json({ error: err });
+        return;
+      }
+      state.version = (state.version || 1) + 1;
+      state.updatedAt = new Date().toISOString();
+      state.updatedBy = body.by;
+      if (await save(state, loaded.etag)) break;
+      if (attempt >= 3) {
+        res.status(409).json({ error: 'Someone else was saving at the same moment. Try again.' });
+        return;
+      }
     }
-    state.version = (state.version || 1) + 1;
-    state.updatedAt = new Date().toISOString();
-    state.updatedBy = body.by;
-    await save(state);
     res.status(200).json({ state, persisted });
   } catch (e) {
     console.error('roadmap error', e);
