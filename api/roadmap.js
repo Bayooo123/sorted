@@ -1,5 +1,5 @@
 // Vercel Node.js Serverless Function behind /roadmap (roadmap.html): the
-// Enough founders' "treasure map" to launch. Same conventions as
+// Enough founders' roadmap to launch, drawn as a map. Same conventions as
 // send-welcome-email.js: no dependencies, no package.json, built-in fetch.
 //
 // Why the content lives here and not in roadmap.html: the stops mention the
@@ -22,6 +22,7 @@
 //   GET  /api/roadmap                       -> { state, persisted, me }
 //   POST /api/roadmap { op, id, note? }     -> { state, persisted, me }
 //        op = claim | done | reopen
+//   POST /api/roadmap { op: 'work', text, id? } -> log other work done
 //   POST /api/roadmap { op: 'guide', mode } -> { text, picks, source }
 //        mode = next | easy | status
 
@@ -31,6 +32,13 @@ const PEOPLE = ['adebayo', 'lynn', 'jude'];
 const FIRST = { adebayo: 'Adebayo', lynn: 'Lynn', jude: 'Jude' };
 const MAX_LOG = 400;
 const EFFORT = { 1: 'small', 2: 'medium', 3: 'big' };
+// Sections of the map. Always taken from here (not storage) so renames apply.
+const REGIONS = [
+  { id: 'cove', name: 'Company setup', blurb: 'Incorporation, agreements, bank' },
+  { id: 'ridge', name: 'Legal and research', blurb: 'Licensing, partners, revenue' },
+  { id: 'bay', name: 'Product', blurb: 'Payments, app, store upload' },
+  { id: 'point', name: 'Pilot', blurb: 'Users, pilot run, fixes' },
+];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmt = (iso) => +iso.slice(8, 10) + ' ' + MON[+iso.slice(5, 7) - 1];
 
@@ -50,12 +58,7 @@ function seed() {
       pilotEnd: '2026-12-06',
       goal: 'A live Enough app on the Google Play Store and Apple App Store, with paying customers and revenue.',
     },
-    regions: [
-      { id: 'cove', name: "Founders' Cove", blurb: 'Make the company real' },
-      { id: 'ridge', name: 'Regulation Ridge', blurb: 'Know the rules before touching money' },
-      { id: 'bay', name: "Builder's Bay", blurb: 'Finish the app' },
-      { id: 'point', name: 'Pilot Point', blurb: 'Put it in real hands' },
-    ],
+    regions: REGIONS,
     stops: [
       s('split', 'cove', 'Agree the shareholding split', 'Settle the split between Adebayo and Lynn, including any vesting or option pool. It only binds once it is in the shareholders’ agreement and the CAC filings.', 2, ['adebayo', 'lynn'], '2026-11-06'),
       s('roles', 'cove', 'Sign off the section 6 roles', 'Agree Lynn’s proposals: she takes company secretarial and tax filings and breaks technical ties; all three share fundraising; spend above a threshold needs Adebayo’s second approval, with Jude informed. Set the threshold.', 1, ['adebayo', 'lynn', 'jude'], '2026-11-13'),
@@ -119,14 +122,16 @@ async function load() {
     const r = await fetch(url, { headers: { authorization: 'Bearer ' + token }, cache: 'no-store' });
     if (r.status === 404) return { state: seed(), etag: null };
     if (!r.ok) throw new Error('Blob read ' + r.status);
-    return { state: await r.json(), etag: r.headers.get('etag') };
+    return { state: normalise(await r.json()), etag: r.headers.get('etag') };
   }
   if (kvConfig()) {
     const raw = await kv(['GET', KV_KEY]);
-    return { state: raw ? JSON.parse(raw) : seed(), etag: null };
+    return { state: raw ? normalise(JSON.parse(raw)) : seed(), etag: null };
   }
   return { state: seed(), etag: null };
 }
+
+function normalise(state) { state.regions = REGIONS; return state; }
 
 async function save(state, etag) {
   const token = blobToken();
@@ -172,8 +177,16 @@ const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400
 const newId = () => crypto.randomBytes(6).toString('hex');
 
 function apply(state, who, body) {
+  if (body.op === 'work') {
+    const text = clean(body.text, 600);
+    if (!text) return 'Write what you did.';
+    const linked = body.id && state.stops.some((x) => x.id === body.id) ? body.id : null;
+    state.log.unshift({ id: newId(), who, stop: linked, action: 'work', note: text, date: lagosToday(), at: new Date().toISOString() });
+    if (state.log.length > MAX_LOG) state.log.length = MAX_LOG;
+    return null;
+  }
   const stop = state.stops.find((x) => x.id === body.id);
-  if (!stop) return 'Unknown stop';
+  if (!stop) return 'Unknown task';
   const note = clean(body.note, 400);
   const today = lagosToday();
   if (body.op === 'claim') {
@@ -210,7 +223,8 @@ function analyse(state, me) {
     load[p] = {
       doing: stops.filter((s) => s.status === 'doing' && s.by === p).map((s) => s.title),
       done: stops.filter((s) => s.status === 'done' && s.by === p).length,
-      lateOnTheirCrew: stops.filter((s) => s.late && s.crew.includes(p)).length,
+      overdueAssigned: stops.filter((s) => s.late && s.crew.includes(p)).length,
+      otherWorkLast7Days: state.log.filter((e) => e.who === p && e.action === 'work' && daysBetween(e.date, today) < 7).map((e) => e.note),
     };
   });
   return { today, stops, load };
@@ -237,26 +251,26 @@ function ruleText(state, a, me, mode, picks) {
   const name = FIRST[me];
   const done = a.stops.filter((s) => s.status === 'done').length;
   if (mode === 'easy') {
-    if (!picks.length) return 'Every open stop is either taken or waiting on something else. Pick a teammate’s stop and offer to help.';
+    if (!picks.length) return 'Every open task is either taken or waiting on another task. Offer to help a teammate with theirs.';
     const p = picks[0];
-    return 'Take a breath, ' + name + '. The lightest open stop is “' + p.title + '”. It’s a ' + EFFORT[p.effort] + ' one and nothing is blocking it. Knock it out and the map moves forward.';
+    return name + ', the easiest open task is “' + p.title + '”. It’s ' + EFFORT[p.effort] + ' and nothing is blocking it, so start there.';
   }
   if (mode === 'next') {
-    if (!picks.length) return 'Nothing on your crew list is open right now, ' + name + '. Try the easiest stop, or help whoever has the most on their plate.';
+    if (!picks.length) return 'None of your assigned tasks are open right now, ' + name + '. Pick the easiest open task, or help whoever has the most on their plate.';
     const p = picks[0];
-    const when = p.late ? 'it’s ' + (-p.daysLeft) + ' days past due' : p.daysLeft + ' days left';
-    return (p.status === 'doing' ? 'Finish what you started, ' + name + ': “' : name + ', your next stop is “') + p.title + '” (' + when + ').' + (picks[1] ? ' Then “' + picks[1].title + '”.' : '');
+    const when = p.late ? (-p.daysLeft) + ' days overdue' : p.daysLeft + ' days left';
+    return (p.status === 'doing' ? 'Finish what you started, ' + name + ': “' : name + ', your next task is “') + p.title + '” (' + when + ').' + (picks[1] ? ' Then “' + picks[1].title + '”.' : '');
   }
   const late = a.stops.filter((s) => s.late).length;
-  return done + ' of ' + a.stops.length + ' stops reached. ' + (late ? late + ' past due' + (picks[0] ? ', starting with “' + picks[0].title + '”' : '') + '.' : 'Nothing past due.') + ' Pilot week starts ' + fmt(state.meta.pilotStart) + '.';
+  return done + ' of ' + a.stops.length + ' tasks done. ' + (late ? late + ' overdue' + (picks[0] ? ', starting with “' + picks[0].title + '”' : '') + '.' : 'Nothing overdue.') + ' Pilot week starts ' + fmt(state.meta.pilotStart) + '.';
 }
 
 async function aiGuide(req, state, me, mode, a, picks) {
   const token = process.env.AI_GATEWAY_API_KEY || req.headers['x-vercel-oidc-token'] || process.env.VERCEL_OIDC_TOKEN;
   if (!token) return null;
   const ask = {
-    next: 'They ask: what should I do next? Recommend one or two stops, from their own crew list where possible, finishing anything they already started first.',
-    easy: 'They feel overwhelmed. Recommend the single easiest open stop they could finish today, gently and without guilt.',
+    next: 'They ask: what should I do next? Recommend one or two tasks, from those assigned to them where possible, finishing anything they already started first.',
+    easy: 'They feel overwhelmed. Recommend the single easiest open task they could finish today, gently and without guilt.',
     status: 'They ask how the team is doing. Give a frank progress read, name the biggest risk to the pilot date, and say who could use help.',
   }[mode];
   const stops = a.stops.map((s) => ({
@@ -270,9 +284,10 @@ async function aiGuide(req, state, me, mode, a, picks) {
     messages: [
       {
         role: 'system',
-        content: 'You are the guide on the Enough founding team’s treasure map to launch. Enough is a Nigerian fintech app that plans a user’s salary so it lasts to payday. ' +
-          'Speak directly to the person asking, by first name. Be warm, concrete and brief: at most 90 words, plain English, at most one light map metaphor. ' +
-          'Only recommend stops that exist, quoting their exact titles. Prefer open stops (nothing blocking them). Respect who is on whose crew, but anyone may help. ' +
+        content: 'You advise the three-person founding team of Enough, a Nigerian fintech app that plans a user’s salary so it lasts to payday, on their roadmap to launch. ' +
+          'Speak directly to the person asking, by first name. Be warm, concrete and brief: at most 90 words, plain English, no metaphors or themed language. ' +
+          'Only recommend tasks that exist, quoting their exact titles. Prefer open tasks (nothing blocking them). Respect who each task is assigned to, but anyone may help. ' +
+          'Take other logged work into account when judging workload. ' +
           'Reply with JSON only: {"text": "...", "picks": ["stopId", ...]} with at most 3 picks.',
       },
       {

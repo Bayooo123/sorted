@@ -79,9 +79,6 @@ textarea{resize:vertical;min-height:64px}
 .crew-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px 14px}
 .crew-row b{font-weight:700}
 .crew-row span{color:var(--muted);font-size:14px}
-.crew-row .gems{margin-left:auto;display:flex;gap:3px}
-.crew-row .gems i{width:10px;height:10px;border-radius:3px;background:var(--sun);transform:rotate(45deg);display:block}
-.crew-row .gems i.u{background:none;border:1.5px solid var(--orange)}
 @media (max-width:860px){.top{grid-template-columns:1fr}}
 
 /* ---------------------------------------------------------------- guide */
@@ -142,10 +139,18 @@ textarea{resize:vertical;min-height:64px}
 .below{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:34px 0 70px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:22px}
 .panel h3{font-size:20px;font-weight:700;margin-bottom:12px}
+.panel.wide{grid-column:1/-1}
+.hint{font-size:14px;color:var(--muted);margin:-6px 0 12px}
+.work-form{display:flex;flex-direction:column;gap:10px}
+.work-form select{border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:10px 14px;font:inherit;font-size:15px}
+.work-form small{color:var(--muted);font-size:13px}
+.work-form small button{border:0;background:none;color:var(--amber);font-weight:700;text-decoration:underline;padding:0;font-size:13px}
+.feed .wk{display:inline-block;font-size:11px;font-weight:700;background:var(--sun-pale);color:var(--amber);border-radius:8px;padding:1px 7px;margin-right:4px}
 .feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .feed li{display:grid;grid-template-columns:auto 1fr;gap:12px;font-size:14.5px;line-height:1.4}
 .feed small{display:block;color:var(--muted);font-size:12.5px}
 .feed .nt{color:var(--muted);font-style:italic}
+.feed{max-height:420px;overflow:auto}
 details.role{border-top:1px solid var(--line-soft);padding:10px 0}
 details.role:first-of-type{border-top:0;padding-top:0}
 details.role summary{display:flex;align-items:center;gap:10px;font-weight:700;cursor:pointer;list-style:none}
@@ -189,10 +194,10 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
   <div class="lock-card">
     <svg class="mapico" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 14l14-6 20 6 14-6v42l-14 6-20-6-14 6z" fill="#FBEBC8" stroke="#2B1B0E" stroke-width="2.5" stroke-linejoin="round"/><path d="M14 40c6-2 6-10 14-12s10 6 16 2" fill="none" stroke="#9A5B00" stroke-width="2.5" stroke-dasharray="1 5" stroke-linecap="round"/><path d="M44 24l6 6M50 24l-6 6" stroke="#C2502A" stroke-width="3" stroke-linecap="round"/><circle cx="14" cy="40" r="3" fill="#FFC23C" stroke="#2B1B0E" stroke-width="1.5"/></svg>
     <h1>Road to launch</h1>
-    <p class="sub">Enough's map for the founding crew. Enter your own code to open it.</p>
+    <p class="sub">Enough's roadmap to launch. Enter your code to open it.</p>
     <form id="lock-form">
-      <input type="password" id="code" placeholder="Your crew code" autocomplete="current-password" aria-label="Your crew code" required>
-      <button class="btn btn-dark" type="submit" id="unlock-btn">Open the map</button>
+      <input type="password" id="code" placeholder="Your code" autocomplete="current-password" aria-label="Your code" required>
+      <button class="btn btn-dark" type="submit" id="unlock-btn">Open roadmap</button>
       <p class="err" id="lock-err" role="alert"></p>
     </form>
   </div>
@@ -214,19 +219,19 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
   <main class="wrap">
     <section class="top">
       <div>
-        <p class="eyebrow">Enough · founding crew</p>
+        <p class="eyebrow">Enough · founding team</p>
         <h1 id="hero"></h1>
         <p class="sub" id="hero-sub"></p>
         <div class="rope" aria-hidden="true"><i id="rope"></i></div>
       </div>
-      <div class="crew" id="crew" aria-label="Crew progress"></div>
+      <div class="crew" id="crew" aria-label="Progress by person"></div>
     </section>
 
     <section class="guide" aria-labelledby="guide-h">
       <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="24" fill="none" stroke="#FFC23C" stroke-width="2.5"/><path d="M27 8l5 19-5 19-5-19z" fill="#FFC23C"/><path d="M27 27l5 0-5 19z" fill="#C2502A"/><circle cx="27" cy="27" r="3" fill="#3A2615"/></svg>
       <div>
-        <h2 id="guide-h">Your guide</h2>
-        <p style="font-size:14.5px;color:#C9B38F;margin-top:4px">It reads the whole map and points you at what to do. Ask it anything below.</p>
+        <h2 id="guide-h">AI guide</h2>
+        <p style="font-size:14.5px;color:#C9B38F;margin-top:4px">It looks at everyone's progress and tells you what to work on.</p>
         <div class="q">
           <button type="button" data-mode="next">What should I do next?</button>
           <button type="button" data-mode="easy" class="easy">I'm overwhelmed. Easiest thing?</button>
@@ -238,18 +243,29 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       </div>
     </section>
 
-    <section class="map" id="map" aria-label="Treasure map of stops to launch"></section>
+    <section class="map" id="map" aria-label="Roadmap to launch"></section>
     <div class="legend">
-      <span><i></i>Open: click to take it</span>
-      <span><i style="background:var(--sun)"></i>Someone's on it</span>
-      <span><i style="background:var(--ink)"></i>Reached</span>
-      <span><i style="border-style:dashed;opacity:.5"></i>Waiting on an earlier stop</span>
-      <span><i style="box-shadow:0 0 0 3px var(--ember)"></i>Past due</span>
+      <span><i></i>Not started</span>
+      <span><i style="background:var(--sun)"></i>In progress</span>
+      <span><i style="background:var(--ink)"></i>Done</span>
+      <span><i style="border-style:dashed;opacity:.5"></i>Waiting on another task</span>
+      <span><i style="box-shadow:0 0 0 3px var(--ember)"></i>Overdue</span>
     </div>
 
     <section class="below">
-      <div class="panel"><h3>Latest on the trail</h3><ul class="feed" id="feed"></ul></div>
-      <div class="panel"><h3>Who does what</h3><div id="roles"></div></div>
+      <div class="panel" id="work">
+        <h3>Log work done</h3>
+        <p class="hint">Anything not on the map: calls, meetings, drafts, fixes. It counts toward your total.</p>
+        <form id="work-form" class="work-form">
+          <textarea id="work-text" maxlength="600" placeholder="e.g. Met two BaaS partners about pooled accounts" required aria-label="What did you do?"></textarea>
+          <select id="work-task" aria-label="Related task"><option value="">Not linked to a task</option></select>
+          <small id="work-signer"></small>
+          <input type="password" id="work-code" placeholder="Your code" aria-label="Your code" hidden>
+          <button class="btn btn-dark" type="submit">Log it</button>
+        </form>
+      </div>
+      <div class="panel"><h3>Recent activity</h3><ul class="feed" id="feed"></ul></div>
+      <div class="panel wide"><h3>Who does what</h3><div id="roles"></div></div>
     </section>
   </main>
 </div>
@@ -268,10 +284,10 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     <div class="needs" id="sh-needs" hidden></div>
     <p class="status-line" id="sh-status"></p>
     <div class="sign">
-      <label for="sh-note" style="font-size:13px;font-weight:700;color:var(--muted)">Note for the crew (optional)</label>
+      <label for="sh-note" style="font-size:13px;font-weight:700;color:var(--muted)">Note (optional)</label>
       <textarea id="sh-note" maxlength="400" placeholder="e.g. Filed on the CAC portal, awaiting approval"></textarea>
       <small id="sh-signer"></small>
-      <input type="password" id="sh-code" placeholder="Your crew code" aria-label="Your crew code" hidden>
+      <input type="password" id="sh-code" placeholder="Your code" aria-label="Your code" hidden>
       <div class="acts" id="sh-acts"></div>
     </div>
   </div>
@@ -354,17 +370,17 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     var total = state.stops.length;
     var done = state.stops.filter(function (s) { return s.status === 'done'; }).length;
     var toPilot = days(todayISO(), state.meta.pilotStart);
-    $('hero').innerHTML = done === total ? 'Treasure <em>found</em>.' : done + ' of ' + total + ' stops <em>reached</em>.';
+    $('hero').innerHTML = done === total ? 'Ready to <em>launch</em>.' : done + ' of ' + total + ' tasks <em>done</em>.';
     $('hero-sub').textContent = (toPilot > 0 ? plural(toPilot, 'day') + ' to pilot week (' + fmt(state.meta.pilotStart) + '). ' : toPilot >= -6 ? 'Pilot week is on. ' : '') +
-      'Click any stop to take it or mark it reached, signed with your code.';
+      'Click a task to start it or mark it done.';
     $('rope').style.width = Math.max(3, done / total * 100) + '%';
     $('crew').innerHTML = PEOPLE.map(function (p) {
       var f = state.stops.filter(function (s) { return s.status === 'done' && s.by === p; }).length;
       var u = state.stops.filter(function (s) { return s.status === 'doing' && s.by === p; }).length;
-      var gems = ''; for (var i = 0; i < f; i++) gems += '<i></i>'; for (i = 0; i < u; i++) gems += '<i class="u"></i>';
-      return '<div class="crew-row">' + av(p, 'lg') + '<div><b>' + esc(state.people[p].name) + '</b><br><span>' + f + ' reached · ' + u + ' underway</span></div><div class="gems" aria-hidden="true">' + gems + '</div></div>';
+      var wk = state.log.filter(function (e) { return e.who === p && e.action === 'work'; }).length;
+      return '<div class="crew-row">' + av(p, 'lg') + '<div><b>' + esc(state.people[p].name) + '</b><br><span>' + f + ' done · ' + u + ' in progress · ' + wk + ' other work logged</span></div></div>';
     }).join('');
-    renderMap(); renderFeed(); renderRoles();
+    renderMap(); renderFeed(); renderRoles(); renderWork();
     if (openId && $('sheet').open) fillSheet(openId);
   }
 
@@ -412,7 +428,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       }
       return d;
     }
-    // how far the trail is lit: up to the last stop in an unbroken run of reached stops
+    // the path is coloured up to the last task in an unbroken run of done tasks
     var lit = 0;
     for (var i = 1; i < seq.length - 1; i++) { if (seq[i].s.status === 'done') lit = i; else break; }
     var art = '<svg class="art" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">';
@@ -442,18 +458,18 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     var html = art;
     seq.forEach(function (n, i) {
       if (n.kind === 'camp') {
-        html += '<div class="camp" style="left:' + n.x + 'px;top:' + n.y + 'px"><svg width="46" height="46" viewBox="0 0 46 46"><path d="M6 40L23 8l17 32z" fill="#FFC23C" stroke="#2B1B0E" stroke-width="2.5" stroke-linejoin="round"/><path d="M23 8v32M18 40l5-10 5 10" stroke="#2B1B0E" stroke-width="2.5" fill="#FFF8EC" stroke-linejoin="round"/></svg><b>Base camp</b><small>2 Nov · MVP ~40%</small></div>';
+        html += '<div class="camp" style="left:' + n.x + 'px;top:' + n.y + 'px"><svg width="46" height="46" viewBox="0 0 46 46"><path d="M6 40L23 8l17 32z" fill="#FFC23C" stroke="#2B1B0E" stroke-width="2.5" stroke-linejoin="round"/><path d="M23 8v32M18 40l5-10 5 10" stroke="#2B1B0E" stroke-width="2.5" fill="#FFF8EC" stroke-linejoin="round"/></svg><b>Start</b><small>2 Nov · MVP about 40% built</small></div>';
         return;
       }
       if (n.kind === 'x') {
-        html += '<div class="xmark" style="left:' + n.x + 'px;top:' + (n.y + 6) + 'px"><svg width="70" height="70" viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" fill="rgba(255,194,60,.35)"/><path d="M18 18l34 34M52 18L18 52" stroke="#C2502A" stroke-width="9" stroke-linecap="round"/></svg><b>Launch</b><small>Live on Play Store and App Store, paying customers</small></div>';
+        html += '<div class="xmark" style="left:' + n.x + 'px;top:' + (n.y + 6) + 'px"><svg width="70" height="70" viewBox="0 0 70 70"><circle cx="35" cy="35" r="30" fill="rgba(255,194,60,.35)"/><path d="M18 18l34 34M52 18L18 52" stroke="#C2502A" stroke-width="9" stroke-linecap="round"/></svg><b>Launch</b><small>Live on Play Store and App Store, with paying customers</small></div>';
         return;
       }
       var s = n.s, wait = waitingOn(s);
       var cls = 'stop ' + s.status + (s.status === 'todo' && wait.length ? ' locked' : '') + (isLate(s) ? ' late' : '') + (picks.indexOf(s.id) >= 0 ? ' pick' : '');
       var dl = days(todayISO(), s.due);
-      var meta = s.status === 'done' ? 'Reached ' + fmt(s.at || s.due) : isLate(s) ? plural(-dl, 'day') + ' late' : 'By ' + fmt(s.due);
-      html += '<button type="button" class="' + cls + '" data-id="' + s.id + '" style="left:' + n.x + 'px;top:' + n.y + 'px;--lw:' + lw + 'px" aria-label="Stop ' + i + ': ' + esc(s.title) + ', ' + (s.status === 'done' ? 'reached' : s.status === 'doing' ? 'in progress' : 'open') + '">' +
+      var meta = s.status === 'done' ? 'Done ' + fmt(s.at || s.due) : isLate(s) ? plural(-dl, 'day') + ' overdue' : 'Due ' + fmt(s.due);
+      html += '<button type="button" class="' + cls + '" data-id="' + s.id + '" style="left:' + n.x + 'px;top:' + n.y + 'px;--lw:' + lw + 'px" aria-label="Task ' + i + ': ' + esc(s.title) + ', ' + (s.status === 'done' ? 'done' : s.status === 'doing' ? 'in progress' : 'not started') + '">' +
         '<span class="dot">' + (s.status === 'done' ? '✓' : i) + (s.by ? av(s.by, 'who') : '') + '</span>' +
         '<span class="lbl">' + esc(s.title) + '</span><span class="meta">' + meta + '</span></button>';
     });
@@ -461,14 +477,20 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
   }
 
   function renderFeed() {
-    var verbs = { claim: 'set off for', done: 'reached', reopen: 'reopened' };
-    var items = state.log.slice(0, 8);
+    var verbs = { claim: 'started', done: 'completed', reopen: 'reopened' };
+    var items = state.log.slice(0, 30);
     $('feed').innerHTML = items.length ? items.map(function (e) {
-      var s = byId(e.stop); if (!s) return '';
+      var s = e.stop ? byId(e.stop) : null;
       var d = days(e.date, todayISO());
+      var when = '<small>' + (d === 0 ? 'Today' : d === 1 ? 'Yesterday' : fmt(e.date)) + '</small>';
+      if (e.action === 'work') {
+        return '<li>' + av(e.who) + '<div><span class="wk">Work</span><b>' + FIRST[e.who] + '</b>: ' + esc(e.note) +
+          (s ? ' <span class="nt">(' + esc(s.title) + ')</span>' : '') + when + '</div></li>';
+      }
+      if (!s) return '';
       return '<li>' + av(e.who) + '<div><b>' + FIRST[e.who] + '</b> ' + verbs[e.action] + ' “' + esc(s.title) + '”' +
-        (e.note ? ' <span class="nt">— ' + esc(e.note) + '</span>' : '') + '<small>' + (d === 0 ? 'Today' : d === 1 ? 'Yesterday' : fmt(e.date)) + '</small></div></li>';
-    }).join('') : '<li style="display:block;color:var(--muted)">Nothing yet. The first click on the map shows up here.</li>';
+        (e.note ? ' <span class="nt">— ' + esc(e.note) + '</span>' : '') + when + '</div></li>';
+    }).join('') : '<li style="display:block;color:var(--muted)">Nothing yet. Task updates and logged work show up here.</li>';
   }
 
   function renderRoles() {
@@ -478,32 +500,56 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
     }).join('') + '<p style="font-size:13.5px;color:var(--muted);margin-top:10px">' + esc(state.shared) + '</p>';
   }
 
+  // ------------------------------------------------------------- log work
+  var workAlt = false;
+  function renderWork() {
+    var sel = $('work-task'), cur = sel.value;
+    sel.innerHTML = '<option value="">Not linked to a task</option>' + state.stops.map(function (s, i) { return '<option value="' + s.id + '">' + (i + 1) + '. ' + esc(s.title) + '</option>'; }).join('');
+    sel.value = cur;
+    $('work-signer').innerHTML = workAlt ? 'Enter your code below.' : 'Logging as <b>' + FIRST[me] + '</b>. Not you? <button type="button" id="work-other">Use your own code</button>';
+    $('work-code').hidden = !workAlt;
+  }
+  $('work').addEventListener('click', function (e) {
+    if (e.target.id === 'work-other') { workAlt = true; renderWork(); $('work-code').focus(); }
+  });
+  $('work-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('work-text').value.trim(); if (!text) return;
+    if (!persisted) { toast('Storage isn\u2019t connected yet, so this can\u2019t be saved.', true); return; }
+    var signCode = workAlt ? $('work-code').value.trim() : code;
+    if (!signCode) { toast('Enter your code.', true); $('work-code').focus(); return; }
+    api('POST', { op: 'work', text: text, id: $('work-task').value || null }, signCode).then(function (d) {
+      state = d.state; $('work-text').value = ''; $('work-task').value = ''; $('work-code').value = ''; workAlt = false;
+      render(); toast('Logged for ' + FIRST[d.me] + '.');
+    }).catch(function (err) { toast(err.message, true); });
+  });
+
   // ----------------------------------------------------------------- sheet
   function fillSheet(id) {
     var s = byId(id); if (!s) return;
     var reg = state.regions.filter(function (r) { return r.id === s.region; })[0];
     var idx = state.stops.indexOf(s) + 1;
-    $('sh-region').textContent = 'Stop ' + idx + ' · ' + reg.name;
+    $('sh-region').textContent = 'Task ' + idx + ' · ' + reg.name;
     $('sh-title').textContent = s.title;
     var dl = days(todayISO(), s.due);
     var coins = ''; for (var i = 0; i < 3; i++) coins += i < s.effort ? '●' : '○';
     $('sh-facts').innerHTML =
-      '<span class="fact' + (isLate(s) ? ' late' : '') + '">' + (s.status === 'done' ? 'Due ' + fmt(s.due) : isLate(s) ? plural(-dl, 'day') + ' late' : dl === 0 ? 'Due today' : 'Due ' + fmt(s.due) + ' · ' + plural(dl, 'day') + ' left') + '</span>' +
+      '<span class="fact' + (isLate(s) ? ' late' : '') + '">' + (s.status === 'done' ? 'Due ' + fmt(s.due) : isLate(s) ? plural(-dl, 'day') + ' overdue' : dl === 0 ? 'Due today' : 'Due ' + fmt(s.due) + ' · ' + plural(dl, 'day') + ' left') + '</span>' +
       '<span class="fact"><span class="coins">' + coins + '</span> ' + EFFORT[s.effort] + ' task</span>';
     $('sh-detail').textContent = s.detail;
-    $('sh-crew').innerHTML = 'Suggested crew: ' + s.crew.map(function (p) { return av(p); }).join('') + ' ' + s.crew.map(function (p) { return FIRST[p]; }).join(', ');
+    $('sh-crew').innerHTML = 'Assigned to: ' + s.crew.map(function (p) { return av(p); }).join('') + ' ' + s.crew.map(function (p) { return FIRST[p]; }).join(', ');
     if (s.after.length) {
       $('sh-needs').hidden = false;
-      $('sh-needs').innerHTML = '<b>Comes after</b><ul>' + s.after.map(function (a) { var x = byId(a); return '<li class="' + (x.status === 'done' ? 'ok' : '') + '">' + (x.status === 'done' ? '✓ ' : '○ ') + esc(x.title) + '</li>'; }).join('') + '</ul>';
+      $('sh-needs').innerHTML = '<b>Depends on</b><ul>' + s.after.map(function (a) { var x = byId(a); return '<li class="' + (x.status === 'done' ? 'ok' : '') + '">' + (x.status === 'done' ? '✓ ' : '○ ') + esc(x.title) + '</li>'; }).join('') + '</ul>';
     } else $('sh-needs').hidden = true;
-    var st = s.status === 'done' ? av(s.by) + ' Reached by ' + FIRST[s.by] + (s.at ? ' on ' + fmt(s.at) : '') :
-      s.status === 'doing' ? av(s.by) + ' ' + FIRST[s.by] + ' is on it' + (s.at ? ' since ' + fmt(s.at) : '') : 'Nobody has taken this yet.';
+    var st = s.status === 'done' ? av(s.by) + ' Done by ' + FIRST[s.by] + (s.at ? ' on ' + fmt(s.at) : '') :
+      s.status === 'doing' ? av(s.by) + ' ' + FIRST[s.by] + ' is working on it' + (s.at ? ' since ' + fmt(s.at) : '') : 'Not started.';
     $('sh-status').innerHTML = st + (s.note ? '<span style="font-weight:400;color:var(--muted);font-style:italic"> — ' + esc(s.note) + '</span>' : '');
-    $('sh-signer').innerHTML = altCode ? 'Sign with your own code below.' : 'Signing as <b>' + FIRST[me] + '</b>. Not you? <button type="button" id="sh-other">Use your own code</button>';
+    $('sh-signer').innerHTML = altCode ? 'Enter your code below.' : 'Signing as <b>' + FIRST[me] + '</b>. Not you? <button type="button" id="sh-other">Use your own code</button>';
     $('sh-code').hidden = !altCode;
     var acts = '';
-    if (s.status !== 'done') acts += '<button type="button" class="btn btn-dark" data-op="done">✓ Mark reached</button>';
-    if (s.status === 'todo' || (s.status === 'doing' && s.by !== me)) acts += '<button type="button" class="btn btn-sun" data-op="claim">I’m on it</button>';
+    if (s.status !== 'done') acts += '<button type="button" class="btn btn-dark" data-op="done">✓ Mark done</button>';
+    if (s.status === 'todo' || (s.status === 'doing' && s.by !== me)) acts += '<button type="button" class="btn btn-sun" data-op="claim">I’m working on it</button>';
     if (s.status !== 'todo') acts += '<button type="button" class="btn btn-ghost" data-op="reopen">Reopen</button>';
     $('sh-acts').innerHTML = acts;
   }
@@ -526,7 +572,7 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
       state = d.state; persisted = d.persisted;
       var s = byId(openId);
       $('sheet').close(); picks = picks.filter(function (p) { return p !== openId; }); render();
-      toast(op === 'done' ? 'Stop reached by ' + FIRST[d.me] + '. The trail moves on.' : op === 'claim' ? FIRST[d.me] + ' is on “' + s.title + '”.' : 'Reopened.');
+      toast(op === 'done' ? 'Marked done by ' + FIRST[d.me] + '.' : op === 'claim' ? FIRST[d.me] + ' is working on “' + s.title + '”.' : 'Reopened.');
     }).catch(function (err) {
       toast(err.message, true);
       Array.prototype.forEach.call($('sh-acts').querySelectorAll('button'), function (x) { x.disabled = false; });
@@ -537,13 +583,13 @@ dialog.sheet::backdrop{background:rgba(43,27,14,.45);backdrop-filter:blur(2px)}
   document.querySelector('.guide .q').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     var ans = $('answer');
-    ans.hidden = false; ans.className = 'answer thinking'; ans.textContent = 'Reading the map…';
+    ans.hidden = false; ans.className = 'answer thinking'; ans.textContent = 'Thinking…';
     $('picks').innerHTML = ''; $('src').textContent = '';
     api('POST', { op: 'guide', mode: b.getAttribute('data-mode') }).then(function (d) {
       ans.className = 'answer'; ans.textContent = d.text;
       picks = d.picks || [];
       $('picks').innerHTML = picks.map(function (id) { var s = byId(id); return s ? '<button type="button" data-id="' + id + '">' + esc(s.title) + '</button>' : ''; }).join('');
-      $('src').textContent = d.source === 'ai' ? 'AI guide · suggestions are highlighted on the map' : 'Quick read from the map (AI guide unavailable right now)';
+      $('src').textContent = d.source === 'ai' ? 'Suggested tasks are highlighted on the map' : 'Rule-based suggestion (AI unavailable right now)';
       renderMap();
     }).catch(function (err) { ans.className = 'answer'; ans.textContent = err.message; });
   });
