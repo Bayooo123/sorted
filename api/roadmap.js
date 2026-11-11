@@ -9,7 +9,7 @@
 // Env vars (Vercel project -> Settings -> Environment Variables):
 //   ROADMAP_CODE_ADEBAYO, ROADMAP_CODE_LYNN, ROADMAP_CODE_JUDE
 //     Each founder's personal code. The code identifies who did what.
-//   BLOB_READ_WRITE_TOKEN
+//   BLOB_STORE_ID (+ the function's OIDC token) or BLOB_READ_WRITE_TOKEN
 //     Set automatically when a private Blob store is connected to this
 //     project (Vercel -> Storage). Upstash (KV_REST_API_URL/TOKEN) also works.
 //     Without storage the map opens read-only on the seed below.
@@ -99,14 +99,23 @@ const BLOB_PATH = 'enough/roadmap-map.json';
 const BLOB_API = 'https://vercel.com/api/blob';
 const KV_KEY = 'enough:roadmap:map';
 
-const blobToken = () => process.env.BLOB_READ_WRITE_TOKEN || null;
-const blobStoreId = (t) => t.split('_')[3] || '';
+// Blob credentials, mirroring @vercel/blob's resolveBlobAuth: either a
+// read-write token (older stores), or the function's OIDC token plus
+// BLOB_STORE_ID (stores connected the newer way, which is what this project has).
+function blobAuth(req) {
+  const rw = (process.env.BLOB_READ_WRITE_TOKEN || '').trim();
+  if (rw) return { token: rw, storeId: rw.split('_')[3] || '' };
+  const storeId = (process.env.BLOB_STORE_ID || '').trim().replace(/^store_/, '');
+  const oidc = (req && req.headers['x-vercel-oidc-token']) || process.env.VERCEL_OIDC_TOKEN;
+  if (storeId && oidc) return { token: String(oidc).trim(), storeId };
+  return null;
+}
 function kvConfig() {
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   return url && token ? { url: url.replace(/\/$/, ''), token } : null;
 }
-const storageReady = () => !!(blobToken() || kvConfig());
+const storageReady = (req) => !!(blobAuth(req) || kvConfig());
 
 async function kv(cmd) {
   const cfg = kvConfig();
@@ -115,13 +124,13 @@ async function kv(cmd) {
   return (await r.json()).result;
 }
 
-async function load() {
-  const token = blobToken();
-  if (token) {
-    const url = 'https://' + blobStoreId(token) + '.private.blob.vercel-storage.com/' + BLOB_PATH + '?cache=0';
-    const r = await fetch(url, { headers: { authorization: 'Bearer ' + token }, cache: 'no-store' });
+async function load(req) {
+  const auth = blobAuth(req);
+  if (auth) {
+    const url = 'https://' + auth.storeId + '.private.blob.vercel-storage.com/' + BLOB_PATH + '?cache=0';
+    const r = await fetch(url, { headers: { authorization: 'Bearer ' + auth.token }, cache: 'no-store' });
     if (r.status === 404) return { state: seed(), etag: null };
-    if (!r.ok) throw new Error('Blob read ' + r.status);
+    if (!r.ok) throw new Error('Blob read ' + r.status + ' ' + (await r.text()).slice(0, 200));
     return { state: normalise(await r.json()), etag: r.headers.get('etag') };
   }
   if (kvConfig()) {
@@ -133,13 +142,13 @@ async function load() {
 
 function normalise(state) { state.regions = REGIONS; return state; }
 
-async function save(state, etag) {
-  const token = blobToken();
-  if (token) {
+async function save(req, state, etag) {
+  const auth = blobAuth(req);
+  if (auth) {
     const headers = {
-      authorization: 'Bearer ' + token,
+      authorization: 'Bearer ' + auth.token,
       'x-api-version': '13',
-      'x-vercel-blob-store-id': blobStoreId(token),
+      'x-vercel-blob-store-id': auth.storeId,
       'x-vercel-blob-access': 'private',
       'x-content-type': 'application/json',
       'x-add-random-suffix': '0',
@@ -331,11 +340,11 @@ module.exports = async (req, res) => {
     res.status(401).json({ error: 'That code didn’t match anyone on the crew.' });
     return;
   }
-  const persisted = storageReady();
+  const persisted = storageReady(req);
 
   try {
     if (req.method === 'GET') {
-      res.status(200).json({ state: (await load()).state, persisted, me });
+      res.status(200).json({ state: (await load(req)).state, persisted, me });
       return;
     }
     if (req.method !== 'POST') {
@@ -351,7 +360,7 @@ module.exports = async (req, res) => {
 
     if (body.op === 'guide') {
       const mode = ['next', 'easy', 'status'].includes(body.mode) ? body.mode : 'next';
-      const { state } = await load();
+      const { state } = await load(req);
       const a = analyse(state, me);
       const picks = rulePicks(a, me, mode);
       try {
@@ -370,14 +379,14 @@ module.exports = async (req, res) => {
     }
     let state;
     for (let attempt = 0; ; attempt++) {
-      const loaded = await load();
+      const loaded = await load(req);
       state = loaded.state;
       const err = apply(state, me, body);
       if (err) { res.status(400).json({ error: err }); return; }
       state.version = (state.version || 1) + 1;
       state.updatedAt = new Date().toISOString();
       state.updatedBy = me;
-      if (await save(state, loaded.etag)) break;
+      if (await save(req, state, loaded.etag)) break;
       if (attempt >= 3) { res.status(409).json({ error: 'Someone else was saving at the same moment. Try again.' }); return; }
     }
     res.status(200).json({ state, persisted, me });
