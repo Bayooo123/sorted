@@ -41,6 +41,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);outline:none}
 .field-row{position:relative}
 .field-toggle{position:absolute;right:10px;top:38px;background:none;border:0;color:var(--amber);font-family:var(--body);font-weight:700;font-size:13px;cursor:pointer;padding:6px}
 .hint{font-size:13px;color:var(--muted);margin-top:6px}
+.consent-row{display:flex;align-items:flex-start;gap:10px;margin:16px 0 4px}
+.consent-row input[type="checkbox"]{width:18px;height:18px;flex:none;margin-top:2px;accent-color:var(--amber);cursor:pointer}
+.consent-row label{font-size:13px;color:var(--muted);line-height:1.5;cursor:pointer;margin:0}
+.consent-row a{color:var(--amber);font-weight:700;text-decoration:none}
+.consent-row a:hover{text-decoration:underline}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;padding:0 20px;border-radius:26px;font-family:var(--body);font-weight:700;font-size:16px;text-decoration:none;border:0;cursor:pointer;margin-top:22px;transition:transform .15s ease, opacity .15s ease}
 .btn:active{transform:scale(.98)}
 .btn-primary{background:var(--ink);color:var(--sun)}
@@ -213,7 +218,11 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
             '<label for="f-state">State</label><select id="f-state" required>' + stateOptions + '</select>' +
             '<label for="f-email">Email</label><input id="f-email" type="email" required>' +
             '<div class="field-row"><label for="f-password">Password</label><input id="f-password" type="password" required minlength="8">' +
-              '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>'
+              '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>' +
+            '<div class="consent-row">' +
+              '<input type="checkbox" id="f-consent">' +
+              '<label for="f-consent">I\'ve read and agree to Enough\'s <a href="/enough-terms" target="_blank" rel="noopener">Terms of Service</a>, <a href="/enough-privacy" target="_blank" rel="noopener">Privacy Policy</a>, and <a href="/enough-data-use" target="_blank" rel="noopener">Data Protection &amp; Data Use Agreement</a>.</label>' +
+            '</div>'
           : '<label for="f-identifier">Email or phone</label><input id="f-identifier" required>' +
             '<div class="field-row"><label for="f-password">Password</label><input id="f-password" type="password" required>' +
               '<button type="button" class="field-toggle" data-target="f-password">Show</button></div>' +
@@ -247,6 +256,12 @@ footer.foot{text-align:center;padding:30px 0;font-size:13px;color:var(--muted)}
 
     document.getElementById('auth-form').addEventListener('submit', function (e) {
       e.preventDefault();
+
+      if (mode === 'signup' && !document.getElementById('f-consent').checked) {
+        renderAuthScreen(mode, 'Please agree to the Terms of Service, Privacy Policy, and Data Protection & Data Use Agreement to continue.');
+        return;
+      }
+
       var submitBtn = document.getElementById('auth-submit');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Please wait…';
