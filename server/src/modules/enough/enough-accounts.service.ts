@@ -425,4 +425,37 @@ export class EnoughAccountsService {
 
     return this.getAccountView(userId);
   }
+
+  /**
+   * Loops migrateToPaga over every existing account not already on
+   * Paga — the practical answer to "how do we move existing users
+   * onto Paga" without hand-running the single-user admin route once
+   * per userId. One account's failure (a missing email, a Paga API
+   * error, whatever) doesn't stop the rest — each result is reported
+   * individually so a partial run is still visible and actionable,
+   * not an opaque 500 partway through a list of whatever length this
+   * turns out to be.
+   */
+  async migrateAllToPaga(): Promise<{ userId: string; status: 'migrated' | 'already_paga' | 'failed'; detail?: string }[]> {
+    const pending = await this.prisma.enoughAccount.findMany({
+      where: { provider: { not: 'paga' } },
+      select: { userId: true },
+    });
+
+    const results: { userId: string; status: 'migrated' | 'already_paga' | 'failed'; detail?: string }[] = [];
+    for (const { userId } of pending) {
+      try {
+        await this.migrateToPaga(userId);
+        results.push({ userId, status: 'migrated' });
+      } catch (err) {
+        if (err instanceof ConflictException) {
+          results.push({ userId, status: 'already_paga' });
+        } else {
+          this.logger.error(`Bulk migrate-to-paga failed for user ${userId}: ${err instanceof Error ? err.message : err}`);
+          results.push({ userId, status: 'failed', detail: err instanceof Error ? err.message : String(err) });
+        }
+      }
+    }
+    return results;
+  }
 }
