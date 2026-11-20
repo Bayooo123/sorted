@@ -60,4 +60,11 @@ export class EnoughController {
   migrateToPaga(@Param('userId') userId: string) {
     return this.accounts.migrateToPaga(userId);
   }
+
+  /** Admin-only (x-admin-key) — see EnoughAccountsService.migrateAllToPaga's doc comment. */
+  @UseGuards(AdminGuard)
+  @Post('admin/migrate-all-to-paga')
+  migrateAllToPaga() {
+    return this.accounts.migrateAllToPaga();
+  }
 }
