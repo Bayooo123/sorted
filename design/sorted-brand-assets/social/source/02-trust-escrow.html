@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1080px; overflow: hidden; }
+  body {
+    background: #F2EEE3;
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    color: #0F2A24;
+    position: relative;
+  }
+  .mark { position: absolute; top: 72px; left: 72px; width: 64px; height: 64px; }
+  .word { position: absolute; top: 76px; left: 152px; font-weight: 800; font-size: 34px; letter-spacing: -0.045em; }
+  .label { position: absolute; top: 300px; left: 72px; font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase; color: #5C7A2E; }
+  h1 { position: absolute; top: 352px; left: 72px; right: 72px; font-size: 92px; font-weight: 800; line-height: 1.04; letter-spacing: -0.03em; }
+  .card { position: absolute; left: 72px; right: 72px; bottom: 170px; background: #FBF9F4; border: 1px solid rgba(15,42,36,0.12); border-radius: 28px; padding: 40px 44px; display: flex; align-items: center; gap: 28px; }
+  .dot { width: 20px; height: 20px; border-radius: 999px; background: #9BE07A; flex: none; }
+  .card p { font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 24px; line-height: 1.5; color: rgba(15,42,36,0.78); }
+  .footer { position: absolute; left: 72px; right: 72px; bottom: 72px; display: flex; justify-content: space-between; align-items: center; }
+  .foot-label { font-family: 'IBM Plex Mono', monospace; font-weight: 500; font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(15,42,36,0.55); }
+</style>
+</head>
+<body>
+  <svg class="mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <rect width="64" height="64" rx="16" fill="#0F2A24"/>
+    <rect x="14" y="18" width="36" height="7" rx="3.5" fill="#F2EEE3"/>
+    <rect x="14" y="29" width="29" height="7" rx="3.5" fill="#F2EEE3"/>
+    <rect x="14" y="40" width="16" height="7" rx="3.5" fill="#9BE07A"/>
+  </svg>
+  <div class="word">sorted</div>
+  <div class="label">How your money stays safe</div>
+  <h1>Payment only releases once the job's done right.</h1>
+  <div class="card">
+    <div class="dot"></div>
+    <p>No upfront risk, no chasing refunds — you approve the work, then the professional gets paid. Simple as that.</p>
+  </div>
+  <div class="footer">
+    <span class="foot-label">sorted.com.ng</span>
+    <span class="foot-label">Escrow, built in</span>
+  </div>
+</body>
+</html>
