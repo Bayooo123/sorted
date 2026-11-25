@@ -82,6 +82,11 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
 .input-wrap{position:relative}
 .input-wrap .peek{position:absolute;right:8px;top:7px;height:40px;padding:0 12px;border:0;background:none;color:var(--amber);font-weight:700;font-size:14px}
 .hint{font-size:13px;color:var(--muted)}
+.consent{display:flex;align-items:flex-start;gap:10px;margin-top:18px}
+.consent input[type="checkbox"]{width:18px;height:18px;flex:none;margin-top:2px;accent-color:var(--amber)}
+.consent label{font-size:13px;color:var(--muted);line-height:1.5}
+.consent a{color:var(--amber);font-weight:700;text-decoration:none}
+.consent a:hover{text-decoration:underline}
 .err{background:var(--bad-soft);color:var(--bad);border-radius:var(--r-sm);padding:12px 14px;font-size:14px;font-weight:600;margin-top:14px}
 .note{background:var(--sun-pale);border:1px solid var(--sun-soft);color:var(--amber);border-radius:var(--r-sm);padding:12px 14px;font-size:14px;margin-top:14px}
 
@@ -544,8 +549,9 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
         '<div class="field"><label for="email">Email</label><input class="input" id="email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com"></div>' +
         '<div class="field"><label for="state">State you live in</label><select class="input" id="state" required><option value="">Choose a state</option>' + STATES.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label for="pw">Password</label><div class="input-wrap"><input class="input" id="pw" type="password" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"><button type="button" class="peek" data-peek="pw">Show</button></div></div>' +
+        '<div class="consent"><input type="checkbox" id="consent"><label for="consent">I\'ve read and agree to Enough\'s <a href="/enough-terms" target="_blank" rel="noopener">Terms of Service</a>, <a href="/enough-privacy" target="_blank" rel="noopener">Privacy Policy</a>, and <a href="/enough-data-use" target="_blank" rel="noopener">Data Protection &amp; Data Use Agreement</a>.</label></div>' +
         '<p class="err" id="err" hidden></p>' +
-        '<div class="cta"><button class="btn btn-ink" type="submit">Continue</button><small>By continuing you agree to Enough’s <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</small></div>' +
+        '<div class="cta"><button class="btn btn-ink" type="submit">Continue</button></div>' +
       '</form>');
     bindPeek();
     $('#f').onsubmit = function (e) {
@@ -558,6 +564,7 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) return showErr(err, 'Enter a valid email address.');
       if (!body.state) return showErr(err, 'Choose the state you live in.');
       if (body.password.length < 8) return showErr(err, 'Your password needs at least 8 characters.');
+      if (!$('#consent').checked) return showErr(err, 'Please agree to the Terms of Service, Privacy Policy, and Data Protection & Data Use Agreement to continue.');
       showErr(err, ''); busy(btn, true, 'Creating your account');
       api('/auth/signup', { method: 'POST', body: body }).then(signedIn).catch(function (x) { busy(btn, false); showErr(err, x.message); });
     };
@@ -1200,8 +1207,9 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
       '</div>' +
       '<div class="section-h"><h3>Help</h3></div><div class="list">' +
         '<a class="row" href="mailto:hello@sorted.com.ng" style="color:inherit;text-decoration:none"><div><p class="t">Contact support</p><p class="s">hello@sorted.com.ng</p></div>' + I.chev + '</a>' +
-        '<a class="row" href="/privacy" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Privacy policy</p></div>' + I.chev + '</a>' +
-        '<a class="row" href="/terms" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Terms of use</p></div>' + I.chev + '</a>' +
+        '<a class="row" href="/enough-privacy" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Privacy policy</p></div>' + I.chev + '</a>' +
+        '<a class="row" href="/enough-terms" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Terms of use</p></div>' + I.chev + '</a>' +
+        '<a class="row" href="/enough-data-use" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Data protection &amp; data use</p></div>' + I.chev + '</a>' +
       '</div>' +
       '<button class="btn btn-line" id="out" style="margin-top:22px;color:var(--bad);border-color:var(--bad-soft)">Log out</button>' +
       '<p class="hint" style="text-align:center;margin-top:16px">Enough by Sorted · V1</p>',
