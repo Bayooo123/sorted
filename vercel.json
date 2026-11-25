@@ -1,6 +1,12 @@
 {
   "cleanUrls": true,
   "rewrites": [
+    { "source": "/", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough" },
+    { "source": "/", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough" },
+    { "source": "/app", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough-pwa" },
+    { "source": "/app", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough-pwa" },
+    { "source": "/app/:path*", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough-pwa" },
+    { "source": "/app/:path*", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough-pwa" },
     {
       "source": "/enough/app",
       "destination": "/enough-pwa"
