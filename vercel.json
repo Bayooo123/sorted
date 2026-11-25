@@ -3,10 +3,44 @@
   "rewrites": [
     { "source": "/", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough" },
     { "source": "/", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough" },
-    { "source": "/app", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough-app" },
-    { "source": "/app", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough-app" },
-    { "source": "/app/api/:path*", "destination": "https://sorted-api.vercel.app/:path*" },
-    { "source": "/app", "destination": "https://sorted-app-preview.vercel.app/app" },
-    { "source": "/app/:path*", "destination": "https://sorted-app-preview.vercel.app/app/:path*" }
+    { "source": "/app", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough-pwa" },
+    { "source": "/app", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough-pwa" },
+    { "source": "/app/:path*", "has": [{ "type": "host", "value": "enough.ng" }], "destination": "/enough-pwa" },
+    { "source": "/app/:path*", "has": [{ "type": "host", "value": "www.enough.ng" }], "destination": "/enough-pwa" },
+    {
+      "source": "/enough/app",
+      "destination": "/enough-pwa"
+    },
+    {
+      "source": "/enough/app/:path*",
+      "destination": "/enough-pwa"
+    },
+    {
+      "source": "/enough/roadmap",
+      "destination": "/roadmap"
+    },
+    {
+      "source": "/app/api/:path*",
+      "destination": "https://sorted-api.vercel.app/:path*"
+    },
+    {
+      "source": "/app",
+      "destination": "https://sorted-app-preview.vercel.app/app"
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "https://sorted-app-preview.vercel.app/app/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/enough-sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
   ]
 }
