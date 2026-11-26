@@ -345,6 +345,14 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
   }
   function showErr(el, msg) { if (!el) return; el.textContent = msg || ''; el.hidden = !msg; }
 
+  function notifCanAsk() { return typeof Notification !== 'undefined' && Notification.permission === 'default'; }
+  function notifStatusLabel() {
+    if (typeof Notification === 'undefined') return 'Not supported on this device';
+    if (Notification.permission === 'granted') return 'Enabled — you’ll be alerted while the app is open';
+    if (Notification.permission === 'denied') return 'Blocked — enable in your browser’s site settings';
+    return 'Off — get alerted the moment money lands';
+  }
+
   /* =========================================================== icons */
   var I = {
     back: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
@@ -879,11 +887,11 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
       { nav: true });
     $('#me').onclick = function () { go('profile'); };
     var v = $('#verifying'); if (v) v.onclick = function () { go('account'); };
-    var sp = $('#split'); if (sp) sp.onclick = splitSheet;
+    var sp = $('#split'); if (sp) sp.onclick = function () { go('split'); };
     var f2 = $('#fund2'); if (f2) f2.onclick = function () { go('fund'); };
     $('#edit').onclick = function () { go('plan'); };
     var mk = $('#mk'); if (mk) mk.onclick = function () { go('describe'); };
-    $$('[data-q]').forEach(function (b) { b.onclick = function () { var q = b.getAttribute('data-q'); if (q === 'split') splitSheet(); else if (q === 'pay') go('pay'); else go('fund'); }; });
+    $$('[data-q]').forEach(function (b) { b.onclick = function () { var q = b.getAttribute('data-q'); if (q === 'split') go('split'); else if (q === 'pay') go('pay'); else go('fund'); }; });
     $$('[data-p]').forEach(function (b) { b.onclick = function () { go('purpose', b.getAttribute('data-p')); }; });
     bindInstall();
     // Refresh quietly so a salary that just landed shows up.
@@ -891,25 +899,26 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
   };
 
   /* -------------------------------------------- Split (the core moment) */
-  function splitSheet() {
+  routes.split = function () {
     var land = landing(), ps = ordered().filter(function (p) { return p.targetPercent; });
-    if (!land) { toast('Nothing waiting to split. New money shows up here when it lands.'); return; }
+    if (!land) { go('home', null, true); toast('Nothing waiting to split. New money shows up here when it lands.'); return; }
     if (!ps.length) { toast('Set up your plan first.'); go('describe'); return; }
     // Shares by target %, rounding down to whole naira; the remainder goes to the biggest share.
     var tp = ps.reduce(function (s, p) { return s + p.targetPercent; }, 0);
     var amounts = ps.map(function (p) { return Math.floor(land * p.targetPercent / tp / 100) * 100; });
     var rem = land - amounts.reduce(function (a, b) { return a + b; }, 0); amounts[0] += rem;
     var pace = ps.map(function (p) { return paced(p.name); });
-    var el = openSheet('<p class="eyebrow">Split</p><h2 style="margin-top:4px"><span class="money">' + naira(land) + '</span> across your plan</h2>' +
-      '<p class="lede" style="font-size:14.5px">Weekly release gives you a quarter now and the rest over the next three weeks.</p>' +
+    screen(topbar('Money has arrived', 'home') +
+      '<div class="hero" style="padding:20px 18px"><div class="sunrise"></div><p class="k">Just landed</p><p class="money big">' + naira(land) + '</p><p class="sub">Decide how it’s treated and divided across your plan below.</p></div>' +
+      '<p class="lede" style="font-size:14.5px;margin-top:16px">Weekly release gives you a quarter now and the rest over the next three weeks.</p>' +
       '<div style="margin-top:8px">' + ps.map(function (p, i) {
         return '<div class="split-row"><span class="dot" style="background:' + colorFor(i) + '"></span><div style="flex:1;min-width:0"><p class="t" style="font-weight:700">' + esc(p.name) + '</p><p class="s" style="font-size:12.5px;color:var(--muted)">' + p.targetPercent + '% · <span data-lbl="' + i + '">' + (pace[i] ? 'released weekly' : 'all now') + '</span></p></div>' +
           '<p class="money" style="font-size:17px">' + naira(amounts[i]) + '</p>' +
           '<label class="toggle" title="Release weekly"><input type="checkbox" data-t="' + i + '"' + (pace[i] ? ' checked' : '') + ' aria-label="Release ' + esc(p.name) + ' weekly"><span></span></label></div>';
       }).join('') + '</div>' +
       '<p class="err" id="serr" hidden></p><button class="btn btn-ink" id="go" style="margin-top:18px">Split ' + naira(land) + '</button>');
-    $$('[data-t]', el).forEach(function (t) { t.onchange = function () { var i = +t.getAttribute('data-t'); pace[i] = t.checked; $('[data-lbl="' + i + '"]', el).textContent = t.checked ? 'released weekly' : 'all now'; }; });
-    $('#go', el).onclick = function () {
+    $$('[data-t]').forEach(function (t) { t.onchange = function () { var i = +t.getAttribute('data-t'); pace[i] = t.checked; $('[data-lbl="' + i + '"]').textContent = t.checked ? 'released weekly' : 'all now'; }; });
+    $('#go').onclick = function () {
       var btn = this; busy(btn, true, 'Splitting');
       var i = 0, done = [];
       (function next() {
@@ -918,11 +927,11 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
         var body = { amountKobo: amounts[i] }; if (pace[i]) body.schedule = { tranches: 4, intervalDays: 7 };
         api('/enough/purposes/' + encodeURIComponent(ps[i].id) + '/allocate', { method: 'POST', body: body })
           .then(function () { done.push(ps[i].name); i++; next(); })
-          .catch(function (x) { busy(btn, false); showErr($('#serr', el), (done.length ? 'Split ' + done.length + ' of ' + ps.length + ' purposes, then stopped: ' : '') + x.message); loadMoney().then(function () { if (current === 'home') routes.home(); }); });
+          .catch(function (x) { busy(btn, false); showErr($('#serr'), (done.length ? 'Split ' + done.length + ' of ' + ps.length + ' purposes, then stopped: ' : '') + x.message); loadMoney().then(function () { if (current === 'home') routes.home(); }); });
       })();
-      function finish() { loadMoney().then(function () { closeSheet(); go('home', null, true); toast('Split done. Every naira has a job.'); }); }
+      function finish() { loadMoney().then(function () { go('home', null, true); toast('Split done. Every naira has a job.'); }); }
     };
-  }
+  };
 
   /* -------------------------------------------------- Purpose detail */
   routes.purpose = function (id) {
@@ -1201,12 +1210,15 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
       '<div class="section-h"><h3>Security</h3></div><div class="list">' +
         '<button class="row" id="pin"><div><p class="t">Transaction PIN</p><p class="s">' + (a.hasTransactionPin ? 'Set. Used to pay and unlock money early.' : 'Not set yet') + '</p></div><span class="r" style="color:var(--amber);font-weight:700;font-size:14px">' + (a.hasTransactionPin ? 'Change' : 'Set') + '</span></button>' +
       '</div>' +
+      '<div class="section-h"><h3>Notifications</h3></div><div class="list">' +
+        '<button class="row" id="notif"><div><p class="t">Alerts when money arrives</p><p class="s">' + notifStatusLabel() + '</p></div>' + (notifCanAsk() ? '<span class="r" style="color:var(--amber);font-weight:700;font-size:14px">Turn on</span>' : '') + '</button>' +
+      '</div>' +
       '<div class="section-h"><h3>Your plan</h3></div><div class="list">' +
         '<button class="row" id="desc"><div><p class="t">About your life</p><p class="s" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + esc(a.description || 'Not written yet') + '</p></div>' + I.chev + '</button>' +
         '<button class="row" id="pace"><div><p class="t">Pacing</p><p class="s">' + LEVELS.filter(function (l) { return l[0] === level(); })[0][1] + '</p></div>' + I.chev + '</button>' +
       '</div>' +
       '<div class="section-h"><h3>Help</h3></div><div class="list">' +
-        '<a class="row" href="mailto:hello@sorted.com.ng" style="color:inherit;text-decoration:none"><div><p class="t">Contact support</p><p class="s">hello@sorted.com.ng</p></div>' + I.chev + '</a>' +
+        '<a class="row" href="mailto:Gbadeboadebayo1000@gmail.com" style="color:inherit;text-decoration:none"><div><p class="t">Contact support</p><p class="s">Gbadeboadebayo1000@gmail.com</p></div>' + I.chev + '</a>' +
         '<a class="row" href="/enough-privacy" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Privacy policy</p></div>' + I.chev + '</a>' +
         '<a class="row" href="/enough-terms" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Terms of use</p></div>' + I.chev + '</a>' +
         '<a class="row" href="/enough-data-use" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div><p class="t">Data protection &amp; data use</p></div>' + I.chev + '</a>' +
@@ -1216,6 +1228,10 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
       { nav: true });
     $('#acct').onclick = function () { go('fund'); };
     $('#pin').onclick = function () { setPinFlow(a.hasTransactionPin, function () { toast('PIN saved'); routes.profile(); }); };
+    $('#notif').onclick = function () {
+      if (!notifCanAsk()) return;
+      Notification.requestPermission().then(function () { routes.profile(); });
+    };
     $('#desc').onclick = function () { go('describe'); };
     $('#pace').onclick = function () { go('plan'); setTimeout(function () { var b = $('#lvl'); if (b) b.click(); }, 50); };
     $('#out').onclick = function () { signOut(); };
@@ -1242,9 +1258,40 @@ textarea.input{height:auto;min-height:160px;padding:14px 16px;line-height:1.5;re
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('/enough-sw.js', { scope: '/enough/app' }).catch(function () {});
   }
-  // Pick up a salary that landed while the app was in the background.
+  /* ============================================ Deposit alerts (live) */
+  // While the app is open, poll for a deposit landing and raise it right
+  // away — not just the passive "Ready to split" card on Home, which only
+  // updates when that screen happens to (re)render. notifiedLanding tracks
+  // the last landing-spot balance we've already alerted on, so a refresh
+  // doesn't re-fire for money the user has already been told about or has
+  // already split; it stays unset (never alerts) until the first real
+  // reading, so opening the app with money already waiting doesn't fire a
+  // false "just arrived".
+  var notifiedLanding = null;
+  var DEPOSIT_POLL_MS = 25000;
+  function checkForDeposit() {
+    if (!S.token || !S.me || document.hidden) return;
+    var before = notifiedLanding === null ? landing() : notifiedLanding;
+    loadMoney().then(function () {
+      var now = landing();
+      if (notifiedLanding !== null && now > before) announceDeposit(now - before);
+      notifiedLanding = now;
+      if (current === 'home' || current === 'plan') { if (routes[current]) routes[current](); }
+    }).catch(function () {});
+  }
+  function announceDeposit(amountKobo) {
+    var msg = naira(amountKobo) + ' just arrived — tap to decide how it’s split.';
+    toast(msg);
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try {
+        var n = new Notification('Money has arrived', { body: msg, icon: '/icons/enough-192.png', tag: 'enough-deposit' });
+        n.onclick = function () { window.focus(); go('split'); n.close(); };
+      } catch (e) {}
+    }
+  }
+  setInterval(checkForDeposit, DEPOSIT_POLL_MS);
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && S.token && S.me && (current === 'home' || current === 'plan')) loadMoney().then(function () { if (routes[current]) routes[current](); }).catch(function () {});
+    if (!document.hidden && S.token && S.me) checkForDeposit();
   });
 
   render();
